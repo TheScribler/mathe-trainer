@@ -245,9 +245,10 @@ Antwort liegt.
 
 `build.mjs` bündelt die Module weiterhin zu **einer** HTML-Seite (`docs/index.html`,
 einfache Konkatenation in einen IIFE, keine Toolchain), inlined `stil.css` sowie KaTeX-CSS
-und -JS und bettet die benötigten KaTeX-WOFF2-Fonts (Main-Regular/Bold/Italic, Math-Italic,
-Size1–3, AMS-Regular) als Base64 ein. Erwartete Dateigröße 0,8–1,2 MB. KaTeX wird **einmal**
-geladen (`npm pack katex` oder curl nach `vendor/katex/`), danach braucht nichts mehr Netz.
+und -JS und bettet alle 20 KaTeX-WOFF2-Fonts als Base64 ein (nur woff2, keine ttf/woff-
+Fallbacks — Safari auf Mac und iPhone unterstützt woff2 vollständig). Gemessene Dateigröße
+nach Phase 0 mit nur dem Platzhalter-Generator: 644 KB. KaTeX wird **einmal** geladen
+(`npm pack katex` nach `vendor/katex/`), danach braucht nichts mehr Netz.
 
 Zusätzlich erzeugt `build.mjs`:
 

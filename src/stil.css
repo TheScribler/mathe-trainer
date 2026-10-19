@@ -1,0 +1,63 @@
+:root {
+  --bg: #fbfaf8; --fg: #1a1a1a; --gedaempft: #5c5c5c;
+  --rand: #d9d5cf; --karte: #ffffff; --gut: #1f7a3d; --schlecht: #b3261e;
+  --akzent: #1f7a3d;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #16161a; --fg: #ececec; --gedaempft: #a0a0a0;
+    --rand: #33333a; --karte: #1e1e24; --gut: #4ade80; --schlecht: #ff6b6b;
+    --akzent: #4ade80;
+  }
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body {
+  margin: 0; padding: 20px 16px 48px;
+  background: var(--bg); color: var(--fg);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+#app { max-width: 36rem; margin: 0 auto; }
+.kopf h1 { font-size: 1.3rem; margin: 0 0 .2rem; }
+.kopf .unter { color: var(--gedaempft); margin: 0 0 1.25rem; font-size: .9rem; }
+.aufgabe-karte {
+  background: var(--karte); border: 1px solid var(--rand); border-radius: 12px;
+  padding: 16px; margin-bottom: 12px;
+}
+.aufgabe-karte h2 { font-size: 1rem; margin: 0 0 .6rem; }
+.frage-text { margin: 0 0 1rem; }
+.eingaben { display: flex; flex-direction: column; gap: 10px; margin-bottom: .75rem; }
+.eingabe-zeile { display: flex; flex-direction: column; gap: .3rem; font-size: .9rem; color: var(--gedaempft); }
+.eingabe-zeile input {
+  font: inherit; padding: 10px 12px; border-radius: 8px; width: 100%;
+  border: 1px solid var(--rand); background: var(--bg); color: var(--fg);
+  -webkit-appearance: none; min-height: 44px;
+}
+.eingabe-zeile input.gut { border-color: var(--gut); }
+.eingabe-zeile input.schlecht { border-color: var(--schlecht); }
+.pruef-ergebnis { min-height: 1.2em; font-weight: 600; }
+.pruef-ergebnis.gut { color: var(--gut); }
+.pruef-ergebnis.schlecht { color: var(--schlecht); }
+.knopf-reihe { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: .75rem; }
+.knopf-reihe button {
+  font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 8px;
+  border: 1px solid var(--rand); background: var(--bg); color: var(--fg);
+  cursor: pointer; -webkit-appearance: none; min-height: 44px;
+}
+.knopf-reihe button:active { transform: translateY(1px); }
+.loesung-container:empty { display: none; }
+.loesung-schritte { border-top: 1px solid var(--rand); padding-top: .75rem; margin-top: .25rem; }
+.loesung-schritt { margin-bottom: .75rem; }
+.loesung-titel {
+  font-size: .75rem; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--gedaempft); margin-bottom: .25rem; font-weight: 600;
+}
+.loesung-formel { overflow-x: auto; }
+.loesung-hinweis { font-size: .85rem; color: var(--gedaempft); margin-top: .2rem; }
+.loesung-ergebnisse {
+  border-top: 1px dashed var(--rand); padding-top: .6rem; margin-top: .5rem;
+}
+.loesung-ergebnis-zeile { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .3rem; }
+.loesung-ergebnis-label { color: var(--gedaempft); font-size: .9rem; }
+.loesung-ergebnis-wert { font-weight: 600; color: var(--akzent); }

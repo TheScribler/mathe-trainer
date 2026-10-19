@@ -1,6 +1,5 @@
-// Service Worker für den Phase-0-Probe: cacht die Seite beim ersten Besuch,
-// danach läuft sie offline (Cache-First mit Netz-Fallback und Update im Hintergrund).
-const CACHE = 'mathe-trainer-probe-v1';
+// Erzeugt von build.mjs am 2026-10-19T13:06:30.660Z — nicht von Hand bearbeiten.
+const CACHE = 'mathe-trainer-20261019130630';
 const ASSETS = [
   './',
   './index.html',
