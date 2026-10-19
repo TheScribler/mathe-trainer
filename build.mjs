@@ -29,7 +29,6 @@ const MODUL_REIHENFOLGE = [
   'latex.js',
   'pruefung.js',
   'loesung.js',
-  'generatoren/dummy.js',
   'generatoren/finanz.js',
   'generatoren/index.js',
   'app.js',

@@ -9,14 +9,32 @@ import { KONFIG } from '../konfig.js';
 
 const NAMEN = ['Jana', 'Lena', 'Paul', 'Mara', 'Jonas', 'Nina', 'Felix', 'Sophie', 'Tom', 'Clara'];
 
-// Zeigt einen Dezimalbruch mit so wenigen Nachkommastellen wie möglich (2–4),
-// ohne das Ergebnis zu verändern — "0,02" statt "0,0200", aber "0,015" wenn
-// zwei Nachkommastellen nicht reichen.
+// Zeigt einen Dezimalbruch mit so wenigen Nachkommastellen wie möglich (2–6),
+// ohne das Ergebnis zu verändern — "0,02" statt "0,0200", aber "0,086806"
+// wenn ein 4-Nachkommastellen-Prozentwert (8,6806 %) als Bruch exakt
+// dieselbe Genauigkeit behalten muss.
 function anteilLatexOhneNullen(anteil) {
-  for (let dp = 2; dp <= 4; dp++) {
+  for (let dp = 2; dp <= 6; dp++) {
     if (Math.abs(runde(anteil, dp) - anteil) < 1e-12) return zahlZuLatex(anteil, dp);
   }
-  return zahlZuLatex(anteil, 4);
+  return zahlZuLatex(anteil, 6);
+}
+
+// Dieselbe Idee für Prozentwerte in reinem Fließtext (kein LaTeX-Escape, kein
+// erzwungener Mindestwert an Nachkommastellen) — "8,16 %" statt "8,1600 %",
+// aber auch "4 %" statt "4,00 %".
+function prozentOhneNullenProse(prozent) {
+  for (let dp = 0; dp <= 4; dp++) {
+    if (Math.abs(runde(prozent, dp) - prozent) < 1e-9) return formatDeZahl(prozent, dp);
+  }
+  return formatDeZahl(prozent, 4);
+}
+
+// Hochgestellte Ziffern für Exponenten in reinem Fließtext, z. B. "q" + "25"
+// -> "q²⁵" — kein LaTeX-Markup ("q^{25}") außerhalb von Formelfeldern.
+const HOCHGESTELLTE_ZIFFERN = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
+function hochgestelltesExponent(n) {
+  return String(n).split('').map((ziffer) => HOCHGESTELLTE_ZIFFERN[Number(ziffer)] ?? ziffer).join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +91,7 @@ export const renteAusKapital = {
           {
             titel: 'Einsetzen',
             latex: `r = ${zahlZuLatex(R0, 0)} \\cdot ${bruch(`${iLatex} \\cdot ${qLatex}^{${n}}`, `${qLatex}^{${n}} - 1`)}`,
-            hinweis: `Zwischenwert: q^{${n}} = ${zahlZuLatex(qn, 6)}`,
+            hinweis: `Zwischenwert: q${hochgestelltesExponent(n)} = ${formatDeZahl(qn, 6)}`,
           },
           { titel: 'Ergebnis', latex: `r = ${zahlZuLatex(r, 2)}\\ \\text{€}` },
         ],
@@ -90,9 +108,9 @@ export const renteAusKapital = {
 // ---------------------------------------------------------------------------
 const VORLAGEN_RENTE_VERAENDERLICH = [
   (iProzent) => `Für die Zahlungszeitpunkte t aus der Tabelle sind nachschüssige Rentenzahlungen ` +
-    `r_t gegeben. Bei einem Zinssatz von ${formatDeZahl(iProzent, 0)} % p.a.: Wie hoch ist der ` +
+    `rₜ gegeben. Bei einem Zinssatz von ${formatDeZahl(iProzent, 0)} % p.a.: Wie hoch ist der ` +
     `Rentenbarwert dieser Zahlungsreihe?`,
-  (iProzent) => `Eine Zahlungsreihe mit nachschüssigen, von Jahr zu Jahr steigenden Zahlungen r_t ` +
+  (iProzent) => `Eine Zahlungsreihe mit nachschüssigen, von Jahr zu Jahr steigenden Zahlungen rₜ ` +
     `(siehe Tabelle) soll bei einem Zinssatz von ${formatDeZahl(iProzent, 0)} % p.a. auf ihren ` +
     `heutigen Wert abgezinst werden. Berechnen Sie den Rentenbarwert.`,
 ];
@@ -122,13 +140,13 @@ export const renteVeraenderlich = {
     const einsetzenLatex = zahlungen
       .map((rt, k) => `${bruch(zahlZuLatex(rt, 0), `(1 + ${iLatex})^{${k + 1}}`)}`)
       .join(' + ');
-    const termeHinweis = terme.map((x) => zahlZuLatex(runde(x, 2), 2)).join(' + ');
+    const termeHinweis = terme.map((x) => formatDeZahl(runde(x, 2), 2)).join(' + ');
 
     return {
       frage: {
         text: VORLAGEN_RENTE_VERAENDERLICH[vorlageIndex](iProzent),
         tabelle: {
-          kopf: ['t', 'r_t'],
+          kopf: ['t', 'rₜ'],
           zeilen: zahlungen.map((rt, k) => [String(k + 1), String(rt)]),
         },
       },
@@ -200,8 +218,8 @@ export const verdopplungszeit = {
             { titel: 'Formel', latex: `K_n = K_0 \\cdot q^n \\quad \\text{mit } K_n = ${faktor} \\cdot K_0` },
             {
               titel: 'Umstellen',
-              latex: `${faktor} = q^n \;\\Rightarrow\; \\ln ${faktor} = n \\cdot \\ln q ` +
-                `\;\\Rightarrow\; n = ${bruch(`\\ln ${faktor}`, '\\ln q')}`,
+              latex: `${faktor} = q^n \\;\\Rightarrow\\; \\ln ${faktor} = n \\cdot \\ln q ` +
+                `\\;\\Rightarrow\\; n = ${bruch(`\\ln ${faktor}`, '\\ln q')}`,
               hinweis: 'Durch K₀ teilen (es kürzt sich heraus), dann beide Seiten logarithmieren ' +
                 'und den Exponenten vor den Logarithmus ziehen.',
             },
@@ -230,7 +248,7 @@ export const verdopplungszeit = {
           { titel: 'Formel', latex: 'K_n = K_0 \\cdot q^n' },
           {
             titel: 'Umstellen',
-            latex: `q^n = ${bruch('K_n', 'K_0')} \;\\Rightarrow\; n = ${bruch(`\\ln(K_n / K_0)`, '\\ln q')}`,
+            latex: `q^n = ${bruch('K_n', 'K_0')} \\;\\Rightarrow\\; n = ${bruch(`\\ln(K_n / K_0)`, '\\ln q')}`,
             hinweis: 'Durch K₀ teilen, dann beide Seiten logarithmieren und den Exponenten vor ' +
               'den Logarithmus ziehen.',
           },
@@ -288,7 +306,7 @@ export const effektivzins = {
         },
         eingaben: [
           {
-            id: 'iEff', label: 'Effektivzins i_eff (%)', typ: 'zahl', punkte: 3,
+            id: 'iEff', label: 'Effektivzins (%)', typ: 'zahl', punkte: 3,
             loesung: iEffProzentExakt, toleranz: KONFIG.toleranz.prozentpunkte,
           },
         ],
@@ -314,11 +332,11 @@ export const effektivzins = {
     return {
       frage: {
         text: `Eine Kapitalanlage mit ${mText(m)} Verzinsung (m = ${m}) erzielt einen Effektivzins ` +
-          `von ${formatDeZahl(iEffGegeben, 4)} % p.a. Wie hoch ist der zugehörige Nominalzins?`,
+          `von ${prozentOhneNullenProse(iEffGegeben)} % p.a. Wie hoch ist der zugehörige Nominalzins?`,
       },
       eingaben: [
         {
-          id: 'iNom', label: 'Nominalzins i_nom (%)', typ: 'zahl', punkte: 3,
+          id: 'iNom', label: 'Nominalzins (%)', typ: 'zahl', punkte: 3,
           loesung: iNomProzent, toleranz: KONFIG.toleranz.prozentpunkte,
         },
       ],
@@ -332,7 +350,7 @@ export const effektivzins = {
           },
           {
             titel: 'Einsetzen',
-            latex: `i_{nom} = \\left(\\left(1 + ${prozentLatex(iEffGegeben / 100, 4)}\\right)^{${bruch('1', String(m))}} - 1\\right) \\cdot ${m}`,
+            latex: `i_{nom} = \\left(\\left(1 + ${anteilLatexOhneNullen(iEffGegeben / 100)}\\right)^{${bruch('1', String(m))}} - 1\\right) \\cdot ${m}`,
           },
           { titel: 'Ergebnis', latex: `i_{nom} = ${zahlZuLatex(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)}\\ \\%` },
         ],

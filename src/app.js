@@ -1,7 +1,6 @@
 // Übungsmodus-UI. Wählt einen Generator, zeigt die Frage, prüft Zahlantworten
 // automatisch und rendert die Lösung in der Formel-Notation der Folien.
-// Phase 0: nur der Platzhalter-Generator ist registriert; die Probeklausur
-// (Timer, Punkte-Split) kommt erst in Phase 5.
+// Die Probeklausur (Timer, Punkte-Split) kommt erst in Phase 5.
 
 function baueTabelle(tabelle) {
   const wrapper = document.createElement('div');
@@ -37,8 +36,7 @@ function starteApp() {
 
   const kopf = document.createElement('header');
   kopf.className = 'kopf';
-  kopf.innerHTML = '<h1>Mathe-Trainer Wirtschaftsmathematik</h1>' +
-    '<p class="unter">Übungsmodus — Phase 0: Infrastrukturtest mit einem Platzhalter-Generator.</p>';
+  kopf.innerHTML = '<h1>Mathe-Trainer Wirtschaftsmathematik</h1>';
   wurzel.appendChild(kopf);
 
   const karte = document.createElement('section');

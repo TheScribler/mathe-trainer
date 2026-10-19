@@ -61,7 +61,19 @@ body {
   font-size: .75rem; text-transform: uppercase; letter-spacing: .05em;
   color: var(--gedaempft); margin-bottom: .25rem; font-weight: 600;
 }
-.loesung-formel { overflow-x: auto; }
+.loesung-formel {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  padding-bottom: 2px; /* Platz für die Scrollbar, damit sie nichts überdeckt */
+}
+@media (max-width: 480px) {
+  /* Lange Summen/Brüche (z. B. veränderliche Rente mit 5 Zahlungen) passen auf
+     schmalen Bildschirmen seltener in die Breite — kleinere Schrift verringert,
+     wie oft überhaupt gescrollt werden muss. Was trotzdem nicht passt, bleibt
+     über overflow-x:auto erreichbar statt abgeschnitten. */
+  .loesung-formel .katex { font-size: 0.85em; }
+}
 .loesung-hinweis { font-size: .85rem; color: var(--gedaempft); margin-top: .2rem; }
 .loesung-ergebnisse {
   border-top: 1px dashed var(--rand); padding-top: .6rem; margin-top: .5rem;

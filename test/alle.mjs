@@ -62,6 +62,37 @@ function testeZahlenparser() {
 const INSTANZEN = 1000;
 const ERLAUBTE_TITEL = ['Formel', 'Umstellen', 'Einsetzen', 'Ergebnis'];
 
+// Nur in echten Formelfeldern (schritt.latex, ergebnis.latex) darf LaTeX-Syntax
+// stehen. Alles andere ist reiner Fließtext und wird als {feld, text} eingesammelt,
+// damit ein einziger Scan jedes Textfeld einer Aufgabe erfasst — auch neue Felder,
+// die künftige Generatoren hinzufügen.
+function sammlePlainTextFelder(aufgabe) {
+  const felder = [{ feld: 'frage.text', text: aufgabe.frage.text }];
+
+  for (const eingabe of aufgabe.eingaben) {
+    felder.push({ feld: `eingaben[${eingabe.id}].label`, text: eingabe.label });
+  }
+
+  for (const schritt of aufgabe.loesung.schritte) {
+    if (schritt.hinweis) felder.push({ feld: `loesung.schritte[${schritt.titel}].hinweis`, text: schritt.hinweis });
+  }
+
+  if (aufgabe.frage.tabelle) {
+    const { kopf, zeilen } = aufgabe.frage.tabelle;
+    kopf.forEach((titel, i) => felder.push({ feld: `frage.tabelle.kopf[${i}]`, text: String(titel) }));
+    zeilen.forEach((zeile, i) => {
+      zeile.forEach((wert, j) => felder.push({ feld: `frage.tabelle.zeilen[${i}][${j}]`, text: String(wert) }));
+    });
+  }
+
+  return felder;
+}
+
+// "{,}" (KaTeX-Komma-Escape), "_" (LaTeX-Subscript), "^{" (LaTeX-Superscript)
+// und "\;" (LaTeX-Spacing) haben in reinem Fließtext nichts zu suchen — dort
+// gelten Unicode-Zeichen (rₜ, q²⁵) oder ganz ausgeschriebene Wörter.
+const LATEX_RESTE = /\{,\}|_|\^\{|\\;/;
+
 function wertVon(aufgabe, id) {
   const eingabe = aufgabe.eingaben.find((e) => e.id === id);
   if (!eingabe) throw new Error(`Eingabe "${id}" nicht gefunden`);
@@ -73,15 +104,6 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
   // (z. B. Kn, iEffGegeben) — für die unabhängige Prüfung ist das die Quelle.
   const p = aufgabe.params;
   const kennzeichnung = `${generator.id} seed=${seed}`;
-
-  if (generator.id === 'dummy.addition') {
-    const erwarteteSumme = p.a + p.b;
-    pruefe(
-      nahBei(wertVon(aufgabe, 'summe'), erwarteteSumme, 1e-9),
-      `${kennzeichnung}: ${p.a}+${p.b} ergibt ${wertVon(aufgabe, 'summe')}, erwartet ${erwarteteSumme}`
-    );
-    return;
-  }
 
   if (generator.id === 'fin.rente-aus-kapital') {
     // Unabhängig: die n Zahlungen r einzeln abzinsen und aufsummieren muss R0 ergeben
@@ -192,11 +214,14 @@ function testeGenerator(generator) {
       );
     }
 
-    // Fragetext ist reine Prosa — keine LaTeX-Escapes wie "{,}" oder rohe Backslashes.
-    pruefe(
-      !/\{,\}|\\\\/.test(aufgabe.frage.text),
-      `${generator.id} seed=${seed}: frage.text enthält LaTeX-Reste: "${aufgabe.frage.text}"`
-    );
+    // Jedes Textfeld (Fragetext, Labels, Hinweise, Tabellenzellen) ist reine
+    // Prosa — keine LaTeX-Reste wie "{,}", "_", "^{" oder "\;".
+    for (const { feld, text } of sammlePlainTextFelder(aufgabe)) {
+      pruefe(
+        !LATEX_RESTE.test(text),
+        `${generator.id} seed=${seed}: ${feld} enthält LaTeX-Reste: "${text}"`
+      );
+    }
 
     // Unabhängige Nachrechnung auf einem anderen Weg als der Generator selbst.
     pruefeInstanzUnabhaengig(generator, params, aufgabe, seed);
