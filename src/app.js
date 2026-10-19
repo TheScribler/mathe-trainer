@@ -3,6 +3,34 @@
 // Phase 0: nur der Platzhalter-Generator ist registriert; die Probeklausur
 // (Timer, Punkte-Split) kommt erst in Phase 5.
 
+function baueTabelle(tabelle) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'frage-tabelle-wrapper';
+  const table = document.createElement('table');
+  table.className = 'frage-tabelle';
+
+  const kopfZeile = document.createElement('tr');
+  for (const titel of tabelle.kopf) {
+    const th = document.createElement('th');
+    th.textContent = titel;
+    kopfZeile.appendChild(th);
+  }
+  table.appendChild(kopfZeile);
+
+  for (const zeile of tabelle.zeilen) {
+    const tr = document.createElement('tr');
+    for (const wert of zeile) {
+      const td = document.createElement('td');
+      td.textContent = wert;
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+
+  wrapper.appendChild(table);
+  return wrapper;
+}
+
 function starteApp() {
   const wurzel = document.getElementById('app');
   wurzel.innerHTML = '';
@@ -39,6 +67,10 @@ function starteApp() {
     frage.className = 'frage-text';
     frage.textContent = aktuelleAufgabe.frage.text;
     karte.appendChild(frage);
+
+    if (aktuelleAufgabe.frage.tabelle) {
+      karte.appendChild(baueTabelle(aktuelleAufgabe.frage.tabelle));
+    }
 
     const form = document.createElement('div');
     form.className = 'eingaben';

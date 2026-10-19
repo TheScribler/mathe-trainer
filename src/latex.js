@@ -23,3 +23,8 @@ export function matrixLatex(werte) {
   const zeilen = werte.map((zeile) => zeile.join(' & ')).join(' \\\\ ');
   return `\\begin{pmatrix} ${zeilen} \\end{pmatrix}`;
 }
+
+// Anteil (als Dezimalbruch, z. B. 0,02 für 2 %) in ein LaTeX-Prozent umwandeln.
+export function prozentLatex(anteil, nachkommastellen = 2) {
+  return zahlZuLatex(anteil * 100, nachkommastellen) + '\\%';
+}

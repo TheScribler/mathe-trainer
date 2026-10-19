@@ -5,6 +5,7 @@
 import { mulberry32 } from '../src/rng.js';
 import { parseDeZahl, nahBei } from '../src/zahl.js';
 import { GENERATOREN } from '../src/generatoren/index.js';
+import { testeFixtures } from './fixtures.mjs';
 
 let fehler = 0;
 
@@ -61,17 +62,101 @@ function testeZahlenparser() {
 const INSTANZEN = 1000;
 const ERLAUBTE_TITEL = ['Formel', 'Umstellen', 'Einsetzen', 'Ergebnis'];
 
+function wertVon(aufgabe, id) {
+  const eingabe = aufgabe.eingaben.find((e) => e.id === id);
+  if (!eingabe) throw new Error(`Eingabe "${id}" nicht gefunden`);
+  return eingabe.loesung;
+}
+
 function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
+  // aufgabe.params kann gegenüber params zusätzliche, abgeleitete Felder tragen
+  // (z. B. Kn, iEffGegeben) — für die unabhängige Prüfung ist das die Quelle.
+  const p = aufgabe.params;
+  const kennzeichnung = `${generator.id} seed=${seed}`;
+
   if (generator.id === 'dummy.addition') {
-    const erwarteteSumme = params.a + params.b;
-    for (const eingabe of aufgabe.eingaben) {
+    const erwarteteSumme = p.a + p.b;
+    pruefe(
+      nahBei(wertVon(aufgabe, 'summe'), erwarteteSumme, 1e-9),
+      `${kennzeichnung}: ${p.a}+${p.b} ergibt ${wertVon(aufgabe, 'summe')}, erwartet ${erwarteteSumme}`
+    );
+    return;
+  }
+
+  if (generator.id === 'fin.rente-aus-kapital') {
+    // Unabhängig: die n Zahlungen r einzeln abzinsen und aufsummieren muss R0 ergeben
+    // (der Generator selbst nutzt die geschlossene Rentenbarwertformel, nicht die Summe).
+    const r = wertVon(aufgabe, 'r');
+    const i = p.iProzent / 100;
+    let summe = 0;
+    for (let t = 1; t <= p.n; t++) summe += r / Math.pow(1 + i, t);
+    pruefe(
+      nahBei(summe, p.R0, 0.15),
+      `${kennzeichnung}: ${p.n}x ${r} abgezinst ergibt ${summe.toFixed(2)}, erwartet R0=${p.R0}`
+    );
+    return;
+  }
+
+  if (generator.id === 'fin.rente-veraenderlich') {
+    // Unabhängig: Summe in umgekehrter Reihenfolge und mit Math.pow(.., -t) statt
+    // Division nachrechnen — anderer Rechenweg als im Generator.
+    const R0 = wertVon(aufgabe, 'R0');
+    const i = p.iProzent / 100;
+    const zahlungen = Array.from({ length: p.n }, (_, k) => p.r1 + k * p.d);
+    let summe = 0;
+    for (let t = p.n; t >= 1; t--) summe += zahlungen[t - 1] * Math.pow(1 + i, -t);
+    pruefe(
+      nahBei(summe, R0, 0.01),
+      `${kennzeichnung}: Summe rückwärts ergibt ${summe.toFixed(4)}, erwartet R0=${R0}`
+    );
+    return;
+  }
+
+  if (generator.id === 'fin.verdopplungszeit') {
+    const n = wertVon(aufgabe, 'n');
+    const q = 1 + p.iProzent / 100;
+    if (p.variante === 'A') {
+      const probe = Math.pow(q, n);
       pruefe(
-        nahBei(eingabe.loesung, erwarteteSumme, 1e-9),
-        `${generator.id} seed=${seed}: ${params.a}+${params.b} ergibt ${eingabe.loesung}, erwartet ${erwarteteSumme}`
+        nahBei(probe, p.faktor, 0.01),
+        `${kennzeichnung}: q^n mit n=${n} ergibt ${probe.toFixed(4)}, erwartet Faktor ${p.faktor}`
+      );
+    } else {
+      const probe = p.K0 * Math.pow(q, n);
+      pruefe(
+        nahBei(probe, p.Kn, 0.05),
+        `${kennzeichnung}: K0*q^n mit n=${n} ergibt ${probe.toFixed(2)}, erwartet Kn=${p.Kn}`
       );
     }
     return;
   }
+
+  if (generator.id === 'fin.effektivzins') {
+    // Unabhängig: m-fache Aufzinsung per Schleife statt Math.pow, wie in PLAN.md
+    // Testkonzept beschrieben ("m-fache Aufzinsung mit j=i_nom/m numerisch").
+    if (p.richtung === 'vorwaerts') {
+      const iEffLoesung = wertVon(aufgabe, 'iEff') / 100;
+      const j = p.iNomProzent / 100 / p.m;
+      let acc = 1;
+      for (let k = 0; k < p.m; k++) acc *= 1 + j;
+      pruefe(
+        nahBei(acc - 1, iEffLoesung, 1e-9),
+        `${kennzeichnung}: m-fache Aufzinsung ergibt ${(acc - 1)}, erwartet i_eff=${iEffLoesung}`
+      );
+    } else {
+      const iNomLoesung = wertVon(aufgabe, 'iNom');
+      const j = iNomLoesung / 100 / p.m;
+      let acc = 1;
+      for (let k = 0; k < p.m; k++) acc *= 1 + j;
+      const iEffProbe = (acc - 1) * 100;
+      pruefe(
+        nahBei(iEffProbe, p.iEffGegeben, 0.01),
+        `${kennzeichnung}: i_nom=${iNomLoesung} ergibt i_eff=${iEffProbe.toFixed(4)}, erwartet ${p.iEffGegeben}`
+      );
+    }
+    return;
+  }
+
   throw new Error(`Kein unabhängiger Prüfweg für Generator "${generator.id}" hinterlegt.`);
 }
 
@@ -107,6 +192,12 @@ function testeGenerator(generator) {
       );
     }
 
+    // Fragetext ist reine Prosa — keine LaTeX-Escapes wie "{,}" oder rohe Backslashes.
+    pruefe(
+      !/\{,\}|\\\\/.test(aufgabe.frage.text),
+      `${generator.id} seed=${seed}: frage.text enthält LaTeX-Reste: "${aufgabe.frage.text}"`
+    );
+
     // Unabhängige Nachrechnung auf einem anderen Weg als der Generator selbst.
     pruefeInstanzUnabhaengig(generator, params, aufgabe, seed);
   }
@@ -114,6 +205,7 @@ function testeGenerator(generator) {
 }
 
 testeZahlenparser();
+fehler += testeFixtures();
 for (const generator of GENERATOREN) {
   testeGenerator(generator);
 }

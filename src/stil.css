@@ -27,6 +27,12 @@ body {
 }
 .aufgabe-karte h2 { font-size: 1rem; margin: 0 0 .6rem; }
 .frage-text { margin: 0 0 1rem; }
+.frage-tabelle-wrapper { overflow-x: auto; margin: 0 0 1rem; }
+.frage-tabelle { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.frage-tabelle th, .frage-tabelle td {
+  border: 1px solid var(--rand); padding: 6px 12px; text-align: center;
+}
+.frage-tabelle th { color: var(--gedaempft); font-weight: 600; font-size: .85rem; }
 .eingaben { display: flex; flex-direction: column; gap: 10px; margin-bottom: .75rem; }
 .eingabe-zeile { display: flex; flex-direction: column; gap: .3rem; font-size: .9rem; color: var(--gedaempft); }
 .eingabe-zeile input {
