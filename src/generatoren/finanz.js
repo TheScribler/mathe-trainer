@@ -368,12 +368,12 @@ export const effektivzins = {
           { titel: 'Formel', latex: `i_{eff} = \\left(1 + ${bruch('i_{nom}', 'm')}\\right)^m - 1` },
           {
             titel: 'Umstellen',
-            latex: `i_{nom} = \\left(\\left(1 + i_{eff}\\right)^{${bruch('1', 'm')}} - 1\\right) \\cdot m`,
+            latex: `i_{nom} = \\left(\\left(1 + i_{eff}\\right)^{1/m} - 1\\right) \\cdot m`,
             hinweis: 'Beide Seiten hoch 1/m, dann −1 und mal m.',
           },
           {
             titel: 'Einsetzen',
-            latex: `i_{nom} = \\left(\\left(1 + ${anteilLatexOhneNullen(iEffGegeben / 100)}\\right)^{${bruch('1', String(m))}} - 1\\right) \\cdot ${m}`,
+            latex: `i_{nom} = \\left(\\left(1 + ${anteilLatexOhneNullen(iEffGegeben / 100)}\\right)^{1/${m}} - 1\\right) \\cdot ${m}`,
           },
           {
             titel: 'Ergebnis',

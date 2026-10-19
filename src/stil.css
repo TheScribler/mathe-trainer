@@ -100,3 +100,7 @@ body {
   overflow-x: auto;
   max-width: 100%;
 }
+.build-stamp {
+  text-align: center; font-size: .72rem; color: var(--gedaempft);
+  margin: 1.5rem 0 0; padding-top: .5rem; opacity: .7;
+}

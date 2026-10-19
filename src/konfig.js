@@ -12,7 +12,13 @@ export const KONFIG = {
   zusatzthemenInKlausur: false,
   toleranz: {
     geld: 0.05,
-    prozentpunkte: 0.01,
+    // Muss strikt kleiner sein als der 2-Dezimalstellen-Rundungsschritt
+    // (0,01 pp), sonst wird die nächste Rundungsstufe fälschlich akzeptiert
+    // (z. B. 3,05 bei einer Antwort von 3,04). Die Rundung auf 2 Dezimal-
+    // stellen weicht im schlechtesten Fall um genau 0,005 vom ungerundeten
+    // Wert ab — 0,006 lässt etwas Spielraum für Gleitkomma-Rauschen an
+    // dieser Grenze, bleibt aber klar unter 0,01.
+    prozentpunkte: 0.006,
     jahre: 0.01,
     exakt: 1e-9,
   },

@@ -4,7 +4,9 @@
 
 import { mulberry32 } from '../src/rng.js';
 import { parseDeZahl, nahBei } from '../src/zahl.js';
+import { pruefeZahl } from '../src/pruefung.js';
 import { GENERATOREN } from '../src/generatoren/index.js';
+import { effektivzins } from '../src/generatoren/finanz.js';
 import { testeFixtures } from './fixtures.mjs';
 
 let fehler = 0;
@@ -239,7 +241,33 @@ function testeGenerator(generator) {
   console.log(`${generator.id}: ${INSTANZEN} Instanzen geprüft, ${textfelderGescannt} Textfelder auf LaTeX-Reste gescannt`);
 }
 
+// ---------------------------------------------------------------------------
+// Toleranzgrenze bei Zinssatz-Antworten: MK2b (i_nom=3 %, m=12) -> i_eff=3,04 %.
+// Die Antwort selbst ist jetzt gerundet (3,04), die Toleranz muss den
+// ungerundeten Wert (3,0416) noch akzeptieren, aber die nächste 2-Dezimal-
+// stellen-Rundungsstufe (3,05) bereits ablehnen (siehe CLAUDE.md Abschnitt 6).
+// -----------------------------------------------------------------------------
+function testeEffektivzinsToleranz() {
+  const aufgabe = effektivzins.baue({ richtung: 'vorwaerts', m: 12, iNomProzent: 3 });
+  const erwartet = aufgabe.eingaben[0].loesung;
+  const toleranz = aufgabe.eingaben[0].toleranz;
+  const faelle = [
+    ['3,04', true], // exakt die gerundete Antwort
+    ['3,0416', true], // ungerundeter Wert laut Hinweis
+    ['3,05', false], // schon die nächste Rundungsstufe — darf nicht akzeptiert werden
+  ];
+  for (const [eingabe, sollRichtigSein] of faelle) {
+    const ergebnis = pruefeZahl(eingabe, erwartet, toleranz);
+    pruefe(
+      ergebnis.korrekt === sollRichtigSein,
+      `Effektivzins-Toleranz: "${eingabe}" korrekt=${ergebnis.korrekt}, erwartet ${sollRichtigSein} (Antwort=${erwartet}, Toleranz=${toleranz})`
+    );
+  }
+  console.log(`Effektivzins-Toleranz: ${faelle.length} Fälle geprüft`);
+}
+
 testeZahlenparser();
+testeEffektivzinsToleranz();
 fehler += testeFixtures();
 for (const generator of GENERATOREN) {
   testeGenerator(generator);

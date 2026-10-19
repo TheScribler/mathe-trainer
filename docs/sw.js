@@ -1,5 +1,5 @@
-// Erzeugt von build.mjs am 2026-10-19T14:53:03.442Z — nicht von Hand bearbeiten.
-const CACHE = 'mathe-trainer-20261019145303';
+// Erzeugt von build.mjs am 2026-10-19 17:34 — nicht von Hand bearbeiten.
+const CACHE = 'mathe-trainer-202610191734';
 const ASSETS = [
   './',
   './index.html',
@@ -25,19 +25,41 @@ self.addEventListener('activate', (ev) => {
   );
 });
 
+const NETZ_ZEITLIMIT_MS = 3000;
+
 self.addEventListener('fetch', (ev) => {
   if (ev.request.method !== 'GET') return;
   // Netz zuerst: wer online ist, bekommt immer den neuesten Stand (wichtig
   // während der Entwicklung — ein Cache-First-Ansatz hätte sonst nach jedem
-  // Build eine veraltete Version weiter ausgeliefert). Nur wenn das Netz
-  // fehlschlägt (Flugmodus), greift der zuletzt erfolgreich geladene Cache.
+  // Build eine veraltete Version weiter ausgeliefert). Bei einer schwachen
+  // Zugverbindung kann das Netz aber erreichbar sein und trotzdem minuten-
+  // lang hängen, statt sauber zu scheitern — deshalb ein Zeitlimit: wartet
+  // das Netz länger als 3 Sekunden, greift sofort der zuletzt erfolgreich
+  // geladene Cache, genau wie bei einem echten Fehlschlag (Flugmodus).
   ev.respondWith(
-    fetch(ev.request)
-      .then((antwort) => {
-        const kopie = antwort.clone();
-        caches.open(CACHE).then((c) => c.put(ev.request, kopie));
-        return antwort;
-      })
-      .catch(() => caches.match(ev.request))
+    new Promise((resolve) => {
+      let entschieden = false;
+      const zeitlimit = setTimeout(() => {
+        if (entschieden) return;
+        entschieden = true;
+        caches.match(ev.request).then(resolve);
+      }, NETZ_ZEITLIMIT_MS);
+
+      fetch(ev.request)
+        .then((antwort) => {
+          const kopie = antwort.clone();
+          caches.open(CACHE).then((c) => c.put(ev.request, kopie));
+          if (entschieden) return; // Zeitlimit ist schon mit dem Cache beantwortet worden
+          entschieden = true;
+          clearTimeout(zeitlimit);
+          resolve(antwort);
+        })
+        .catch(() => {
+          if (entschieden) return;
+          entschieden = true;
+          clearTimeout(zeitlimit);
+          caches.match(ev.request).then(resolve);
+        });
+    })
   );
 });

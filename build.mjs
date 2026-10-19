@@ -17,6 +17,18 @@ function lesen(pfad) {
   return readFileSync(pfad, 'utf8');
 }
 
+// Ein Zeitstempel, einmal berechnet und für zwei Zwecke genutzt: lesbar als
+// sichtbarer Build-Stand unten auf der Seite, und daraus abgeleitet als
+// Service-Worker-Cache-Name — beide bleiben dadurch immer zueinander
+// nachvollziehbar (lokale Zeit des Build-Rechners, nicht UTC).
+function formatiereZeitstempel(datum) {
+  const zweistellig = (n) => String(n).padStart(2, '0');
+  return `${datum.getFullYear()}-${zweistellig(datum.getMonth() + 1)}-${zweistellig(datum.getDate())} ` +
+    `${zweistellig(datum.getHours())}:${zweistellig(datum.getMinutes())}`;
+}
+const BUILD_ZEITSTEMPEL = formatiereZeitstempel(new Date());
+const BUILD_VERSION = BUILD_ZEITSTEMPEL.replace(/[^0-9]/g, '');
+
 // ---------------------------------------------------------------------------
 // 1. Module aus src/ zu einem einzigen Skript ohne import/export zusammensetzen.
 //    Reihenfolge ist Abhängigkeitsreihenfolge: jedes Modul darf nur Namen aus
@@ -168,9 +180,8 @@ writeFileSync(join(DOCS, 'manifest.json'), JSON.stringify(manifest, null, 2) + '
 // ---------------------------------------------------------------------------
 // 6. Service Worker — ein neuer Cache-Name pro Build erzwingt ein Update.
 // ---------------------------------------------------------------------------
-const VERSION = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-const swJs = `// Erzeugt von build.mjs am ${new Date().toISOString()} — nicht von Hand bearbeiten.
-const CACHE = 'mathe-trainer-${VERSION}';
+const swJs = `// Erzeugt von build.mjs am ${BUILD_ZEITSTEMPEL} — nicht von Hand bearbeiten.
+const CACHE = 'mathe-trainer-${BUILD_VERSION}';
 const ASSETS = [
   './',
   './index.html',
@@ -196,20 +207,42 @@ self.addEventListener('activate', (ev) => {
   );
 });
 
+const NETZ_ZEITLIMIT_MS = 3000;
+
 self.addEventListener('fetch', (ev) => {
   if (ev.request.method !== 'GET') return;
   // Netz zuerst: wer online ist, bekommt immer den neuesten Stand (wichtig
   // während der Entwicklung — ein Cache-First-Ansatz hätte sonst nach jedem
-  // Build eine veraltete Version weiter ausgeliefert). Nur wenn das Netz
-  // fehlschlägt (Flugmodus), greift der zuletzt erfolgreich geladene Cache.
+  // Build eine veraltete Version weiter ausgeliefert). Bei einer schwachen
+  // Zugverbindung kann das Netz aber erreichbar sein und trotzdem minuten-
+  // lang hängen, statt sauber zu scheitern — deshalb ein Zeitlimit: wartet
+  // das Netz länger als 3 Sekunden, greift sofort der zuletzt erfolgreich
+  // geladene Cache, genau wie bei einem echten Fehlschlag (Flugmodus).
   ev.respondWith(
-    fetch(ev.request)
-      .then((antwort) => {
-        const kopie = antwort.clone();
-        caches.open(CACHE).then((c) => c.put(ev.request, kopie));
-        return antwort;
-      })
-      .catch(() => caches.match(ev.request))
+    new Promise((resolve) => {
+      let entschieden = false;
+      const zeitlimit = setTimeout(() => {
+        if (entschieden) return;
+        entschieden = true;
+        caches.match(ev.request).then(resolve);
+      }, NETZ_ZEITLIMIT_MS);
+
+      fetch(ev.request)
+        .then((antwort) => {
+          const kopie = antwort.clone();
+          caches.open(CACHE).then((c) => c.put(ev.request, kopie));
+          if (entschieden) return; // Zeitlimit ist schon mit dem Cache beantwortet worden
+          entschieden = true;
+          clearTimeout(zeitlimit);
+          resolve(antwort);
+        })
+        .catch(() => {
+          if (entschieden) return;
+          entschieden = true;
+          clearTimeout(zeitlimit);
+          caches.match(ev.request).then(resolve);
+        });
+    })
   );
 });
 `;
@@ -237,6 +270,7 @@ ${stilCss}
 </head>
 <body>
 <main id="app"></main>
+<footer class="build-stamp">Version ${BUILD_ZEITSTEMPEL}</footer>
 <script>
 ${katexJs}
 </script>
