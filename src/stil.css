@@ -36,9 +36,11 @@ body {
 }
 .eingabe-zeile input.gut { border-color: var(--gut); }
 .eingabe-zeile input.schlecht { border-color: var(--schlecht); }
+.eingelesen-als { font-size: .8rem; color: var(--gedaempft); min-height: 1.1em; }
 .pruef-ergebnis { min-height: 1.2em; font-weight: 600; }
 .pruef-ergebnis.gut { color: var(--gut); }
 .pruef-ergebnis.schlecht { color: var(--schlecht); }
+.pruef-ergebnis.neutral { color: var(--gedaempft); }
 .knopf-reihe { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: .75rem; }
 .knopf-reihe button {
   font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 8px;

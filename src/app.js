@@ -56,6 +56,24 @@ function starteApp() {
       feld.autocorrect = 'off';
       feld.spellcheck = false;
       zeile.appendChild(feld);
+
+      const eingelesenAls = document.createElement('span');
+      eingelesenAls.className = 'eingelesen-als';
+      zeile.appendChild(eingelesenAls);
+
+      feld.addEventListener('input', function () {
+        feld.classList.remove('gut', 'schlecht');
+        const text = feld.value.trim();
+        if (text === '') {
+          eingelesenAls.textContent = '';
+          return;
+        }
+        const wert = parseDeZahl(text);
+        eingelesenAls.textContent = isFinite(wert)
+          ? 'Eingelesen als ' + formatDeZahlFrei(wert)
+          : 'Eingelesen als: keine Zahl erkannt';
+      });
+
       form.appendChild(zeile);
       felder[eingabe.id] = feld;
     }
@@ -75,16 +93,32 @@ function starteApp() {
     pruefenKnopf.type = 'button';
     pruefenKnopf.textContent = 'Prüfen';
     pruefenKnopf.addEventListener('click', function () {
+      let gibtLeereFelder = false;
       let alleRichtig = true;
       for (const eingabe of aktuelleAufgabe.eingaben) {
-        const text = felder[eingabe.id].value;
-        const ergebnis = pruefeZahl(text, eingabe.loesung, eingabe.toleranz);
-        felder[eingabe.id].classList.remove('gut', 'schlecht');
-        felder[eingabe.id].classList.add(ergebnis.korrekt ? 'gut' : 'schlecht');
+        const feld = felder[eingabe.id];
+        feld.classList.remove('gut', 'schlecht');
+        if (feld.value.trim() === '') {
+          // Ein leeres Feld ist "noch nicht beantwortet", nicht "falsch" —
+          // deshalb keine rote Markierung und keine neutrale Fehlermeldung.
+          gibtLeereFelder = true;
+          alleRichtig = false;
+          continue;
+        }
+        const ergebnis = pruefeZahl(feld.value, eingabe.loesung, eingabe.toleranz);
+        feld.classList.add(ergebnis.korrekt ? 'gut' : 'schlecht');
         if (!ergebnis.korrekt) alleRichtig = false;
       }
-      ergebnisZeile.textContent = alleRichtig ? 'Richtig.' : 'Noch nicht richtig — Lösung ansehen?';
-      ergebnisZeile.className = 'pruef-ergebnis ' + (alleRichtig ? 'gut' : 'schlecht');
+      if (gibtLeereFelder) {
+        ergebnisZeile.textContent = 'Bitte eine Zahl eingeben.';
+        ergebnisZeile.className = 'pruef-ergebnis neutral';
+      } else if (alleRichtig) {
+        ergebnisZeile.textContent = 'Richtig.';
+        ergebnisZeile.className = 'pruef-ergebnis gut';
+      } else {
+        ergebnisZeile.textContent = 'Noch nicht richtig — Lösung ansehen?';
+        ergebnisZeile.className = 'pruef-ergebnis schlecht';
+      }
     });
     knopfReihe.appendChild(pruefenKnopf);
 

@@ -19,16 +19,18 @@ function pruefe(bedingung, beschreibung) {
 // Zahlenparser: deutsche Schreibweisen, mit und ohne Tausenderpunkt.
 // ---------------------------------------------------------------------------
 function testeZahlenparser() {
+  // Regel (2026-10-19): Komma ist immer der Dezimaltrenner. Ohne Komma ist ein
+  // einzelner Punkt der Dezimalpunkt — "1.234" und "1,234" ergeben deshalb
+  // beide 1,234, nicht 1234. Siehe Kommentar in src/zahl.js.
   const faelle = [
     ['7782,55', 7782.55],          // ohne Tausenderpunkt (iPhone-Test, 2026-10-19)
-    ['7.782,55', 7782.55],         // mit Tausenderpunkt
-    ['7782.55', 7782.55],          // Punkt als Dezimalzeichen
-    ['1.234.567', 1234567],        // reine Tausendergruppen ohne Dezimalteil
-    ['1.234', 1234],               // eine Tausendergruppe
-    ['100.000', 100000],
-    ['100.000,00', 100000],
+    ['7.782,55', 7782.55],         // mit Tausenderpunkt + Komma als Dezimaltrenner
+    ['7782.55', 7782.55],          // kein Komma: Punkt ist der Dezimalpunkt
+    ['1.234', 1.234],              // kein Komma: Punkt ist der Dezimalpunkt, NICHT 1234
+    ['1,234', 1.234],              // Komma ist der Dezimaltrenner — dieselbe Zahl wie oben
+    ['100.000,00', 100000],        // Komma vorhanden: Punkt davor ist Tausendertrenner
     ['-5,25', -5.25],              // negativ
-    ['-1.234,56', -1234.56],       // negativ mit Tausenderpunkt
+    ['-1.234,56', -1234.56],       // negativ, Komma vorhanden: Punkt ist Tausendertrenner
     ['0,00', 0],
     ['0', 0],
     ['  3,10 €  ', 3.10],          // Leerzeichen und Einheit
@@ -45,6 +47,11 @@ function testeZahlenparser() {
   }
   pruefe(Number.isNaN(parseDeZahl('')), 'parseDeZahl("") sollte NaN ergeben');
   pruefe(Number.isNaN(parseDeZahl('abc')), 'parseDeZahl("abc") sollte NaN ergeben');
+  // Mehrere Punkte ohne Komma sind absichtlich nicht auflösbar (siehe Regel oben).
+  pruefe(
+    Number.isNaN(parseDeZahl('1.234.567')),
+    'parseDeZahl("1.234.567") sollte NaN ergeben (mehrdeutig ohne Komma)'
+  );
   console.log(`Zahlenparser: ${faelle.length} Fälle geprüft`);
 }
 
