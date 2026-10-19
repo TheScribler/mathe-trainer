@@ -337,7 +337,11 @@ export const extremwerteZweiVariablenKubisch = {
           { titel: 'Ergebnis', latex: `y_1 = 0, \\quad y_2 = ${zahlZuLatex(y2, 0)}` },
           {
             titel: 'Formel',
-            latex: `H = \\begin{pmatrix} f_{xx} & f_{xy} \\\\ f_{yx} & f_{yy} \\end{pmatrix}, \\quad f_{xx}=6x ${2 * b < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(2 * b), minimaleNachkommastellen(Math.abs(2 * b)))}, \\; f_{yy}=${zahlZuLatex(2 * c, 0)}, \\; f_{xy}=${zahlZuLatex(a, 0)}`,
+            latex: mehrzeiligeKette([
+              `H = \\begin{pmatrix} f_{xx} & f_{xy} \\\\ f_{yx} & f_{yy} \\end{pmatrix}`,
+              `f_{xx}=6x ${2 * b < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(2 * b), minimaleNachkommastellen(Math.abs(2 * b)))}`,
+              `f_{yy}=${zahlZuLatex(2 * c, 0)}, \\; f_{xy}=${zahlZuLatex(a, 0)}`,
+            ]),
             hinweis: 'Det(H)>0 und die zweite Ableitung nach x negativ: Maximum. Det(H)>0 und positiv: Minimum. Det(H)<0: Sattelpunkt.',
           },
           {
