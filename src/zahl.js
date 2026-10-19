@@ -49,3 +49,14 @@ export function runde(zahl, nachkommastellen = 2) {
 export function nahBei(a, b, toleranz = 1e-9) {
   return Math.abs(a - b) <= toleranz;
 }
+
+// Wie viele Nachkommastellen eine Zahl mindestens braucht, um sie exakt
+// darzustellen (bis zu maxStellen) — Grundlage für "ohne überflüssige
+// Nullen"-Anzeigen wie in finanz.js (anteilLatexOhneNullen,
+// prozentOhneNullenProse) und für polynomLatex (latex.js).
+export function minimaleNachkommastellen(zahl, maxStellen = 4) {
+  for (let dp = 0; dp <= maxStellen; dp++) {
+    if (Math.abs(runde(zahl, dp) - zahl) < 1e-9) return dp;
+  }
+  return maxStellen;
+}

@@ -104,3 +104,15 @@ body {
   text-align: center; font-size: .72rem; color: var(--gedaempft);
   margin: 1.5rem 0 0; padding-top: .5rem; opacity: .7;
 }
+.koeffizienten-reihe { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.koeffizienten-teil { display: inline-flex; align-items: center; gap: .3rem; }
+.koeffizienten-teil input { width: 4.5rem; }
+.koeffizienten-potenz { font-size: .95rem; }
+.koeffizienten-plus { color: var(--gedaempft); }
+.eingabe-zeile select {
+  font: inherit; padding: 10px 12px; border-radius: 8px; width: 100%;
+  border: 1px solid var(--rand); background: var(--bg); color: var(--fg);
+  -webkit-appearance: none; min-height: 44px;
+}
+.eingabe-zeile select.gut { border-color: var(--gut); }
+.eingabe-zeile select.schlecht { border-color: var(--schlecht); }

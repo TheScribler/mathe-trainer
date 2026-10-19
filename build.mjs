@@ -42,6 +42,7 @@ const MODUL_REIHENFOLGE = [
   'pruefung.js',
   'loesung.js',
   'generatoren/finanz.js',
+  'generatoren/diff.js',
   'generatoren/index.js',
   'app.js',
 ];

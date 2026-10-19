@@ -64,6 +64,36 @@ function testeZahlenparser() {
 const INSTANZEN = 1000;
 const ERLAUBTE_TITEL = ['Formel', 'Umstellen', 'Einsetzen', 'Ergebnis'];
 
+// Hilfsfunktionen für unabhängige numerische Prüfwege (siehe PLAN.md,
+// Testkonzept: "Ableitung per Differenzenquotient" usw.).
+function wertePolynom(koeffAbsteigend, exponenten, x) {
+  return koeffAbsteigend.reduce((summe, k, i) => summe + k * Math.pow(x, exponenten[i]), 0);
+}
+
+function ableitungNumerisch(f, x, h = 1e-4) {
+  return (f(x + h) - f(x - h)) / (2 * h);
+}
+
+function partielleAbleitungNumerisch(f, x, y, nachX, h = 1e-4) {
+  return nachX
+    ? (f(x + h, y) - f(x - h, y)) / (2 * h)
+    : (f(x, y + h) - f(x, y - h)) / (2 * h);
+}
+
+// Numerische Hesse-Matrix per finiter Differenzen — ein anderer Rechenweg als
+// die symbolischen zweiten Ableitungen des Generators. Klassifikation über
+// Det(H) und fxx ist für eine quadratische Form exakt (keine Kreis-Abtastung
+// nötig, die bei schmalem Sattel-Kegel und wenigen Abtastwinkeln unzuverlässig
+// werden kann — genau das ist beim ersten Testentwurf hier aufgetreten).
+function klassifiziereNumerisch(f, x, y, h = 1e-3) {
+  const fxx = (f(x + h, y) - 2 * f(x, y) + f(x - h, y)) / (h * h);
+  const fyy = (f(x, y + h) - 2 * f(x, y) + f(x, y - h)) / (h * h);
+  const fxy = (f(x + h, y + h) - f(x + h, y - h) - f(x - h, y + h) + f(x - h, y - h)) / (4 * h * h);
+  const det = fxx * fyy - fxy * fxy;
+  if (det < -1e-2) return 'Sattelpunkt';
+  return fxx < 0 ? 'Maximum' : 'Minimum';
+}
+
 // Nur in echten Formelfeldern (schritt.latex, ergebnis.latex) darf LaTeX-Syntax
 // stehen. Alles andere ist reiner Fließtext und wird als {feld, text} eingesammelt,
 // damit ein einziger Scan jedes Textfeld einer Aufgabe erfasst — auch neue Felder,
@@ -94,10 +124,13 @@ function sammlePlainTextFelder(aufgabe) {
   return felder;
 }
 
-// "{,}" (KaTeX-Komma-Escape), "_" (LaTeX-Subscript), "^{" (LaTeX-Superscript)
-// und "\;" (LaTeX-Spacing) haben in reinem Fließtext nichts zu suchen — dort
-// gelten Unicode-Zeichen (rₜ, q²⁵) oder ganz ausgeschriebene Wörter.
-const LATEX_RESTE = /\{,\}|_|\^\{|\\;/;
+// "{,}" (KaTeX-Komma-Escape), "_" (LaTeX-Subscript), "^" (LaTeX-Superscript,
+// auch ohne Klammern wie "x^2" — genau dieser Fall ist in diff.ableitungen
+// tatsächlich aufgetreten und wurde deshalb hier mit aufgenommen) und jeder
+// Backslash-Befehl ("\dfrac", "\sqrt", "\;" usw.) haben in reinem Fließtext
+// nichts zu suchen — dort gelten Unicode-Zeichen (rₜ, q²⁵, √) oder ganz
+// ausgeschriebene Wörter.
+const LATEX_RESTE = /\{,\}|_|\^|\\(?:[a-zA-Z]|;)/;
 
 function wertVon(aufgabe, id) {
   const eingabe = aufgabe.eingaben.find((e) => e.id === id);
@@ -185,6 +218,105 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
         `${kennzeichnung}: i_nom=${iNomLoesung} ergibt i_eff=${iEffProbe.toFixed(4)}, erwartet ${p.iEffGegeben}`
       );
     }
+    return;
+  }
+
+  if (generator.id === 'diff.gewinn-breakeven') {
+    const eKoeff = wertVon(aufgabe, 'E');
+    const gKoeff = wertVon(aufgabe, 'G');
+    const kKoeff = [eKoeff[0] - gKoeff[0], eKoeff[1] - gKoeff[1], eKoeff[2] - gKoeff[2]]; // K = E - G
+    const exp = [2, 1, 0];
+
+    // E(x) muss an mehreren Stellen mit p(x)·x übereinstimmen.
+    for (const x of [0, 1, 3, p.x0]) {
+      const eErwartet = (p.a - p.b * x) * x;
+      pruefe(nahBei(wertePolynom(eKoeff, exp, x), eErwartet, 1e-6),
+        `${kennzeichnung}: E(${x}) laut Koeffizienten ${wertePolynom(eKoeff, exp, x)}, erwartet ${eErwartet}`);
+    }
+    // G muss an x1 und x2 Nullstellen haben.
+    for (const x of [p.x1, p.x2]) {
+      pruefe(nahBei(wertePolynom(gKoeff, exp, x), 0, 1e-4),
+        `${kennzeichnung}: G(${x}) = ${wertePolynom(gKoeff, exp, x)}, erwartet 0`);
+    }
+    // K'(x0) numerisch aus K = E - G (eigener Rechenweg, nicht die analytische Ableitung).
+    const kVonX = (x) => wertePolynom(kKoeff, exp, x);
+    pruefe(nahBei(ableitungNumerisch(kVonX, p.x0), wertVon(aufgabe, 'Kstrich'), 1e-3),
+      `${kennzeichnung}: K'(${p.x0}) numerisch ${ableitungNumerisch(kVonX, p.x0)}, erwartet ${wertVon(aufgabe, 'Kstrich')}`);
+    // xmax: G'(xmax)=0 numerisch; pmax, gmax direkt an der Stelle xmax.
+    const gVonX = (x) => wertePolynom(gKoeff, exp, x);
+    const xmax = wertVon(aufgabe, 'xmax');
+    pruefe(nahBei(ableitungNumerisch(gVonX, xmax), 0, 1e-2),
+      `${kennzeichnung}: G'(${xmax}) numerisch ${ableitungNumerisch(gVonX, xmax)}, erwartet 0`);
+    pruefe(nahBei(gVonX(xmax), wertVon(aufgabe, 'gmax'), 1e-2),
+      `${kennzeichnung}: G(xmax)=${gVonX(xmax)}, erwartet gmax=${wertVon(aufgabe, 'gmax')}`);
+    pruefe(nahBei(p.a - p.b * xmax, wertVon(aufgabe, 'pmax'), 1e-2),
+      `${kennzeichnung}: p(xmax)=${p.a - p.b * xmax}, erwartet pmax=${wertVon(aufgabe, 'pmax')}`);
+    return;
+  }
+
+  if (generator.id === 'diff.extremwerte-2var') {
+    const fVon = (x, y) => Math.pow(x, 3) + p.a * x * y + p.b * x * x + p.c * y * y;
+    for (const [x, y, typErwartet, wertId] of [
+      [wertVon(aufgabe, 'p1x'), wertVon(aufgabe, 'p1y'), wertVon(aufgabe, 'p1typ'), 'p1wert'],
+      [wertVon(aufgabe, 'p2x'), wertVon(aufgabe, 'p2y'), wertVon(aufgabe, 'p2typ'), 'p2wert'],
+    ]) {
+      pruefe(Math.abs(partielleAbleitungNumerisch(fVon, x, y, true)) < 1e-2,
+        `${kennzeichnung}: f_x(${x},${y}) numerisch ungleich 0`);
+      pruefe(Math.abs(partielleAbleitungNumerisch(fVon, x, y, false)) < 1e-2,
+        `${kennzeichnung}: f_y(${x},${y}) numerisch ungleich 0`);
+      pruefe(nahBei(fVon(x, y), wertVon(aufgabe, wertId), 1e-2),
+        `${kennzeichnung}: f(${x},${y})=${fVon(x, y)}, erwartet ${wertVon(aufgabe, wertId)}`);
+      const klassifikation = klassifiziereNumerisch(fVon, x, y);
+      pruefe(klassifikation === typErwartet,
+        `${kennzeichnung}: numerische Hesse-Matrix an (${x},${y}) ergibt ${klassifikation}, erwartet ${typErwartet}`);
+    }
+    return;
+  }
+
+  if (generator.id === 'diff.extremwerte-2var-quadratisch') {
+    const fVon = (x, y) => p.A * x * x + p.B * x + p.C * y * y + p.D * y + p.E * x * y + p.F;
+    const x = wertVon(aufgabe, 'x');
+    const y = wertVon(aufgabe, 'y');
+    pruefe(Math.abs(partielleAbleitungNumerisch(fVon, x, y, true)) < 1e-2,
+      `${kennzeichnung}: f_x(${x},${y}) numerisch ungleich 0`);
+    pruefe(Math.abs(partielleAbleitungNumerisch(fVon, x, y, false)) < 1e-2,
+      `${kennzeichnung}: f_y(${x},${y}) numerisch ungleich 0`);
+    pruefe(nahBei(fVon(x, y), wertVon(aufgabe, 'wert'), 1e-2),
+      `${kennzeichnung}: f(${x},${y})=${fVon(x, y)}, erwartet ${wertVon(aufgabe, 'wert')}`);
+    const klassifikation = klassifiziereNumerisch(fVon, x, y);
+    pruefe(klassifikation === wertVon(aufgabe, 'typ'),
+      `${kennzeichnung}: numerische Hesse-Matrix an (${x},${y}) ergibt ${klassifikation}, erwartet ${wertVon(aufgabe, 'typ')}`);
+    return;
+  }
+
+  if (generator.id === 'diff.nutzenmaximum') {
+    const x1 = wertVon(aufgabe, 'x1');
+    const x2 = wertVon(aufgabe, 'x2');
+    // Budget muss exakt eingehalten werden.
+    pruefe(nahBei(p.P1 * x1 + p.P2 * x2, p.P1 * p.x1Stern + p.P2 * p.x2Stern, 1e-6),
+      `${kennzeichnung}: Budget P1·x1+P2·x2=${p.P1 * x1 + p.P2 * x2} weicht vom Einkommen ab`);
+    const uVon = (x1_, x2_) => p.alpha * x1_ + p.beta * x2_ + p.gamma * x1_ * x2_ + p.delta;
+    const uOptimum = uVon(x1, x2);
+    // U im Optimum muss größer sein als an zulässigen Nachbarpunkten auf
+    // der Budgetgeraden (x1 leicht verschoben, x2 passt sich an).
+    for (const dx of [-1, 1]) {
+      const x1Nachbar = x1 + dx;
+      const x2Nachbar = (p.P1 * p.x1Stern + p.P2 * p.x2Stern - p.P1 * x1Nachbar) / p.P2;
+      pruefe(uOptimum >= uVon(x1Nachbar, x2Nachbar) - 1e-6,
+        `${kennzeichnung}: U(${x1Nachbar},${x2Nachbar})=${uVon(x1Nachbar, x2Nachbar)} > U im Optimum ${uOptimum}`);
+    }
+    return;
+  }
+
+  if (generator.id === 'diff.ableitungen') {
+    const faWert = wertVon(aufgabe, 'a_check');
+    const fbWert = wertVon(aufgabe, 'b_check');
+    const faVon = (x) => p.a * x * x + 1 / x;
+    const fbVon = (x) => (x - p.b) * Math.sqrt(x * x - p.c);
+    pruefe(nahBei(ableitungNumerisch(faVon, p.x0a), faWert, 1e-3),
+      `${kennzeichnung}: f'(${p.x0a}) numerisch (a) = ${ableitungNumerisch(faVon, p.x0a)}, erwartet ${faWert}`);
+    pruefe(nahBei(ableitungNumerisch(fbVon, p.x0b), fbWert, 1e-3),
+      `${kennzeichnung}: f'(${p.x0b}) numerisch (b) = ${ableitungNumerisch(fbVon, p.x0b)}, erwartet ${fbWert}`);
     return;
   }
 

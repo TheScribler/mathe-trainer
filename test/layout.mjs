@@ -24,6 +24,11 @@ const GENERATOR_IDS = [
   'fin.rente-veraenderlich',
   'fin.verdopplungszeit',
   'fin.effektivzins',
+  'diff.gewinn-breakeven',
+  'diff.extremwerte-2var',
+  'diff.extremwerte-2var-quadratisch',
+  'diff.nutzenmaximum',
+  'diff.ableitungen',
 ];
 
 function warte(ms) {
