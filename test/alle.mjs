@@ -132,6 +132,26 @@ function sammlePlainTextFelder(aufgabe) {
 // ausgeschriebene Wörter.
 const LATEX_RESTE = /\{,\}|_|\^|\\(?:[a-zA-Z]|;)/;
 
+// Koeffizient 1 bzw. -1 muss weggelassen werden ("x" statt "1x", "x0" statt
+// "1 \cdot x0") — tatsächlich mehrfach in diff.js aufgetreten (P1=1, 2c=1,
+// E=±1 je nach Zufallszug). "1x"/"1\cdot" zählt nur, wenn die "1" davor nicht
+// Teil einer größeren Zahl ist (Start, Leerzeichen, +, -, "(" davor).
+const KOEFFIZIENT_EINS = /(^|[\s+\-(])1(x\b|\s*\\cdot|·)/;
+
+function sammleAlleTextfelder(aufgabe) {
+  // Für den Koeffizient-1-Scan zählen auch echte Formelfelder (im Gegensatz
+  // zu sammlePlainTextFelder, das genau die NICHT prüft) — die Regel gilt
+  // überall, nicht nur in reiner Prosa.
+  const felder = sammlePlainTextFelder(aufgabe);
+  for (const schritt of aufgabe.loesung.schritte) {
+    felder.push({ feld: `loesung.schritte[${schritt.titel}].latex`, text: schritt.latex });
+  }
+  for (const ergebnis of aufgabe.loesung.ergebnisse ?? []) {
+    felder.push({ feld: `loesung.ergebnisse[${ergebnis.label}].latex`, text: ergebnis.latex });
+  }
+  return felder;
+}
+
 function wertVon(aufgabe, id) {
   const eingabe = aufgabe.eingaben.find((e) => e.id === id);
   if (!eingabe) throw new Error(`Eingabe "${id}" nicht gefunden`);
@@ -364,6 +384,15 @@ function testeGenerator(generator) {
       pruefe(
         !LATEX_RESTE.test(text),
         `${generator.id} seed=${seed}: ${feld} enthält LaTeX-Reste: "${text}"`
+      );
+    }
+
+    // Koeffizient 1/-1 muss überall weggelassen werden, auch in Formelfeldern
+    // (nicht nur in Prosa) — "x" statt "1x", "x0" statt "1 \cdot x0".
+    for (const { feld, text } of sammleAlleTextfelder(aufgabe)) {
+      pruefe(
+        !KOEFFIZIENT_EINS.test(text),
+        `${generator.id} seed=${seed}: ${feld} zeigt Koeffizient 1 aus statt ihn wegzulassen: "${text}"`
       );
     }
 

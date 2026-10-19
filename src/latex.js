@@ -29,6 +29,16 @@ export function prozentLatex(anteil, nachkommastellen = 2) {
   return zahlZuLatex(anteil * 100, nachkommastellen) + '\\%';
 }
 
+// Mehrzeilige Gleichung statt einer langen Zeile mit mehreren "=" — bricht
+// bei jedem "=" um, rechtsbündig am Gleichheitszeichen ausgerichtet (KaTeX
+// `aligned`-Umgebung). lhs ist die linke Seite (z. B. "G(x)"), rhsListe die
+// aufeinanderfolgenden rechten Seiten (erste ist meist die Einsetzung, die
+// letzte das vereinfachte Ergebnis).
+export function mehrzeiligeGleichung(lhs, rhsListe) {
+  const zeilen = [`${lhs} &= ${rhsListe[0]}`, ...rhsListe.slice(1).map((r) => `&= ${r}`)];
+  return `\\begin{aligned} ${zeilen.join(' \\\\ ')} \\end{aligned}`;
+}
+
 // Polynom aus Koeffizienten + zugehörigen Exponenten als LaTeX, z. B.
 // polynomLatex([-2.4, 36, -120], [2, 1, 0]) -> "-2{,}4x^{2} + 36x - 120".
 // Nullkoeffizienten werden übersprungen, Koeffizient 1/-1 vor einer Potenz

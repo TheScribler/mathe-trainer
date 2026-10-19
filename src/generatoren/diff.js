@@ -5,7 +5,7 @@
 
 import { zufallInt, zufallAus } from '../rng.js';
 import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
-import { zahlZuLatex, bruch, polynomLatex } from '../latex.js';
+import { zahlZuLatex, bruch, polynomLatex, mehrzeiligeGleichung } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // Term mit Vorzeichen, Koeffizient 1/-1 wird nicht ausgeschrieben (gleiche
@@ -22,6 +22,21 @@ function termMitVorzeichen(koeff, einheit, formatFn, minus = '−') {
 // Baut einen mehrteiligen Ausdruck aus [Koeffizient, Einheit]-Paaren:
 // Nullkoeffizienten werden übersprungen, führendes "+" entfällt. paare[].0
 // kann auch '' als Einheit haben (reine Konstante).
+// "koeffizient \cdot ausdruck", aber ohne den Faktor auszuschreiben, wenn
+// |koeffizient| = 1 ist (z. B. "x0" statt "1 \cdot x0"). koeffizient hier
+// ist bereits mit Vorzeichen — der Aufrufer setzt das Vorzeichen davor selbst.
+function cdotWennNicht1(koeffizient, ausdruck) {
+  const betrag = Math.abs(koeffizient);
+  return betrag === 1 ? ausdruck : `${zahlZuLatex(betrag, minimaleNachkommastellen(betrag))} \\cdot ${ausdruck}`;
+}
+
+// "koeffizient" direkt vor einer Variable (z. B. "2x_1"), ohne den Faktor zu
+// zeigen, wenn er genau 1 ist ("x_1" statt "1x_1"). Nur für positive, schon
+// vorzeichenlose Koeffizienten (P1, P2, γ sind hier immer positiv).
+function koeffVariable(koeff, variable) {
+  return koeff === 1 ? variable : `${zahlZuLatex(koeff, minimaleNachkommastellen(koeff))}${variable}`;
+}
+
 function bauePolynomAusdruck(paare, formatFn, minus) {
   const nichtNull = paare.filter(([k]) => k !== 0);
   if (nichtNull.length === 0) return formatFn(0, 0);
@@ -36,12 +51,19 @@ function bauePolynomAusdruck(paare, formatFn, minus) {
 // E(x) = p(x)x = ax - bx²
 // G(x) = E(x) - K(x) = -(b+c)x² + (a-d)x - e =: -A x² + A(x1+x2) x - A x1 x2
 // ---------------------------------------------------------------------------
+// Koeffizient vor einer Variable in reinem Fließtext, Koeffizient 1 wird
+// weggelassen ("x" statt "1x"); b, c sind hier immer positiv (b∈{1,2,3},
+// c>0), kein Vorzeichen-Handling nötig.
+function proseKoeffVariable(koeff, variable) {
+  return koeff === 1 ? variable : `${formatDeZahl(koeff, minimaleNachkommastellen(koeff))}${variable}`;
+}
+
 const VORLAGEN_GEWINN = [
-  (a, b, c, d, e) => `Gegeben sei die Preisabsatzfunktion p(x) = ${formatDeZahl(a, 0)} − ${formatDeZahl(b, b % 1 === 0 ? 0 : 1)}x ` +
-    `sowie die Kostenfunktion K(x) = ${formatDeZahl(c, minimaleNachkommastellen(c))}x² ${d < 0 ? '−' : '+'} ${formatDeZahl(Math.abs(d), minimaleNachkommastellen(Math.abs(d)))}x ` +
+  (a, b, c, d, e) => `Gegeben sei die Preisabsatzfunktion p(x) = ${formatDeZahl(a, 0)} − ${proseKoeffVariable(b, 'x')} ` +
+    `sowie die Kostenfunktion K(x) = ${proseKoeffVariable(c, 'x²')} ${d < 0 ? '−' : '+'} ${proseKoeffVariable(Math.abs(d), 'x')} ` +
     `${e < 0 ? '−' : '+'} ${formatDeZahl(Math.abs(e), 0)}.`,
-  (a, b, c, d, e) => `Eine Preisabsatzfunktion lautet p(x) = ${formatDeZahl(a, 0)} − ${formatDeZahl(b, b % 1 === 0 ? 0 : 1)}x, ` +
-    `die zugehörige Kostenfunktion K(x) = ${formatDeZahl(c, minimaleNachkommastellen(c))}x² ${d < 0 ? '−' : '+'} ${formatDeZahl(Math.abs(d), minimaleNachkommastellen(Math.abs(d)))}x ` +
+  (a, b, c, d, e) => `Eine Preisabsatzfunktion lautet p(x) = ${formatDeZahl(a, 0)} − ${proseKoeffVariable(b, 'x')}, ` +
+    `die zugehörige Kostenfunktion K(x) = ${proseKoeffVariable(c, 'x²')} ${d < 0 ? '−' : '+'} ${proseKoeffVariable(Math.abs(d), 'x')} ` +
     `${e < 0 ? '−' : '+'} ${formatDeZahl(Math.abs(e), 0)}.`,
 ];
 
@@ -114,7 +136,10 @@ export const gewinnBreakeven = {
           },
           {
             titel: 'Einsetzen',
-            latex: `G(x) = ${polynomLatex(eKoeff, [2, 1, 0])} - \\left(${polynomLatex([c, d, e], [2, 1, 0])}\\right) = ${polynomLatex(gKoeff, [2, 1, 0])}`,
+            latex: mehrzeiligeGleichung('G(x)', [
+              `${polynomLatex(eKoeff, [2, 1, 0])} - \\left(${polynomLatex([c, d, e], [2, 1, 0])}\\right)`,
+              polynomLatex(gKoeff, [2, 1, 0]),
+            ]),
           },
           {
             titel: 'Formel',
@@ -123,7 +148,9 @@ export const gewinnBreakeven = {
           },
           {
             titel: 'Einsetzen',
-            latex: `K'(x) = ${polynomLatex([2 * c, d], [1, 0])} \\;\\Rightarrow\\; K'(${x0}) = ${zahlZuLatex(2 * c, minimaleNachkommastellen(2 * c))} \\cdot ${x0} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), minimaleNachkommastellen(Math.abs(d)))}`,
+            latex: mehrzeiligeGleichung("K'(x)", [
+              polynomLatex([2 * c, d], [1, 0]),
+            ]) + ` \\;\\Rightarrow\\; K'(${x0}) = ${cdotWennNicht1(2 * c, String(x0))} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), minimaleNachkommastellen(Math.abs(d)))}`,
           },
           { titel: 'Ergebnis', latex: `K'(${x0}) = ${zahlZuLatex(grenzkosten, 2)}` },
           {
@@ -132,9 +159,19 @@ export const gewinnBreakeven = {
             hinweis: 'Durch den Koeffizienten von x² teilen, damit vor x² eine 1 steht.',
           },
           {
+            titel: 'Ergebnis',
+            latex: `p = ${zahlZuLatex(-(x1 + x2), 0)}, \\quad q = ${zahlZuLatex(x1 * x2, 0)}`,
+            hinweis: 'Koeffizienten der normierten Gleichung x² + px + q = 0 ablesen.',
+          },
+          {
             titel: 'Einsetzen',
-            latex: `x_{1,2} = -\\dfrac{p}{2} \\pm \\sqrt{\\left(\\dfrac{p}{2}\\right)^2 - q} = ${zahlZuLatex((x1 + x2) / 2, minimaleNachkommastellen((x1 + x2) / 2))} \\pm ${zahlZuLatex((x2 - x1) / 2, minimaleNachkommastellen((x2 - x1) / 2))}`,
-            hinweis: 'p-q-Formel mit p = −(x₁+x₂) und q = x₁·x₂.',
+            latex: mehrzeiligeGleichung('x_{1,2}', [
+              `-\\dfrac{p}{2} \\pm \\sqrt{\\left(\\dfrac{p}{2}\\right)^2 - q}`,
+              `-\\dfrac{${zahlZuLatex(-(x1 + x2), 0)}}{2} \\pm \\sqrt{\\left(\\dfrac{${zahlZuLatex(-(x1 + x2), 0)}}{2}\\right)^2 - ${zahlZuLatex(x1 * x2, 0)}}`,
+              `${zahlZuLatex((x1 + x2) / 2, minimaleNachkommastellen((x1 + x2) / 2))} \\pm \\sqrt{${zahlZuLatex(Math.pow((x1 + x2) / 2, 2), minimaleNachkommastellen(Math.pow((x1 + x2) / 2, 2)))} - ${zahlZuLatex(x1 * x2, 0)}}`,
+              `${zahlZuLatex((x1 + x2) / 2, minimaleNachkommastellen((x1 + x2) / 2))} \\pm ${zahlZuLatex((x2 - x1) / 2, minimaleNachkommastellen((x2 - x1) / 2))}`,
+            ]),
+            hinweis: 'p-q-Formel.',
           },
           { titel: 'Ergebnis', latex: `x_1 = ${x1}\\ \\text{(Break-Even)}, \\quad x_2 = ${x2}\\ \\text{(Gewinngrenze)}` },
           {
@@ -229,6 +266,7 @@ export const extremwerteZweiVariablenKubisch = {
     const wert2 = runde(x2 * x2 * x2 + a * x2 * y2 + b * x2 * x2 + c * y2 * y2, 4);
 
     const text = `f(x,y) = x³ ${termMitVorzeichen(a, 'xy', formatDeZahl)} ${termMitVorzeichen(b, 'x²', formatDeZahl)} ${termMitVorzeichen(c, 'y²', formatDeZahl)}`;
+    const yKoeff = -a / (2 * c); // aus f_y=0 umgestellt: y = -(a/2c)x
 
     return {
       frage: { text: `Bestimmen Sie alle Extremwerte und Sattelpunkte der Funktion ${text}.` },
@@ -246,18 +284,18 @@ export const extremwerteZweiVariablenKubisch = {
         schritte: [
           {
             titel: 'Formel',
-            latex: `f_x = 3x^2 ${a < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(a), 0)}y ${2 * b < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(2 * b), minimaleNachkommastellen(Math.abs(2 * b)))}x, \\quad ` +
-              `f_y = ${zahlZuLatex(a, 0)}x ${2 * c < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(2 * c), 0)}y`,
+            latex: `f_x = 3x^2 ${a < 0 ? '-' : '+'} ${koeffVariable(Math.abs(a), 'y')} ${2 * b < 0 ? '-' : '+'} ${koeffVariable(Math.abs(2 * b), 'x')}, \\quad ` +
+              `f_y = ${a < 0 ? '-' : ''}${koeffVariable(Math.abs(a), 'x')} ${2 * c < 0 ? '-' : '+'} ${koeffVariable(Math.abs(2 * c), 'y')}`,
             hinweis: 'Partielle Ableitungen: beim Ableiten nach x wird y wie eine Zahl behandelt und umgekehrt.',
           },
           {
             titel: 'Umstellen',
-            latex: `f_y = 0 \\;\\Rightarrow\\; y = -\\dfrac{a}{2c}x = ${zahlZuLatex(-a / (2 * c), 0)}x`,
+            latex: `f_y = 0 \\;\\Rightarrow\\; y = -\\dfrac{${zahlZuLatex(a, 0)}}{2 \\cdot (${zahlZuLatex(c, 0)})}x = ${yKoeff < 0 ? '-' : ''}${koeffVariable(Math.abs(yKoeff), 'x')}`,
             hinweis: 'Nach y umstellen, dann in die Ableitung nach x einsetzen.',
           },
           {
             titel: 'Einsetzen',
-            latex: `f_x = 3x^2 ${a < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(a), 0)} \\cdot (${zahlZuLatex(-a / (2 * c), 0)}x) ${2 * b < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(2 * b), minimaleNachkommastellen(Math.abs(2 * b)))}x = 0`,
+            latex: `f_x = 3x^2 ${a < 0 ? '-' : '+'} ${cdotWennNicht1(Math.abs(a), `(${yKoeff < 0 ? '-' : ''}${koeffVariable(Math.abs(yKoeff), 'x')})`)} ${2 * b < 0 ? '-' : '+'} ${koeffVariable(Math.abs(2 * b), 'x')} = 0`,
           },
           {
             titel: 'Ergebnis',
@@ -318,6 +356,16 @@ export const extremwerteZweiVariablenQuadratisch = {
       const B = -(2 * A * xStern + E * yStern);
       const D = -(2 * C * yStern + E * xStern);
       const F = zufallInt(rng, -5, 5);
+
+      // Die Einsetzungsmethode (siehe baue()) braucht vier abgeleitete
+      // Zwischenwerte k1,k2,m1,n1 — die müssen "sauber" bleiben (höchstens
+      // 2 Nachkommastellen), sonst ist die gezeigte Rechnung unleserlich.
+      const k1 = -B / (2 * A);
+      const k2 = -E / (2 * A);
+      const m1 = 2 * C + E * k2;
+      const n1 = D + E * k1;
+      if ([k1, k2, m1, n1].some((w) => minimaleNachkommastellen(w) > 2)) continue;
+
       return { A, B, C, D, E, F, xStern, yStern };
     }
     return { A: -1, B: 24, C: -2, D: 40, E: -2, F: -3, xStern: 4, yStern: 8 }; // Rückfall: Übung 15a
@@ -332,6 +380,14 @@ export const extremwerteZweiVariablenQuadratisch = {
     const wert = runde(A * xStern * xStern + B * xStern + C * yStern * yStern + D * yStern + E * xStern * yStern + F, 4);
 
     const fText = `f(x,y) = ${bauePolynomAusdruck([[A, 'x²'], [B, 'x'], [C, 'y²'], [D, 'y'], [E, 'xy'], [F, '']], formatDeZahl, '−')}`;
+
+    // Einsetzungsmethode mit echten Zahlen (keine Platzhalterbuchstaben):
+    // x = k1 + k2·y aus f_x=0, dann in f_y=0 eingesetzt und nach y aufgelöst.
+    const k1 = runde(-B / (2 * A), 4);
+    const k2 = runde(-E / (2 * A), 4);
+    const xVonY = bauePolynomAusdruck([[k1, ''], [k2, 'y']], zahlZuLatex, '-');
+    const m1 = runde(2 * C + E * k2, 4);
+    const n1 = runde(D + E * k1, 4);
 
     return {
       frage: { text: `Bestimmen Sie alle Extremwerte der Funktion ${fText}.` },
@@ -351,24 +407,35 @@ export const extremwerteZweiVariablenQuadratisch = {
           },
           {
             titel: 'Umstellen',
-            latex: `f_x = 0 \\;\\Rightarrow\\; x = ${bruch(bauePolynomAusdruck([[-B, ''], [-E, 'y']], zahlZuLatex, '-'), zahlZuLatex(2 * A, 0))}`,
-            hinweis: 'Nach x umstellen (Einsetzungsmethode), dann in die zweite Ableitung einsetzen und nach y auflösen — hier direkt mit dem Ergebnis.',
+            latex: `f_x = 0 \\;\\Rightarrow\\; x = ${xVonY}`,
+            hinweis: 'Nach x umstellen (Einsetzungsmethode).',
           },
           {
             titel: 'Einsetzen',
-            latex: `f_x(${zahlZuLatex(xStern, 0)},${zahlZuLatex(yStern, 0)}) = ${zahlZuLatex(2 * A, 0)} \\cdot (${zahlZuLatex(xStern, 0)}) ${B < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(B), 0)} ${E < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(E), 0)} \\cdot (${zahlZuLatex(yStern, 0)}) = 0`,
-            hinweis: 'Probe: beide Ableitungen müssen an der Lösung null ergeben.',
+            latex: mehrzeiligeGleichung('f_y', [
+              `${koeffVariable(2 * C, 'y')}${D === 0 ? '' : ` ${D < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(D), 0)}`} ${E < 0 ? '-' : '+'} ${cdotWennNicht1(Math.abs(E), `(${xVonY})`)}`,
+              `${koeffVariable(m1, 'y')} ${n1 < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(n1), minimaleNachkommastellen(Math.abs(n1)))}`,
+            ]) + ' = 0',
+            hinweis: 'x ersetzen und ausmultiplizieren.',
           },
+          { titel: 'Ergebnis', latex: `y = ${zahlZuLatex(yStern, 0)}` },
           {
-            titel: 'Ergebnis',
-            latex: `x = ${zahlZuLatex(xStern, 0)}, \\quad y = ${zahlZuLatex(yStern, 0)}`,
+            titel: 'Einsetzen',
+            latex: `x = ${zahlZuLatex(k1, minimaleNachkommastellen(k1))} ${k2 < 0 ? '-' : '+'} ${cdotWennNicht1(k2, zahlZuLatex(yStern, 0))} = ${zahlZuLatex(xStern, 0)}`,
           },
           {
             titel: 'Formel',
-            latex: `H = \\begin{pmatrix} f_{xx} & f_{xy} \\\\ f_{yx} & f_{yy} \\end{pmatrix} = \\begin{pmatrix} ${zahlZuLatex(fxx, 0)} & ${zahlZuLatex(fxy, 0)} \\\\ ${zahlZuLatex(fxy, 0)} & ${zahlZuLatex(fyy, 0)} \\end{pmatrix}`,
+            latex: `H = \\begin{pmatrix} f_{xx} & f_{xy} \\\\ f_{yx} & f_{yy} \\end{pmatrix}`,
             hinweis: 'Det(H)>0 und die zweite Ableitung nach x negativ: Maximum. Det(H)>0 und positiv: Minimum. Det(H)<0: Sattelpunkt.',
           },
-          { titel: 'Einsetzen', latex: `\\det(H) = (${zahlZuLatex(fxx, 0)}) \\cdot (${zahlZuLatex(fyy, 0)}) - (${zahlZuLatex(fxy, 0)})^2 = ${zahlZuLatex(det, 0)}` },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeGleichung('\\det(H)', [
+              `\\begin{vmatrix} ${zahlZuLatex(fxx, 0)} & ${zahlZuLatex(fxy, 0)} \\\\ ${zahlZuLatex(fxy, 0)} & ${zahlZuLatex(fyy, 0)} \\end{vmatrix}`,
+              `(${zahlZuLatex(fxx, 0)}) \\cdot (${zahlZuLatex(fyy, 0)}) - (${zahlZuLatex(fxy, 0)})^2`,
+              zahlZuLatex(det, 0),
+            ]),
+          },
           {
             titel: 'Ergebnis',
             latex: `(${zahlZuLatex(xStern, 0)}|${zahlZuLatex(yStern, 0)})\\text{ ist ein } \\textbf{${typ}}, \\; f(${zahlZuLatex(xStern, 0)},${zahlZuLatex(yStern, 0)}) = ${zahlZuLatex(wert, 2)}`,
@@ -457,11 +524,11 @@ export const nutzenmaximum = {
         schritte: [
           {
             titel: 'Formel',
-            latex: `${uLatex} \\quad \\text{u.d.N.} \\quad ${zahlZuLatex(P1, 0)}x_1 + ${zahlZuLatex(P2, 0)}x_2 = ${zahlZuLatex(Y, 0)}`,
+            latex: `${uLatex} \\quad \\text{u.d.N.} \\quad ${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} = ${zahlZuLatex(Y, 0)}`,
           },
           {
             titel: 'Umstellen',
-            latex: `x_2 = ${bruch(`${zahlZuLatex(Y, 0)} - ${zahlZuLatex(P1, 0)}x_1`, zahlZuLatex(P2, 0))}`,
+            latex: `x_2 = ${bruch(`${zahlZuLatex(Y, 0)} - ${koeffVariable(P1, 'x_1')}`, zahlZuLatex(P2, 0))}`,
             hinweis: 'Nebenbedingung nach x₂ umstellen, dann in U einsetzen (Einsetzungsmethode).',
           },
           {
@@ -480,18 +547,18 @@ export const nutzenmaximum = {
           },
           {
             titel: 'Einsetzen',
-            latex: `x_2 = ${bruch(`${zahlZuLatex(Y, 0)} - ${zahlZuLatex(P1, 0)} \\cdot ${zahlZuLatex(x1Stern, 0)}`, zahlZuLatex(P2, 0))} = ${zahlZuLatex(x2Stern, 0)}`,
+            latex: `x_2 = ${bruch(`${zahlZuLatex(Y, 0)} - ${cdotWennNicht1(P1, zahlZuLatex(x1Stern, 0))}`, zahlZuLatex(P2, 0))} = ${zahlZuLatex(x2Stern, 0)}`,
           },
           { titel: 'Ergebnis', latex: `(x_1;x_2) = (${zahlZuLatex(x1Stern, 0)};${zahlZuLatex(x2Stern, 0)})` },
           {
             titel: 'Formel',
-            latex: `L(x_1,x_2,\\lambda) = U(x_1,x_2) + \\lambda(${zahlZuLatex(P1, 0)}x_1 + ${zahlZuLatex(P2, 0)}x_2 - ${zahlZuLatex(Y, 0)})`,
+            latex: `L(x_1,x_2,\\lambda) = U(x_1,x_2) + \\lambda(${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} - ${zahlZuLatex(Y, 0)})`,
             hinweis: 'Kontrolle mit der Lagrange-Methode: L nach x₁, x₂ und λ ableiten und null setzen.',
           },
           {
             titel: 'Einsetzen',
-            latex: `L_{x_1} = ${zahlZuLatex(alpha, 0)} + ${zahlZuLatex(gamma, 0)}x_2 + ${zahlZuLatex(P1, 0)}\\lambda = 0, \\quad ` +
-              `L_{x_2} = ${zahlZuLatex(beta, 0)} + ${zahlZuLatex(gamma, 0)}x_1 + ${zahlZuLatex(P2, 0)}\\lambda = 0`,
+            latex: `L_{x_1} = ${zahlZuLatex(alpha, 0)} + ${koeffVariable(gamma, 'x_2')} + ${koeffVariable(P1, '\\lambda')} = 0, \\quad ` +
+              `L_{x_2} = ${zahlZuLatex(beta, 0)} + ${koeffVariable(gamma, 'x_1')} + ${koeffVariable(P2, '\\lambda')} = 0`,
           },
           { titel: 'Ergebnis', latex: `\\lambda = ${zahlZuLatex(lambda, minimaleNachkommastellen(lambda))}\\text{ (aus beiden Gleichungen identisch)}` },
         ],
@@ -563,11 +630,11 @@ export const ableitungen = {
             hinweis: 'Umschreiben: 1/x = x⁻¹, dann Potenzregel (xⁿ)\' = n·xⁿ⁻¹ auf jeden Summanden anwenden.',
           },
           { titel: 'Ergebnis', latex: `f'(x) = ${faStrich}` },
-          { titel: 'Einsetzen', latex: `f'(${zahlZuLatex(x0a, 0)}) = ${faStrichWert < 0 ? '' : ''}${zahlZuLatex(faStrichWert, 2)}` },
+          { titel: 'Einsetzen', latex: `f'(${zahlZuLatex(x0a, 0)}) = ${zahlZuLatex(faStrichWert, 2)}` },
           {
             titel: 'Formel',
             latex: `f(x) = ${fbLatex}`,
-            hinweis: 'Produktregel (u·v)\' = u\'v + uv\' mit u = x − b, v = √(x²−c); für v\' die Kettenregel.',
+            hinweis: `Produktregel (u·v)' = u'v + uv' mit u = x − ${formatDeZahl(b, 0)}, v = √(x² − ${formatDeZahl(c, 0)}); für v' die Kettenregel.`,
           },
           { titel: 'Ergebnis', latex: `f'(x) = ${fbStrich}` },
           { titel: 'Einsetzen', latex: `f'(${zahlZuLatex(x0b, 0)}) = ${zahlZuLatex(fbStrichWert, 2)}` },

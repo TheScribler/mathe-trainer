@@ -13,7 +13,14 @@
 * { box-sizing: border-box; }
 html, body { background: var(--bg); overflow-x: hidden; }
 body {
-  margin: 0; padding: 20px 16px 48px;
+  margin: 0;
+  /* env(safe-area-inset-*) ist 0 ohne viewport-fit=cover (gesetzt in
+     build.mjs); max() hält den bisherigen Mindestabstand, wenn die Insel/
+     Notch/Home-Indicator mehr Platz braucht als das. */
+  padding-top: max(20px, env(safe-area-inset-top));
+  padding-bottom: max(48px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
   background: var(--bg); color: var(--fg);
   font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
   -webkit-text-size-adjust: 100%;
@@ -42,7 +49,15 @@ body {
 }
 .eingabe-zeile input.gut { border-color: var(--gut); }
 .eingabe-zeile input.schlecht { border-color: var(--schlecht); }
-.eingelesen-als { font-size: .8rem; color: var(--gedaempft); min-height: 1.1em; }
+.eingelesen-als {
+  display: block; font-size: .8rem; color: var(--gedaempft);
+  /* Feste Höhe von Anfang an reserviert (nicht nur min-height — bei einem
+     reinen <span> ohne eigenes Block-Layout hätte min-height sonst keine
+     Wirkung gehabt), damit das Erscheinen des Textes die Zeile nicht
+     verschiebt. Ein geschütztes Leerzeichen hält die Zeile bei leerem Feld. */
+  height: 1.1em; line-height: 1.1em; overflow: hidden;
+}
+.eingelesen-als-reihe { margin-top: .3rem; }
 .pruef-ergebnis { min-height: 1.2em; font-weight: 600; }
 .pruef-ergebnis.gut { color: var(--gut); }
 .pruef-ergebnis.schlecht { color: var(--schlecht); }

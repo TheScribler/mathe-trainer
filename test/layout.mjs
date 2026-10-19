@@ -136,6 +136,51 @@ async function main() {
       }
       console.log(`${generatorId}: ${SEEDS_PRO_GENERATOR} Instanzen bei ${tatsaechlicheBreite}px geprüft, ${problemeFuerGenerator} Layout-Probleme`);
     }
+
+    // Dynamic-Island-Simulation: echtes Desktop-Safari liefert immer
+    // env(safe-area-inset-*) = 0 (kein Notch), darum lässt sich die Insel nicht
+    // über die Fensterbreite/-höhe erzeugen. Stattdessen wird body.padding-top
+    // direkt per injiziertem <style> auf 59px überschrieben (der Wert, den der
+    // Nutzer für die Dynamic-Island-Höhe im Hochformat angegeben hat) und
+    // geprüft, dass dadurch kein horizontales Scrollen oder Abschneiden entsteht.
+    console.log('\nSimuliere Dynamic Island (safe-area-inset-top: 59px) …');
+    await wd(`/session/${id}/execute/sync`, 'POST', {
+      script: `
+        const stil = document.createElement('style');
+        stil.textContent = 'body { padding-top: 59px !important; padding-bottom: 48px !important; }';
+        document.head.appendChild(stil);
+      `, args: [],
+    });
+    let inselFehler = 0;
+    for (const generatorId of GENERATOR_IDS) {
+      await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: 'window.__testErzeugeAufgabe(arguments[0], arguments[1], true);',
+        args: [generatorId, 0],
+      });
+      const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: LAYOUT_PRUEFSKRIPT, args: [],
+      });
+      geprueft += 1;
+      for (const problem of ergebnis.probleme) {
+        fehler += 1;
+        inselFehler += 1;
+        console.error(`FEHLER (Dynamic Island): ${generatorId}: ${problem}`);
+      }
+      const { value: kopfSichtbar } = { value: await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: `
+          const kopf = document.querySelector('.kopf h1') || document.querySelector('#app');
+          if (!kopf) return null;
+          const rect = kopf.getBoundingClientRect();
+          return rect.top >= 59;
+        `, args: [],
+      }) };
+      if (kopfSichtbar === false) {
+        fehler += 1;
+        inselFehler += 1;
+        console.error(`FEHLER (Dynamic Island): ${generatorId}: Kopfbereich beginnt oberhalb der simulierten Insel (< 59px)`);
+      }
+    }
+    console.log(`Dynamic-Island-Simulation: ${GENERATOR_IDS.length} Generatoren geprüft, ${inselFehler} Probleme`);
   } finally {
     if (sitzung && sitzung.sessionId) {
       await wd(`/session/${sitzung.sessionId}`, 'DELETE').catch(() => {});

@@ -85,7 +85,11 @@ function starteApp() {
       karte.appendChild(baueTabelle(aktuelleAufgabe.frage.tabelle));
     }
 
-    function baueZahlenfeld(zeile) {
+    // mitEigenerHinweis=false: das Feld bekommt keinen eigenen "Eingelesen
+    // als"-Hinweis direkt daneben (für Koeffizientenreihen, wo das die Zeile
+    // zum Umbrechen bringen würde — ein gemeinsamer Hinweis unter der ganzen
+    // Reihe wird stattdessen vom Aufrufer gebaut, siehe unten).
+    function baueZahlenfeld(zeile, { mitEigenerHinweis = true } = {}) {
       const feld = document.createElement('input');
       feld.type = 'text';
       feld.inputMode = 'decimal';
@@ -94,23 +98,32 @@ function starteApp() {
       feld.spellcheck = false;
       zeile.appendChild(feld);
 
-      const eingelesenAls = document.createElement('span');
-      eingelesenAls.className = 'eingelesen-als';
-      zeile.appendChild(eingelesenAls);
-
-      feld.addEventListener('input', function () {
-        feld.classList.remove('gut', 'schlecht');
-        const text = feld.value.trim();
-        if (text === '') {
-          eingelesenAls.textContent = '';
-          return;
-        }
-        const wert = parseDeZahl(text);
-        eingelesenAls.textContent = isFinite(wert)
-          ? 'Eingelesen als ' + formatDeZahlFrei(wert)
-          : 'Eingelesen als: keine Zahl erkannt';
-      });
+      if (mitEigenerHinweis) {
+        const eingelesenAls = document.createElement('span');
+        eingelesenAls.className = 'eingelesen-als';
+        zeile.appendChild(eingelesenAls);
+        feld.addEventListener('input', function () {
+          feld.classList.remove('gut', 'schlecht');
+          aktualisiereEingelesenAls(feld.value, eingelesenAls);
+        });
+      } else {
+        feld.addEventListener('input', function () {
+          feld.classList.remove('gut', 'schlecht');
+        });
+      }
       return feld;
+    }
+
+    function aktualisiereEingelesenAls(text, ziel) {
+      const getrimmt = text.trim();
+      if (getrimmt === '') {
+        ziel.textContent = ' '; // geschütztes Leerzeichen: Höhe bleibt reserviert
+        return;
+      }
+      const wert = parseDeZahl(getrimmt);
+      ziel.textContent = isFinite(wert)
+        ? 'Eingelesen als ' + formatDeZahlFrei(wert)
+        : 'Eingelesen als: keine Zahl erkannt';
     }
 
     const form = document.createElement('div');
@@ -136,7 +149,7 @@ function starteApp() {
           }
           const teilZeile = document.createElement('span');
           teilZeile.className = 'koeffizienten-teil';
-          const feld = baueZahlenfeld(teilZeile);
+          const feld = baueZahlenfeld(teilZeile, { mitEigenerHinweis: false });
           const potenzLabel = document.createElement('span');
           potenzLabel.className = 'koeffizienten-potenz';
           potenzLabel.textContent = potenzBeschriftung(exponent);
@@ -145,6 +158,29 @@ function starteApp() {
           teilfelder.push(feld);
         });
         zeile.appendChild(reihe);
+
+        // Ein gemeinsamer Hinweis unter der ganzen Reihe, nicht je Feld —
+        // zeigt alle Koeffizienten zusammen, z. B. "Eingelesen als: -2, 25, 0".
+        const eingelesenAls = document.createElement('span');
+        eingelesenAls.className = 'eingelesen-als eingelesen-als-reihe';
+        eingelesenAls.textContent = ' ';
+        zeile.appendChild(eingelesenAls);
+        teilfelder.forEach((feld) => {
+          feld.addEventListener('input', function () {
+            const werte = teilfelder.map((f) => f.value.trim());
+            if (werte.every((w) => w === '')) {
+              eingelesenAls.textContent = ' ';
+              return;
+            }
+            const geparst = werte.map((w) => {
+              if (w === '') return '–';
+              const z = parseDeZahl(w);
+              return isFinite(z) ? formatDeZahlFrei(z) : '?';
+            });
+            eingelesenAls.textContent = 'Eingelesen als: ' + geparst.join(', ');
+          });
+        });
+
         felder[eingabe.id] = teilfelder;
       } else if (eingabe.typ === 'auswahl') {
         const auswahl = document.createElement('select');
@@ -194,56 +230,59 @@ function starteApp() {
     pruefenKnopf.type = 'button';
     pruefenKnopf.textContent = 'Prüfen';
     pruefenKnopf.addEventListener('click', function () {
-      let gibtLeereFelder = false;
-      let alleRichtig = true;
+      // Jedes Feld zählt unabhängig: leer ist "noch nicht beantwortet"
+      // (neutral, keine rote Markierung), nicht automatisch falsch. Am Ende
+      // steht eine Zusammenfassung über alle (nicht-term-)Felder.
+      let gesamt = 0;
+      let richtig = 0;
+      let leer = 0;
       for (const eingabe of aktuelleAufgabe.eingaben) {
         const feldOderFelder = felder[eingabe.id];
         if (eingabe.typ === 'term') continue; // nicht automatisch geprüft, siehe oben
+        gesamt += 1;
 
         if (eingabe.typ === 'koeffizienten') {
           feldOderFelder.forEach((f) => f.classList.remove('gut', 'schlecht'));
           if (feldOderFelder.some((f) => f.value.trim() === '')) {
-            gibtLeereFelder = true;
-            alleRichtig = false;
+            leer += 1;
             continue;
           }
           const werte = feldOderFelder.map((f) => f.value);
           const ergebnis = pruefeKoeffizienten(werte, eingabe.loesung, eingabe.toleranz);
           feldOderFelder.forEach((f) => f.classList.add(ergebnis.korrekt ? 'gut' : 'schlecht'));
-          if (!ergebnis.korrekt) alleRichtig = false;
+          if (ergebnis.korrekt) richtig += 1;
         } else if (eingabe.typ === 'auswahl') {
           feldOderFelder.classList.remove('gut', 'schlecht');
           if (feldOderFelder.value === '') {
-            gibtLeereFelder = true;
-            alleRichtig = false;
+            leer += 1;
             continue;
           }
           const ergebnis = pruefeAuswahl(feldOderFelder.value, eingabe.loesung);
           feldOderFelder.classList.add(ergebnis.korrekt ? 'gut' : 'schlecht');
-          if (!ergebnis.korrekt) alleRichtig = false;
+          if (ergebnis.korrekt) richtig += 1;
         } else {
           feldOderFelder.classList.remove('gut', 'schlecht');
           if (feldOderFelder.value.trim() === '') {
-            // Ein leeres Feld ist "noch nicht beantwortet", nicht "falsch" —
-            // deshalb keine rote Markierung und keine neutrale Fehlermeldung.
-            gibtLeereFelder = true;
-            alleRichtig = false;
+            leer += 1;
             continue;
           }
           const ergebnis = pruefeZahl(feldOderFelder.value, eingabe.loesung, eingabe.toleranz);
           feldOderFelder.classList.add(ergebnis.korrekt ? 'gut' : 'schlecht');
-          if (!ergebnis.korrekt) alleRichtig = false;
+          if (ergebnis.korrekt) richtig += 1;
         }
       }
-      if (gibtLeereFelder) {
-        ergebnisZeile.textContent = 'Bitte eine Zahl eingeben.';
+
+      const falsch = gesamt - richtig - leer;
+      if (leer === gesamt) {
+        ergebnisZeile.textContent = 'Bitte mindestens ein Feld ausfüllen.';
         ergebnisZeile.className = 'pruef-ergebnis neutral';
-      } else if (alleRichtig) {
+      } else if (richtig === gesamt) {
         ergebnisZeile.textContent = 'Richtig.';
         ergebnisZeile.className = 'pruef-ergebnis gut';
       } else {
-        ergebnisZeile.textContent = 'Noch nicht richtig — Lösung ansehen?';
-        ergebnisZeile.className = 'pruef-ergebnis schlecht';
+        const leerZusatz = leer > 0 ? `, ${leer} Feld${leer === 1 ? '' : 'er'} leer` : '';
+        ergebnisZeile.textContent = `${richtig} von ${gesamt} richtig${leerZusatz}.`;
+        ergebnisZeile.className = 'pruef-ergebnis ' + (falsch > 0 ? 'schlecht' : 'neutral');
       }
     });
     knopfReihe.appendChild(pruefenKnopf);
