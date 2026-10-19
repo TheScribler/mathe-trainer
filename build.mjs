@@ -198,17 +198,18 @@ self.addEventListener('activate', (ev) => {
 
 self.addEventListener('fetch', (ev) => {
   if (ev.request.method !== 'GET') return;
+  // Netz zuerst: wer online ist, bekommt immer den neuesten Stand (wichtig
+  // während der Entwicklung — ein Cache-First-Ansatz hätte sonst nach jedem
+  // Build eine veraltete Version weiter ausgeliefert). Nur wenn das Netz
+  // fehlschlägt (Flugmodus), greift der zuletzt erfolgreich geladene Cache.
   ev.respondWith(
-    caches.match(ev.request).then((cached) => {
-      const netz = fetch(ev.request)
-        .then((antwort) => {
-          const kopie = antwort.clone();
-          caches.open(CACHE).then((c) => c.put(ev.request, kopie));
-          return antwort;
-        })
-        .catch(() => cached);
-      return cached || netz;
-    })
+    fetch(ev.request)
+      .then((antwort) => {
+        const kopie = antwort.clone();
+        caches.open(CACHE).then((c) => c.put(ev.request, kopie));
+        return antwort;
+      })
+      .catch(() => caches.match(ev.request))
   );
 });
 `;

@@ -26,7 +26,7 @@
   }
 }
 * { box-sizing: border-box; }
-html, body { background: var(--bg); }
+html, body { background: var(--bg); overflow-x: hidden; }
 body {
   margin: 0; padding: 20px 16px 48px;
   background: var(--bg); color: var(--fg);
@@ -42,7 +42,7 @@ body {
 }
 .aufgabe-karte h2 { font-size: 1rem; margin: 0 0 .6rem; }
 .frage-text { margin: 0 0 1rem; }
-.frage-tabelle-wrapper { overflow-x: auto; margin: 0 0 1rem; }
+.frage-tabelle-wrapper { overflow-x: auto; max-width: 100%; margin: 0 0 1rem; }
 .frage-tabelle { border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .frage-tabelle th, .frage-tabelle td {
   border: 1px solid var(--rand); padding: 6px 12px; text-align: center;
@@ -77,25 +77,35 @@ body {
   color: var(--gedaempft); margin-bottom: .25rem; font-weight: 600;
 }
 .loesung-formel {
+  /* -webkit-overflow-scrolling:touch ist auf aktuellem iOS wirkungslos
+     (Safari scrollt überall nativ mit Momentum) und wurde entfernt. */
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
   max-width: 100%;
-  padding-bottom: 2px; /* Platz für die Scrollbar, damit sie nichts überdeckt */
 }
 @media (max-width: 480px) {
   /* Lange Summen/Brüche (z. B. veränderliche Rente mit 5 Zahlungen) passen auf
      schmalen Bildschirmen seltener in die Breite — kleinere Schrift verringert,
      wie oft überhaupt gescrollt werden muss. Was trotzdem nicht passt, bleibt
      über overflow-x:auto erreichbar statt abgeschnitten. */
-  .loesung-formel .katex { font-size: 0.85em; }
+  .loesung-formel .katex, .loesung-ergebnis-wert .katex { font-size: 0.85em; }
 }
 .loesung-hinweis { font-size: .85rem; color: var(--gedaempft); margin-top: .2rem; }
 .loesung-ergebnisse {
   border-top: 1px dashed var(--rand); padding-top: .6rem; margin-top: .5rem;
 }
 .loesung-ergebnis-zeile { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .3rem; }
-.loesung-ergebnis-label { color: var(--gedaempft); font-size: .9rem; }
-.loesung-ergebnis-wert { font-weight: 600; color: var(--akzent); }
+.loesung-ergebnis-label { color: var(--gedaempft); font-size: .9rem; flex-shrink: 0; }
+.loesung-ergebnis-wert {
+  font-weight: 600; color: var(--akzent);
+  /* Kritisch: Flex-Items schrumpfen ohne min-width:0 nicht unter die
+     Inhaltsbreite — eine lange KaTeX-Formel hätte sonst die ganze Zeile
+     (und damit die Seite) aufgedrückt, statt in ihrer eigenen Box zu
+     scrollen. overflow-x:auto greift erst, wenn der Flex-Item wirklich
+     schrumpfen darf. */
+  min-width: 0;
+  overflow-x: auto;
+  max-width: 100%;
+}
 
 </style>
 </head>
@@ -728,7 +738,7 @@ const effektivzins = {
           },
           { titel: 'Ergebnis', latex: `i_{nom} = ${zahlZuLatex(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)}\\ \\%` },
         ],
-        ergebnisse: [{ label: 'Nominalzins i_nom', latex: `${zahlZuLatex(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)}\\ \\%` }],
+        ergebnisse: [{ label: 'Nominalzins', latex: `${zahlZuLatex(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)}\\ \\%` }],
       },
       params: { ...params, iEffGegeben },
     };

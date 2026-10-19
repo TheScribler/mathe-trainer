@@ -77,6 +77,10 @@ function sammlePlainTextFelder(aufgabe) {
     if (schritt.hinweis) felder.push({ feld: `loesung.schritte[${schritt.titel}].hinweis`, text: schritt.hinweis });
   }
 
+  for (const ergebnis of aufgabe.loesung.ergebnisse ?? []) {
+    felder.push({ feld: `loesung.ergebnisse[${ergebnis.label}].label`, text: ergebnis.label });
+  }
+
   if (aufgabe.frage.tabelle) {
     const { kopf, zeilen } = aufgabe.frage.tabelle;
     kopf.forEach((titel, i) => felder.push({ feld: `frage.tabelle.kopf[${i}]`, text: String(titel) }));
@@ -183,6 +187,7 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
 }
 
 function testeGenerator(generator) {
+  let textfelderGescannt = 0;
   for (let seed = 0; seed < INSTANZEN; seed++) {
     const rng = mulberry32(seed);
     const params = generator.waehleParameter(rng);
@@ -214,9 +219,11 @@ function testeGenerator(generator) {
       );
     }
 
-    // Jedes Textfeld (Fragetext, Labels, Hinweise, Tabellenzellen) ist reine
-    // Prosa — keine LaTeX-Reste wie "{,}", "_", "^{" oder "\;".
-    for (const { feld, text } of sammlePlainTextFelder(aufgabe)) {
+    // Jedes Textfeld (Fragetext, Labels, Hinweise, Tabellenzellen, Ergebnis-
+    // Labels) ist reine Prosa — keine LaTeX-Reste wie "{,}", "_", "^{" oder "\;".
+    const plainTextFelder = sammlePlainTextFelder(aufgabe);
+    textfelderGescannt += plainTextFelder.length;
+    for (const { feld, text } of plainTextFelder) {
       pruefe(
         !LATEX_RESTE.test(text),
         `${generator.id} seed=${seed}: ${feld} enthält LaTeX-Reste: "${text}"`
@@ -226,7 +233,7 @@ function testeGenerator(generator) {
     // Unabhängige Nachrechnung auf einem anderen Weg als der Generator selbst.
     pruefeInstanzUnabhaengig(generator, params, aufgabe, seed);
   }
-  console.log(`${generator.id}: ${INSTANZEN} Instanzen geprüft`);
+  console.log(`${generator.id}: ${INSTANZEN} Instanzen geprüft, ${textfelderGescannt} Textfelder auf LaTeX-Reste gescannt`);
 }
 
 testeZahlenparser();

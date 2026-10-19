@@ -354,7 +354,7 @@ export const effektivzins = {
           },
           { titel: 'Ergebnis', latex: `i_{nom} = ${zahlZuLatex(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)}\\ \\%` },
         ],
-        ergebnisse: [{ label: 'Nominalzins i_nom', latex: `${zahlZuLatex(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)}\\ \\%` }],
+        ergebnisse: [{ label: 'Nominalzins', latex: `${zahlZuLatex(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)}\\ \\%` }],
       },
       params: { ...params, iEffGegeben },
     };
