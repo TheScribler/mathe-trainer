@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mathe-Trainer Probe</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --fg: #1a1a1a; --gedaempft: #5c5c5c;
+    --rand: #d9d5cf; --karte: #ffffff; --gut: #1f7a3d; --schlecht: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16161a; --fg: #ececec; --gedaempft: #a0a0a0;
+      --rand: #33333a; --karte: #1e1e24; --gut: #4ade80; --schlecht: #ff6b6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 48px;
+    background: var(--bg); color: var(--fg);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  main { max-width: 36rem; margin: 0 auto; }
+  h1 { font-size: 1.35rem; margin: 0 0 .25rem; }
+  p.unter { color: var(--gedaempft); margin: 0 0 1.5rem; font-size: .9rem; }
+  section {
+    background: var(--karte); border: 1px solid var(--rand); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 12px;
+  }
+  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em;
+       color: var(--gedaempft); margin: 0 0 .6rem; font-weight: 600; }
+  .zeile { display: flex; justify-content: space-between; gap: 12px;
+           padding: 4px 0; font-variant-numeric: tabular-nums; }
+  .zeile span:first-child { color: var(--gedaempft); }
+  .gut { color: var(--gut); font-weight: 600; }
+  .schlecht { color: var(--schlecht); font-weight: 600; }
+  button {
+    font: inherit; font-weight: 600; padding: 12px 18px; border-radius: 8px;
+    border: 1px solid var(--rand); background: var(--karte); color: var(--fg);
+    cursor: pointer; -webkit-appearance: none; min-height: 44px;
+  }
+  button:active { transform: translateY(1px); }
+  input {
+    font: inherit; padding: 10px 12px; border-radius: 8px; width: 100%;
+    border: 1px solid var(--rand); background: var(--bg); color: var(--fg);
+    -webkit-appearance: none; min-height: 44px;
+  }
+  label { display: block; font-size: .85rem; color: var(--gedaempft); margin-bottom: .35rem; }
+  .bild { display: flex; align-items: center; gap: 10px; }
+  .bild img { width: 28px; height: 28px; image-rendering: pixelated;
+              border: 1px solid var(--rand); border-radius: 4px; }
+  .breit { overflow-x: auto; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: .85em; }
+  #kaputt { color: var(--schlecht); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mathe-Trainer — Probe</h1>
+  <p class="unter">Kein Node, kein KaTeX, keine Netzverbindung. Diese Seite prüft nur, ob
+  iOS eine lokale HTML-Datei richtig ausführt.</p>
+
+  <p id="kaputt">JavaScript läuft NICHT. iOS zeigt nur eine Vorschau — wir brauchen einen
+  anderen Auslieferungsweg.</p>
+
+  <section>
+    <h2>1 · JavaScript</h2>
+    <div class="zeile"><span>Ausführung</span><span id="t-js">—</span></div>
+    <div class="zeile"><span>Rechnen (1,02<sup>15</sup>)</span><span id="t-rechnen">—</span></div>
+    <div class="zeile"><span>Zahlformat de-DE</span><span id="t-format">—</span></div>
+  </section>
+
+  <section>
+    <h2>2 · Speicher (Fortschritt)</h2>
+    <div class="zeile"><span>localStorage</span><span id="t-ls">—</span></div>
+    <div class="zeile"><span>Zähler überlebt Neuladen</span><span id="t-zaehler">—</span></div>
+    <p style="margin:.75rem 0 0"><button id="btn">Tippen, dann Seite neu laden</button></p>
+  </section>
+
+  <section>
+    <h2>3 · Eingebettete Daten (wie die KaTeX-Fonts)</h2>
+    <div class="zeile"><span>data:-URI lädt</span><span id="t-data">—</span></div>
+    <div class="bild" style="margin-top:.5rem">
+      <img id="probebild" alt="">
+      <span class="unter" style="margin:0">Hier muss ein kleines Karo zu sehen sein.</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>4 · Eingabe und Tastatur</h2>
+    <label for="feld">Zahlenfeld — es muss die Zifferntastatur mit Komma erscheinen</label>
+    <input id="feld" type="text" inputmode="decimal" enterkeyhint="done"
+           autocomplete="off" autocorrect="off" spellcheck="false" placeholder="7.782,55">
+    <div class="zeile" style="margin-top:.5rem"><span>Eingelesen als</span><span id="t-eingabe">—</span></div>
+  </section>
+
+  <section>
+    <h2>5 · Darstellung</h2>
+    <div class="zeile"><span>Fensterbreite</span><span id="t-breite">—</span></div>
+    <div class="zeile"><span>Querscrollen der Seite</span><span id="t-scroll">—</span></div>
+    <div class="zeile"><span>Dunkelmodus erkannt</span><span id="t-dunkel">—</span></div>
+    <div class="breit" style="margin-top:.6rem">
+      <code>R₀ = r · (qⁿ − 1) / (i · qⁿ) &nbsp; mit &nbsp; q = 1 + i</code>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function setze(id, ok, text) {
+    var el = $(id);
+    el.textContent = text;
+    el.className = ok ? 'gut' : 'schlecht';
+  }
+
+  // 1 JavaScript
+  $('kaputt').style.display = 'none';
+  setze('t-js', true, 'läuft');
+
+  var qn = Math.pow(1.02, 15);
+  setze('t-rechnen', Math.abs(qn - 1.345868) < 1e-5, qn.toFixed(6));
+
+  try {
+    var f = (7782.55).toLocaleString('de-DE', { minimumFractionDigits: 2 });
+    setze('t-format', f.indexOf(',') > -1, f);
+  } catch (e) {
+    setze('t-format', false, 'Fehler: ' + e.message);
+  }
+
+  // 2 Speicher
+  var ls = null;
+  try {
+    localStorage.setItem('probe', '1');
+    localStorage.removeItem('probe');
+    ls = localStorage;
+    setze('t-ls', true, 'verfügbar');
+  } catch (e) {
+    setze('t-ls', false, 'blockiert (' + e.name + ') — Rückfall auf RAM');
+  }
+
+  var stand = 0;
+  if (ls) { stand = parseInt(ls.getItem('mt-probe-zaehler') || '0', 10); }
+  function zeigeZaehler() {
+    if (!ls) { setze('t-zaehler', false, 'nicht prüfbar'); return; }
+    setze('t-zaehler', stand > 0, stand + ' Tipp(s) gespeichert');
+  }
+  zeigeZaehler();
+  $('btn').addEventListener('click', function () {
+    stand += 1;
+    if (ls) { try { ls.setItem('mt-probe-zaehler', String(stand)); } catch (e) {} }
+    zeigeZaehler();
+    $('btn').textContent = 'Gezählt: ' + stand + ' — jetzt neu laden';
+  });
+
+  // 3 data:-URI (gleicher Mechanismus wie die eingebetteten KaTeX-Fonts)
+  var bild = $('probebild');
+  bild.onload = function () { setze('t-data', true, 'geladen'); };
+  bild.onerror = function () { setze('t-data', false, 'blockiert'); };
+  bild.src = 'data:image/gif;base64,R0lGODlhCAAIAIAAAP///wAAACwAAAAACAAIAAACD' +
+             'IQRqXcKwCMKQl2lAgA7';
+
+  // 4 Eingabe
+  $('feld').addEventListener('input', function (ev) {
+    var roh = ev.target.value.trim();
+    if (!roh) { setze('t-eingabe', false, '—'); return; }
+    var norm = roh.replace(/\s/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.');
+    var zahl = Number(norm);
+    setze('t-eingabe', isFinite(zahl), isFinite(zahl) ? String(zahl) : 'keine Zahl');
+  });
+
+  // 5 Darstellung
+  setze('t-breite', true, window.innerWidth + ' px');
+  var quer = document.documentElement.scrollWidth > window.innerWidth + 1;
+  setze('t-scroll', !quer, quer ? 'ja — Layout zu breit' : 'nein');
+  var dunkel = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  setze('t-dunkel', true, dunkel ? 'dunkel' : 'hell');
+})();
+</script>
+</body>
+</html>

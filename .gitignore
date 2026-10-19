@@ -1,0 +1,10 @@
+# Niemals Dozentenmaterial aus dem Vault committen (Arbeitsregel 5, siehe PLAN.md)
+*.pdf
+Musterklausur*
+Musterlösung*
+*Übungsaufgaben*
+Formelsammlung*
+
+# System
+.DS_Store
+node_modules/
