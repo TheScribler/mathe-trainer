@@ -17,6 +17,11 @@ import {
   nutzenmaximum,
   ableitungen,
 } from '../src/generatoren/diff.js';
+import {
+  integralUnbestimmt,
+  integralBestimmt,
+  integralKonsumentenrente,
+} from '../src/generatoren/integral.js';
 
 export function testeFixtures() {
   let fehler = 0;
@@ -166,6 +171,67 @@ export function testeFixtures() {
     const w16c = Object.fromEntries(a16c.eingaben.map((e) => [e.id, e.loesung]));
     pruefe(w16c.x1 === 83 && w16c.x2 === 252, `Übung 16c: (${w16c.x1};${w16c.x2}), erwartet (83;252)`);
     faelle.push('Übung 16a, 16c');
+  }
+
+  // Übung 18a: ∫2x²dx = ⅔x³ + c.
+  // Übung 18b: ∫(4x³-3x²+2x-1)dx = x⁴-x³+x²-x + c.
+  {
+    const a18a = integralUnbestimmt.baue({ exponenten: [2], koeffizienten: [2] });
+    const w18a = a18a.eingaben[0].loesung;
+    pruefe(w18a.length === 1 && nahBei(w18a[0], 2 / 3, 1e-9), `Übung 18a: F-Koeffizient ${w18a}, erwartet 2/3`);
+
+    const a18b = integralUnbestimmt.baue({ exponenten: [3, 2, 1, 0], koeffizienten: [4, -3, 2, -1] });
+    const w18b = a18b.eingaben[0].loesung;
+    const erw18b = [1, -1, 1, -1];
+    pruefe(w18b.every((w, i) => nahBei(w, erw18b[i], 1e-9)), `Übung 18b: F-Koeffizienten ${w18b}, erwartet ${erw18b}`);
+    faelle.push('Übung 18a/b');
+  }
+
+  // Übung 19a: ∫[0,1] ½x⁴dx = 1/10. 19b: ∫[-3,0] x³dx = -20,25.
+  // 19c: ∫[1,3] (3x²-2x⁻³)dx = 25 1/9. 19d: ∫[1,2] (-64x⁻⁵-16x⁻³)dx = -21.
+  {
+    const a19a = integralBestimmt.baue({ termeF: [{ zaehler: 1, nenner: 10, exponent: 5 }], a: 0, b: 1 });
+    const w19a = a19a.eingaben[0].loesung;
+    pruefe(nahBei(w19a, 0.1, 1e-9), `Übung 19a: ${w19a}, erwartet 0,1`);
+
+    const a19b = integralBestimmt.baue({ termeF: [{ zaehler: 1, nenner: 4, exponent: 4 }], a: -3, b: 0 });
+    const w19b = a19b.eingaben[0].loesung;
+    pruefe(nahBei(w19b, -20.25, 1e-9), `Übung 19b: ${w19b}, erwartet -20,25`);
+
+    const a19c = integralBestimmt.baue({
+      termeF: [{ zaehler: 1, nenner: 1, exponent: 3 }, { zaehler: 1, nenner: 1, exponent: -2 }], a: 1, b: 3,
+    });
+    const w19c = a19c.eingaben[0].loesung;
+    // loesung ist auf 4 Nachkommastellen gerundet (siehe baue()), daher eine
+    // gröbere Toleranz als bei den anderen (ganzzahligen) Übung-19-Fällen.
+    pruefe(nahBei(w19c, 25 + 1 / 9, 1e-3), `Übung 19c: ${w19c}, erwartet 25 1/9`);
+
+    const a19d = integralBestimmt.baue({
+      termeF: [{ zaehler: 16, nenner: 1, exponent: -4 }, { zaehler: 8, nenner: 1, exponent: -2 }], a: 1, b: 2,
+    });
+    const w19d = a19d.eingaben[0].loesung;
+    pruefe(nahBei(w19d, -21, 1e-9), `Übung 19d: ${w19d}, erwartet -21`);
+    faelle.push('Übung 19a-d');
+  }
+
+  // Übung 20a-e: je x0, p0, KR, PR (Folie 160).
+  {
+    const faelle20 = [
+      { params: { x0: 4, b: 2, c: 3, a: 20, p0: 12 }, erwartet: { x0: 4, p0: 12, KR: 16, PR: 24 }, name: '20a' },
+      { params: { x0: 8, b: 1, c: 5, a: 48, p0: 40 }, erwartet: { x0: 8, p0: 40, KR: 32, PR: 160 }, name: '20b' },
+      { params: { x0: 20, b: 0.5, c: 0.1, a: 12, p0: 2 }, erwartet: { x0: 20, p0: 2, KR: 100, PR: 20 }, name: '20c' },
+      { params: { x0: 15, b: 4, c: 0.2, a: 63, p0: 3 }, erwartet: { x0: 15, p0: 3, KR: 450, PR: 22.5 }, name: '20d' },
+      { params: { x0: 10, b: 1.5, c: 0.5, a: 20, p0: 5 }, erwartet: { x0: 10, p0: 5, KR: 75, PR: 25 }, name: '20e' },
+    ];
+    for (const { params, erwartet, name } of faelle20) {
+      const aufgabe = integralKonsumentenrente.baue(params);
+      const werte = Object.fromEntries(aufgabe.eingaben.map((e) => [e.id, e.loesung]));
+      for (const schluessel of ['x0', 'p0', 'KR', 'PR']) {
+        pruefe(nahBei(werte[schluessel], erwartet[schluessel], 1e-6),
+          `Übung ${name}: ${schluessel}=${werte[schluessel]}, erwartet ${erwartet[schluessel]}`);
+      }
+    }
+    faelle.push('Übung 20a-e');
   }
 
   console.log(`Fixtures: ${faelle.length} geprüft (${faelle.join(', ')})`);

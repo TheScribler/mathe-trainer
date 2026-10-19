@@ -60,3 +60,14 @@ export function minimaleNachkommastellen(zahl, maxStellen = 4) {
   }
   return maxStellen;
 }
+
+// Größter gemeinsamer Teiler (immer ≥ 0) — Grundlage fürs Kürzen von Brüchen
+// (bruchGekuerzt/bruchMitDezimal in latex.js, Integralrechnung).
+export function ggT(a, b) {
+  a = Math.abs(a);
+  b = Math.abs(b);
+  while (b !== 0) {
+    [a, b] = [b, a % b];
+  }
+  return a || 1;
+}

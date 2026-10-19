@@ -74,6 +74,19 @@ function ableitungNumerisch(f, x, h = 1e-4) {
   return (f(x + h) - f(x - h)) / (2 * h);
 }
 
+// Simpson-Quadratur — ein von der symbolischen Stammfunktion des Generators
+// unabhängiger Rechenweg für die Integralrechnung (int.bestimmt,
+// int.konsumentenrente, siehe PLAN.md Testkonzept).
+function simpson(f, a, b, n = 2000) {
+  if (n % 2 !== 0) n += 1;
+  const h = (b - a) / n;
+  let summe = f(a) + f(b);
+  for (let i = 1; i < n; i++) {
+    summe += (i % 2 === 0 ? 2 : 4) * f(a + i * h);
+  }
+  return (h / 3) * summe;
+}
+
 function partielleAbleitungNumerisch(f, x, y, nachX, h = 1e-4) {
   return nachX
     ? (f(x + h, y) - f(x - h, y)) / (2 * h)
@@ -350,6 +363,58 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
       `${kennzeichnung}: f'(${p.x0a}) numerisch (a) = ${ableitungNumerisch(faVon, p.x0a)}, erwartet ${faWert}`);
     pruefe(nahBei(ableitungNumerisch(fbVon, p.x0b), fbWert, 1e-3),
       `${kennzeichnung}: f'(${p.x0b}) numerisch (b) = ${ableitungNumerisch(fbVon, p.x0b)}, erwartet ${fbWert}`);
+    return;
+  }
+
+  if (generator.id === 'int.unbestimmt') {
+    // Unabhängig: F'(x) per Differenzenquotient muss wieder f(x) ergeben
+    // (der Generator selbst leitet F symbolisch aus f her, nicht umgekehrt).
+    const eingabe = aufgabe.eingaben[0];
+    const FVon = (x) => wertePolynom(eingabe.loesung, eingabe.exponenten, x);
+    const fVon = (x) => wertePolynom(p.koeffizienten, p.exponenten, x);
+    for (const x of [-2, -0.5, 0.5, 1, 2.5]) {
+      pruefe(nahBei(ableitungNumerisch(FVon, x), fVon(x), 1e-3),
+        `${kennzeichnung}: F'(${x}) numerisch ${ableitungNumerisch(FVon, x)}, erwartet f(${x})=${fVon(x)}`);
+    }
+    return;
+  }
+
+  if (generator.id === 'int.bestimmt') {
+    // Unabhängig: f = F' per Potenzregel neu hergeleitet (separat von baue()),
+    // dann per Simpson-Quadratur gegen den angezeigten Wert geprüft.
+    const termeF_abgeleitet = p.termeF.map(({ zaehler, nenner, exponent }) => ({
+      wert: (zaehler / nenner) * exponent, exponent: exponent - 1,
+    }));
+    const fVon = (x) => termeF_abgeleitet.reduce((s, t) => s + t.wert * Math.pow(x, t.exponent), 0);
+    const quad = simpson(fVon, p.a, p.b);
+    const wert = wertVon(aufgabe, 'wert');
+    pruefe(nahBei(quad, wert, 1e-2),
+      `${kennzeichnung}: Simpson-Quadratur ergibt ${quad}, erwartet ${wert}`);
+    return;
+  }
+
+  if (generator.id === 'int.konsumentenrente') {
+    const pN = (x) => p.a - p.b * x;
+    const pA = (x) => p.c * x;
+    pruefe(nahBei(pN(p.x0), p.p0, 1e-6), `${kennzeichnung}: p_N(x0)=${pN(p.x0)}, erwartet p0=${p.p0}`);
+    pruefe(nahBei(pA(p.x0), p.p0, 1e-6), `${kennzeichnung}: p_A(x0)=${pA(p.x0)}, erwartet p0=${p.p0}`);
+    const KRquad = simpson(pN, 0, p.x0) - p.x0 * p.p0;
+    const PRquad = p.x0 * p.p0 - simpson(pA, 0, p.x0);
+    pruefe(nahBei(KRquad, wertVon(aufgabe, 'KR'), 1e-2),
+      `${kennzeichnung}: KR per Quadratur ${KRquad}, erwartet ${wertVon(aufgabe, 'KR')}`);
+    pruefe(nahBei(PRquad, wertVon(aufgabe, 'PR'), 1e-2),
+      `${kennzeichnung}: PR per Quadratur ${PRquad}, erwartet ${wertVon(aufgabe, 'PR')}`);
+    return;
+  }
+
+  if (generator.id === 'int.kosten-aus-grenzkosten') {
+    // Unabhängig: K' per Differenzenquotient aus der angegebenen K(x) muss
+    // wieder K'(x)=mx+n ergeben; K(0) muss den gegebenen Fixkosten entsprechen.
+    const KKoeff = wertVon(aufgabe, 'K');
+    const KVon = (x) => wertePolynom(KKoeff, [2, 1, 0], x);
+    pruefe(nahBei(ableitungNumerisch(KVon, 3), p.m * 3 + p.n, 1e-3),
+      `${kennzeichnung}: K'(3) numerisch ${ableitungNumerisch(KVon, 3)}, erwartet ${p.m * 3 + p.n}`);
+    pruefe(nahBei(KVon(0), p.Kf, 1e-6), `${kennzeichnung}: K(0)=${KVon(0)}, erwartet Kf=${p.Kf}`);
     return;
   }
 

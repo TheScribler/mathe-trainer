@@ -1,7 +1,7 @@
 // Bausteine, um Zahlen und Strukturen in die LaTeX-Notation der Folien und
 // der Musterlösung zu bringen (z. B. "7.782{,}55" statt "7,782.55").
 
-import { formatDeZahl, minimaleNachkommastellen } from './zahl.js';
+import { formatDeZahl, minimaleNachkommastellen, ggT } from './zahl.js';
 
 export function zahlZuLatex(zahl, nachkommastellen = 2) {
   const negativ = zahl < 0;
@@ -13,6 +13,29 @@ export function zahlZuLatex(zahl, nachkommastellen = 2) {
 
 export function bruch(zaehler, nenner) {
   return `\\dfrac{${zaehler}}{${nenner}}`;
+}
+
+// Kürzt einen Bruch (Vorzeichen wandert immer in den Zähler, Nenner bleibt
+// positiv) — Grundlage für die Integralrechnung, wo Koeffizienten als exakte
+// Brüche entstehen (z. B. a_k/(k+1)), nicht nur als Dezimalzahlen.
+export function bruchGekuerzt(zaehler, nenner) {
+  if (nenner < 0) { zaehler = -zaehler; nenner = -nenner; }
+  const g = ggT(zaehler, nenner);
+  return { zaehler: zaehler / g, nenner: nenner / g };
+}
+
+// Zeigt einen Bruch als exakten, gekürzten Bruch PLUS die Dezimalzahl, z. B.
+// "\dfrac{2}{3} \approx 0{,}6667" — oder nur die ganze Zahl, wenn der Bruch
+// sich zu einer ganzen Zahl kürzt (Nenner 1, kein Dezimal-Zusatz nötig, da
+// identisch).
+export function bruchMitDezimal(zaehler, nenner, nachkommastellen) {
+  const { zaehler: z, nenner: n } = bruchGekuerzt(zaehler, nenner);
+  if (n === 1) return zahlZuLatex(z, 0);
+  const negativ = z < 0;
+  const dezimalwert = z / n;
+  const stellen = nachkommastellen ?? minimaleNachkommastellen(dezimalwert);
+  const bruchText = `${negativ ? '-' : ''}${bruch(Math.abs(z), n)}`;
+  return `${bruchText} \\approx ${zahlZuLatex(dezimalwert, stellen)}`;
 }
 
 export function potenz(basis, exponent) {

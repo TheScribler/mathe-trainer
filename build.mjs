@@ -43,13 +43,19 @@ const MODUL_REIHENFOLGE = [
   'loesung.js',
   'generatoren/finanz.js',
   'generatoren/diff.js',
+  'generatoren/integral.js',
   'generatoren/index.js',
   'app.js',
 ];
 
 function entferneModulSyntax(code) {
   return code
-    .replace(/^import\s.+;\s*$/gm, '')
+    // [\s\S]*? statt .+, damit auch ein mehrzeiliges "import { a, b,\n c }
+    // from '...';" komplett entfernt wird — ein einzeiliges ".+" ließ genau
+    // das einmal durchrutschen (import.js, Phase 3) und erzeugte im
+    // gebauten Bundle ein rohes "import {...}", das im Browser sofort mit
+    // einem SyntaxError abbrach.
+    .replace(/^import\s[\s\S]*?from\s*['"][^'"]+['"];?\s*$/gm, '')
     .replace(/^export\s+(default\s+)?/gm, '');
 }
 

@@ -29,6 +29,10 @@ const GENERATOR_IDS = [
   'diff.extremwerte-2var-quadratisch',
   'diff.nutzenmaximum',
   'diff.ableitungen',
+  'int.unbestimmt',
+  'int.bestimmt',
+  'int.konsumentenrente',
+  'int.kosten-aus-grenzkosten',
 ];
 
 function warte(ms) {
@@ -74,6 +78,15 @@ const LAYOUT_PRUEFSKRIPT = `
     if (box.clientWidth > eltern.clientWidth + 1) {
       probleme.push(box.className + ': eigene Breite ' + box.clientWidth + ' > Elternbreite ' + eltern.clientWidth);
     }
+  });
+
+  // KaTeX rendert mit throwOnError:false (siehe src/loesung.js) — ein
+  // kaputtes LaTeX-Fragment wirft also nie eine JS-Exception, sondern
+  // erscheint nur als rot markiertes .katex-error im DOM. Ohne diesen
+  // expliziten Scan würde das lautlos durchrutschen (PLAN.md Testkonzept:
+  // "kein KaTeX-Fehler beim Rendern aller Schritte").
+  document.querySelectorAll('#app .katex-error').forEach((fehler) => {
+    probleme.push('KaTeX-Fehler: ' + (fehler.title || fehler.textContent));
   });
 
   return { seitenbreite, probleme };
