@@ -170,6 +170,21 @@ function starteApp() {
     karte.appendChild(loesungContainer);
   }
 
+  // Nur für Tests (test/layout.mjs): erzeugt eine bestimmte Aufgabe
+  // deterministisch und zeigt optional sofort die Lösung, damit ein
+  // Layout-Test ohne Klicksimulation eine konkrete Instanz prüfen kann.
+  // Ohne Effekt auf die normale Nutzung.
+  window.__testErzeugeAufgabe = function (generatorId, seed, mitLoesung) {
+    const generator = findeGenerator(generatorId);
+    if (!generator) throw new Error('Unbekannter Generator: ' + generatorId);
+    const params = generator.waehleParameter(mulberry32(seed));
+    aktuelleAufgabe = generator.baue(params);
+    zeichneAufgabe(generator);
+    if (mitLoesung) {
+      renderLoesung(aktuelleAufgabe.loesung, karte.querySelector('.loesung-container'));
+    }
+  };
+
   neueAufgabe();
 }
 

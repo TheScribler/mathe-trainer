@@ -78,15 +78,24 @@ body {
 .loesung-ergebnisse {
   border-top: 1px dashed var(--rand); padding-top: .6rem; margin-top: .5rem;
 }
-.loesung-ergebnis-zeile { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .3rem; }
-.loesung-ergebnis-label { color: var(--gedaempft); font-size: .9rem; flex-shrink: 0; }
+.loesung-ergebnis-zeile {
+  /* flex-wrap statt einer starren einzeiligen Zeile: das Label darf selbst
+     mehrzeilig umbrechen (min-width:0 erlaubt das Schrumpfen unter die
+     Inhaltsbreite), und wenn für den Wert daneben kein Platz mehr bleibt,
+     wandert er als eigene Zeile darunter — bei 375px kommt das bei langen
+     Labels wie "Effektivzins (genau)" regelmäßig vor. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .15rem .5rem;
+  margin-bottom: .3rem;
+}
+.loesung-ergebnis-label { color: var(--gedaempft); font-size: .9rem; flex: 1 1 auto; min-width: 0; }
 .loesung-ergebnis-wert {
   font-weight: 600; color: var(--akzent);
-  /* Kritisch: Flex-Items schrumpfen ohne min-width:0 nicht unter die
-     Inhaltsbreite — eine lange KaTeX-Formel hätte sonst die ganze Zeile
-     (und damit die Seite) aufgedrückt, statt in ihrer eigenen Box zu
-     scrollen. overflow-x:auto greift erst, wenn der Flex-Item wirklich
-     schrumpfen darf. */
+  /* Rückfall für den Fall, dass eine einzelne Formel auch allein auf ihrer
+     Zeile noch breiter als der Bildschirm ist: dann scrollt nur diese Box. */
+  flex: 0 1 auto;
   min-width: 0;
   overflow-x: auto;
   max-width: 100%;

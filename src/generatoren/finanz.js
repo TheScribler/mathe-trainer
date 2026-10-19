@@ -299,6 +299,7 @@ export const effektivzins = {
     if (richtung === 'vorwaerts') {
       const iEff2dp = runde(iEffProzentExakt, 2);
       const iEff4dp = runde(iEffProzentExakt, 4);
+      const brauchtGenau = iEff2dp !== iEff4dp;
       return {
         frage: {
           text: `Eine Kapitalanlage hat einen Nominalzins von ${formatDeZahl(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)} % ` +
@@ -315,14 +316,21 @@ export const effektivzins = {
             { titel: 'Formel', latex: `i_{eff} = \\left(1 + ${bruch('i_{nom}', 'm')}\\right)^m - 1` },
             {
               titel: 'Einsetzen',
-              latex: `i_{eff} = \\left(1 + ${bruch(prozentLatex(iNom, iNomProzent % 1 === 0 ? 0 : 2), String(m))}\\right)^{${m}} - 1`,
+              latex: `i_{eff} = \\left(1 + ${bruch(anteilLatexOhneNullen(iNom), String(m))}\\right)^{${m}} - 1`,
             },
-            { titel: 'Ergebnis', latex: `i_{eff} = ${prozentLatex(iEff2dp / 100, 2)}\\ (\\text{genau } ${prozentLatex(iEff4dp / 100, 4)})` },
+            {
+              titel: 'Ergebnis',
+              latex: brauchtGenau
+                ? `i_{eff} = ${prozentLatex(iEff2dp / 100, 2)}\\ (\\text{genau } ${prozentLatex(iEff4dp / 100, 4)})`
+                : `i_{eff} = ${prozentLatex(iEff2dp / 100, 2)}`,
+            },
           ],
-          ergebnisse: [
-            { label: 'Effektivzins (2 Nachkommastellen)', latex: prozentLatex(iEff2dp / 100, 2) },
-            { label: 'Effektivzins (4 Nachkommastellen, Rundungsregel des Dozenten)', latex: prozentLatex(iEff4dp / 100, 4) },
-          ],
+          ergebnisse: brauchtGenau
+            ? [
+                { label: 'Effektivzins (gerundet)', latex: prozentLatex(iEff2dp / 100, 2) },
+                { label: 'Effektivzins (genau)', latex: prozentLatex(iEff4dp / 100, 4) },
+              ]
+            : [{ label: 'Effektivzins', latex: prozentLatex(iEff2dp / 100, 2) }],
         },
         params,
       };

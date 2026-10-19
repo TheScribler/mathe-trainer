@@ -93,15 +93,24 @@ body {
 .loesung-ergebnisse {
   border-top: 1px dashed var(--rand); padding-top: .6rem; margin-top: .5rem;
 }
-.loesung-ergebnis-zeile { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .3rem; }
-.loesung-ergebnis-label { color: var(--gedaempft); font-size: .9rem; flex-shrink: 0; }
+.loesung-ergebnis-zeile {
+  /* flex-wrap statt einer starren einzeiligen Zeile: das Label darf selbst
+     mehrzeilig umbrechen (min-width:0 erlaubt das Schrumpfen unter die
+     Inhaltsbreite), und wenn für den Wert daneben kein Platz mehr bleibt,
+     wandert er als eigene Zeile darunter — bei 375px kommt das bei langen
+     Labels wie "Effektivzins (genau)" regelmäßig vor. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .15rem .5rem;
+  margin-bottom: .3rem;
+}
+.loesung-ergebnis-label { color: var(--gedaempft); font-size: .9rem; flex: 1 1 auto; min-width: 0; }
 .loesung-ergebnis-wert {
   font-weight: 600; color: var(--akzent);
-  /* Kritisch: Flex-Items schrumpfen ohne min-width:0 nicht unter die
-     Inhaltsbreite — eine lange KaTeX-Formel hätte sonst die ganze Zeile
-     (und damit die Seite) aufgedrückt, statt in ihrer eigenen Box zu
-     scrollen. overflow-x:auto greift erst, wenn der Flex-Item wirklich
-     schrumpfen darf. */
+  /* Rückfall für den Fall, dass eine einzelne Formel auch allein auf ihrer
+     Zeile noch breiter als der Bildschirm ist: dann scrollt nur diese Box. */
+  flex: 0 1 auto;
   min-width: 0;
   overflow-x: auto;
   max-width: 100%;
@@ -683,6 +692,7 @@ const effektivzins = {
     if (richtung === 'vorwaerts') {
       const iEff2dp = runde(iEffProzentExakt, 2);
       const iEff4dp = runde(iEffProzentExakt, 4);
+      const brauchtGenau = iEff2dp !== iEff4dp;
       return {
         frage: {
           text: `Eine Kapitalanlage hat einen Nominalzins von ${formatDeZahl(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)} % ` +
@@ -699,14 +709,21 @@ const effektivzins = {
             { titel: 'Formel', latex: `i_{eff} = \\left(1 + ${bruch('i_{nom}', 'm')}\\right)^m - 1` },
             {
               titel: 'Einsetzen',
-              latex: `i_{eff} = \\left(1 + ${bruch(prozentLatex(iNom, iNomProzent % 1 === 0 ? 0 : 2), String(m))}\\right)^{${m}} - 1`,
+              latex: `i_{eff} = \\left(1 + ${bruch(anteilLatexOhneNullen(iNom), String(m))}\\right)^{${m}} - 1`,
             },
-            { titel: 'Ergebnis', latex: `i_{eff} = ${prozentLatex(iEff2dp / 100, 2)}\\ (\\text{genau } ${prozentLatex(iEff4dp / 100, 4)})` },
+            {
+              titel: 'Ergebnis',
+              latex: brauchtGenau
+                ? `i_{eff} = ${prozentLatex(iEff2dp / 100, 2)}\\ (\\text{genau } ${prozentLatex(iEff4dp / 100, 4)})`
+                : `i_{eff} = ${prozentLatex(iEff2dp / 100, 2)}`,
+            },
           ],
-          ergebnisse: [
-            { label: 'Effektivzins (2 Nachkommastellen)', latex: prozentLatex(iEff2dp / 100, 2) },
-            { label: 'Effektivzins (4 Nachkommastellen, Rundungsregel des Dozenten)', latex: prozentLatex(iEff4dp / 100, 4) },
-          ],
+          ergebnisse: brauchtGenau
+            ? [
+                { label: 'Effektivzins (gerundet)', latex: prozentLatex(iEff2dp / 100, 2) },
+                { label: 'Effektivzins (genau)', latex: prozentLatex(iEff4dp / 100, 4) },
+              ]
+            : [{ label: 'Effektivzins', latex: prozentLatex(iEff2dp / 100, 2) }],
         },
         params,
       };
@@ -931,6 +948,21 @@ function starteApp() {
     karte.appendChild(knopfReihe);
     karte.appendChild(loesungContainer);
   }
+
+  // Nur für Tests (test/layout.mjs): erzeugt eine bestimmte Aufgabe
+  // deterministisch und zeigt optional sofort die Lösung, damit ein
+  // Layout-Test ohne Klicksimulation eine konkrete Instanz prüfen kann.
+  // Ohne Effekt auf die normale Nutzung.
+  window.__testErzeugeAufgabe = function (generatorId, seed, mitLoesung) {
+    const generator = findeGenerator(generatorId);
+    if (!generator) throw new Error('Unbekannter Generator: ' + generatorId);
+    const params = generator.waehleParameter(mulberry32(seed));
+    aktuelleAufgabe = generator.baue(params);
+    zeichneAufgabe(generator);
+    if (mitLoesung) {
+      renderLoesung(aktuelleAufgabe.loesung, karte.querySelector('.loesung-container'));
+    }
+  };
 
   neueAufgabe();
 }
