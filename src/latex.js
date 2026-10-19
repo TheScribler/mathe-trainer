@@ -29,14 +29,33 @@ export function prozentLatex(anteil, nachkommastellen = 2) {
   return zahlZuLatex(anteil * 100, nachkommastellen) + '\\%';
 }
 
+// Baut eine KaTeX-`aligned`-Umgebung aus bereits fertigen Zeilen — jede Zeile
+// bricht die Gleichung an der Stelle ihres eigenen "&"-Ankers um. Gemeinsame
+// Grundlage für mehrzeiligeGleichung (Anker vor "=") und gleichungsKette
+// (Anker vor "⇒"); wer eine andere Umbruchstelle braucht, baut die Zeilen
+// selbst und übergibt sie hier direkt.
+export function mehrzeiligeKette(zeilen) {
+  return `\\begin{aligned} ${zeilen.join(' \\\\ ')} \\end{aligned}`;
+}
+
 // Mehrzeilige Gleichung statt einer langen Zeile mit mehreren "=" — bricht
-// bei jedem "=" um, rechtsbündig am Gleichheitszeichen ausgerichtet (KaTeX
-// `aligned`-Umgebung). lhs ist die linke Seite (z. B. "G(x)"), rhsListe die
-// aufeinanderfolgenden rechten Seiten (erste ist meist die Einsetzung, die
-// letzte das vereinfachte Ergebnis).
+// bei jedem "=" um, rechtsbündig am Gleichheitszeichen ausgerichtet. lhs ist
+// die linke Seite (z. B. "G(x)"), rhsListe die aufeinanderfolgenden rechten
+// Seiten (erste ist meist die Einsetzung, die letzte das vereinfachte
+// Ergebnis — ein abschließendes "= 0" gehört an das Ende des letzten
+// rhsListe-Eintrags, nicht als eigene Zeile danach angehängt).
 export function mehrzeiligeGleichung(lhs, rhsListe) {
   const zeilen = [`${lhs} &= ${rhsListe[0]}`, ...rhsListe.slice(1).map((r) => `&= ${r}`)];
-  return `\\begin{aligned} ${zeilen.join(' \\\\ ')} \\end{aligned}`;
+  return mehrzeiligeKette(zeilen);
+}
+
+// Lösungskette mit "⇒" zwischen den Schritten (z. B. "2y + 8 = 0 ⇒ 2y = −8
+// ⇒ y = −4") — bricht bei jedem "⇒" um, analog zu mehrzeiligeGleichung bei
+// "=". teile[0] ist die Ausgangsgleichung, jeder weitere Eintrag ein
+// Umformungsschritt.
+export function gleichungsKette(teile) {
+  const zeilen = [`&${teile[0]}`, ...teile.slice(1).map((t) => `&\\Rightarrow ${t}`)];
+  return mehrzeiligeKette(zeilen);
 }
 
 // Polynom aus Koeffizienten + zugehörigen Exponenten als LaTeX, z. B.

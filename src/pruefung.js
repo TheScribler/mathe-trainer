@@ -22,6 +22,27 @@ export function pruefeKoeffizienten(eingabeFelder, erwarteteFelder, toleranz = 1
   return { korrekt: true };
 }
 
+// Bewertet eine Koeffizientenzeile Box für Box statt als Ganzes — sonst würde
+// z. B. bei E(x) = −2x² + 43x (Konstante 0, vom Nutzer nachvollziehbar leer
+// gelassen statt "0" einzutippen) die ganze Zeile als unbeantwortet gelten,
+// obwohl zwei von drei Boxen richtig ausgefüllt sind. Nur eine KOMPLETT leere
+// Zeile gilt als leer; sobald mindestens eine Box gefüllt ist, zählt jede
+// leere Box darin als eingegebene 0 (richtig, wenn die Lösung dort 0 ist).
+// werteTexte: Rohtext je Box (wie im Eingabefeld), erwarteteFelder: Lösung
+// je Box, in derselben Reihenfolge.
+export function bewerteKoeffizientenZeile(werteTexte, erwarteteFelder, toleranz = 1e-9) {
+  const alleLeer = werteTexte.every((w) => w.trim() === '');
+  if (alleLeer) {
+    return { leer: werteTexte.length, proBox: werteTexte.map(() => ({ bewertet: false, korrekt: false })) };
+  }
+  const proBox = werteTexte.map((text, i) => {
+    const gefuellterText = text.trim() === '' ? '0' : text;
+    const ergebnis = pruefeZahl(gefuellterText, erwarteteFelder[i], toleranz);
+    return { bewertet: true, korrekt: ergebnis.korrekt };
+  });
+  return { leer: 0, proBox };
+}
+
 export function pruefeMatrix(eingabeMatrix, erwarteteMatrix, toleranz = 1e-9) {
   if (eingabeMatrix.length !== erwarteteMatrix.length) return { korrekt: false };
   for (let i = 0; i < eingabeMatrix.length; i++) {

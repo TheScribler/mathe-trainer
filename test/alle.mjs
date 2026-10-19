@@ -4,7 +4,7 @@
 
 import { mulberry32 } from '../src/rng.js';
 import { parseDeZahl, nahBei } from '../src/zahl.js';
-import { pruefeZahl } from '../src/pruefung.js';
+import { pruefeZahl, bewerteKoeffizientenZeile } from '../src/pruefung.js';
 import { GENERATOREN } from '../src/generatoren/index.js';
 import { effektivzins } from '../src/generatoren/finanz.js';
 import { testeFixtures } from './fixtures.mjs';
@@ -135,8 +135,21 @@ const LATEX_RESTE = /\{,\}|_|\^|\\(?:[a-zA-Z]|;)/;
 // Koeffizient 1 bzw. -1 muss weggelassen werden ("x" statt "1x", "x0" statt
 // "1 \cdot x0") — tatsächlich mehrfach in diff.js aufgetreten (P1=1, 2c=1,
 // E=±1 je nach Zufallszug). "1x"/"1\cdot" zählt nur, wenn die "1" davor nicht
-// Teil einer größeren Zahl ist (Start, Leerzeichen, +, -, "(" davor).
-const KOEFFIZIENT_EINS = /(^|[\s+\-(])1(x\b|\s*\\cdot|·)/;
+// Teil einer größeren Zahl ist (Start, Leerzeichen, +, -, "(" davor). "y" und
+// "\lambda" zusätzlich zu "x", weil beide als Variable in diff.js vorkommen
+// (2-Variablen-Extremwerte, Lagrange). "\cdot (1)"/"(1) \cdot" (auch mit
+// Mediopunkt "·" statt "\cdot") zusätzlich, weil ein nicht-vereinfachter
+// Nenner wie "2 \cdot (1)" von der ursprünglichen Regel nicht erfasst wurde
+// (die "1" steht dort in Klammern, nicht direkt vor der Variable).
+const KOEFFIZIENT_EINS = /(^|[\s+\-(])1(x\b|y\b|\\lambda\b|\s*\\cdot|·)|\\cdot\s*\(1\)|\(1\)\s*\\cdot|·\s*\(1\)|\(1\)\s*·/;
+
+// "+ -3" oder "- -3" (zwei Vorzeichen direkt hintereinander, mit oder ohne
+// Leerzeichen, ASCII "-" oder Unicode "−" in jeder Mischung) lesen sich
+// falsch — eine negative Zahl nach einem Operator braucht entweder eine
+// Klammer ("2 + (−4)") oder ein zusammengeführtes Vorzeichen ("2 − 4"), nie
+// "2 + −4". Ein "(" zwischen den beiden Zeichen (bereits korrekt geklammert)
+// matcht nicht, weil dort kein zweites Vorzeichen direkt folgt.
+const DOPPELVORZEICHEN = /[+\-−]\s*[-−]/;
 
 function sammleAlleTextfelder(aufgabe) {
   // Für den Koeffizient-1-Scan zählen auch echte Formelfelder (im Gegensatz
@@ -388,11 +401,16 @@ function testeGenerator(generator) {
     }
 
     // Koeffizient 1/-1 muss überall weggelassen werden, auch in Formelfeldern
-    // (nicht nur in Prosa) — "x" statt "1x", "x0" statt "1 \cdot x0".
+    // (nicht nur in Prosa) — "x" statt "1x", "x0" statt "1 \cdot x0". Und:
+    // kein "+ -"/"- -" (unverschmolzene Doppelvorzeichen) irgendwo im Text.
     for (const { feld, text } of sammleAlleTextfelder(aufgabe)) {
       pruefe(
         !KOEFFIZIENT_EINS.test(text),
         `${generator.id} seed=${seed}: ${feld} zeigt Koeffizient 1 aus statt ihn wegzulassen: "${text}"`
+      );
+      pruefe(
+        !DOPPELVORZEICHEN.test(text),
+        `${generator.id} seed=${seed}: ${feld} zeigt ein unverschmolzenes Doppelvorzeichen: "${text}"`
       );
     }
 
@@ -427,8 +445,43 @@ function testeEffektivzinsToleranz() {
   console.log(`Effektivzins-Toleranz: ${faelle.length} Fälle geprüft`);
 }
 
+// ---------------------------------------------------------------------------
+// Box-weise Bewertung von Koeffizientenzeilen (app.js-Prüflogik, hier als
+// reine Funktion in pruefung.js getestet statt im Browser): nur eine KOMPLETT
+// leere Zeile zählt als leer; sobald mindestens eine Box gefüllt ist, zählt
+// jede leere Box als eingegebene 0.
+// ---------------------------------------------------------------------------
+function testeBewerteKoeffizientenZeile() {
+  const loesung = [-2, 43, 0]; // E(x) = -2x² + 43x, Konstante 0
+
+  // Alle Boxen gefüllt, alle richtig.
+  let b = bewerteKoeffizientenZeile(['-2', '43', '0'], loesung);
+  pruefe(b.leer === 0 && b.proBox.every((p) => p.korrekt), 'Koeffizientenzeile: voll ausgefüllt und richtig wird als 0 leer erkannt');
+
+  // Konstante (= 0) leer gelassen statt "0" einzutippen: muss trotzdem als
+  // richtig gelten (Nutzerfall aus der iPhone-Rückmeldung).
+  b = bewerteKoeffizientenZeile(['-2', '43', ''], loesung);
+  pruefe(b.leer === 0, 'Koeffizientenzeile: teilweise gefüllt zählt nicht als komplett leer');
+  pruefe(b.proBox.length === 3 && b.proBox.every((p) => p.bewertet && p.korrekt), 'Koeffizientenzeile: leere Box bei Lösung 0 wird als richtige 0 gewertet');
+
+  // Gemischt: eine Box falsch, eine leer (bei Lösung 0 richtig), eine richtig.
+  b = bewerteKoeffizientenZeile(['-3', '43', ''], loesung);
+  pruefe(b.proBox[0].korrekt === false && b.proBox[1].korrekt === true && b.proBox[2].korrekt === true, 'Koeffizientenzeile: gemischt gibt pro Box das richtige Ergebnis');
+
+  // Leere Box bei einer Lösung ≠ 0 muss falsch sein (nicht automatisch als 0 akzeptiert).
+  b = bewerteKoeffizientenZeile(['-2', '', '0'], loesung);
+  pruefe(b.proBox[1].korrekt === false, 'Koeffizientenzeile: leere Box bei Lösung ≠ 0 zählt als falsch, nicht als leer');
+
+  // Komplett leere Zeile: alle Boxen zählen als leer, keine wird bewertet.
+  b = bewerteKoeffizientenZeile(['', '', ''], loesung);
+  pruefe(b.leer === 3 && b.proBox.every((p) => p.bewertet === false), 'Koeffizientenzeile: komplett leer zählt als leer, nicht als falsch');
+
+  console.log('Koeffizientenzeile-Bewertung: 5 Fälle geprüft');
+}
+
 testeZahlenparser();
 testeEffektivzinsToleranz();
+testeBewerteKoeffizientenZeile();
 fehler += testeFixtures();
 for (const generator of GENERATOREN) {
   testeGenerator(generator);

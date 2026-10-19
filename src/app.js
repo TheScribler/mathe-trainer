@@ -239,19 +239,22 @@ function starteApp() {
       for (const eingabe of aktuelleAufgabe.eingaben) {
         const feldOderFelder = felder[eingabe.id];
         if (eingabe.typ === 'term') continue; // nicht automatisch geprüft, siehe oben
-        gesamt += 1;
 
         if (eingabe.typ === 'koeffizienten') {
           feldOderFelder.forEach((f) => f.classList.remove('gut', 'schlecht'));
-          if (feldOderFelder.some((f) => f.value.trim() === '')) {
-            leer += 1;
+          gesamt += feldOderFelder.length;
+          const werte = feldOderFelder.map((f) => f.value);
+          const bewertung = bewerteKoeffizientenZeile(werte, eingabe.loesung, eingabe.toleranz);
+          if (bewertung.leer > 0) {
+            leer += bewertung.leer;
             continue;
           }
-          const werte = feldOderFelder.map((f) => f.value);
-          const ergebnis = pruefeKoeffizienten(werte, eingabe.loesung, eingabe.toleranz);
-          feldOderFelder.forEach((f) => f.classList.add(ergebnis.korrekt ? 'gut' : 'schlecht'));
-          if (ergebnis.korrekt) richtig += 1;
+          bewertung.proBox.forEach((box, i) => {
+            feldOderFelder[i].classList.add(box.korrekt ? 'gut' : 'schlecht');
+            if (box.korrekt) richtig += 1;
+          });
         } else if (eingabe.typ === 'auswahl') {
+          gesamt += 1;
           feldOderFelder.classList.remove('gut', 'schlecht');
           if (feldOderFelder.value === '') {
             leer += 1;
@@ -261,6 +264,7 @@ function starteApp() {
           feldOderFelder.classList.add(ergebnis.korrekt ? 'gut' : 'schlecht');
           if (ergebnis.korrekt) richtig += 1;
         } else {
+          gesamt += 1;
           feldOderFelder.classList.remove('gut', 'schlecht');
           if (feldOderFelder.value.trim() === '') {
             leer += 1;

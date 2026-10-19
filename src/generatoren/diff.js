@@ -5,7 +5,7 @@
 
 import { zufallInt, zufallAus } from '../rng.js';
 import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
-import { zahlZuLatex, bruch, polynomLatex, mehrzeiligeGleichung } from '../latex.js';
+import { zahlZuLatex, bruch, polynomLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // Term mit Vorzeichen, Koeffizient 1/-1 wird nicht ausgeschrieben (gleiche
@@ -15,7 +15,11 @@ import { KONFIG } from '../konfig.js';
 // explizit "-" (ASCII) für LaTeX-Felder übergeben.
 function termMitVorzeichen(koeff, einheit, formatFn, minus = '−') {
   const abs = Math.abs(koeff);
-  const zahl = abs === 1 ? '' : formatFn(abs, minimaleNachkommastellen(abs));
+  // Koeffizient 1 wird nur vor einer Variable weggelassen ("x" statt "1x") —
+  // bei einem reinen Zahlenterm (einheit === '', z. B. die Konstante eines
+  // Polynoms) wäre "" statt "1" keine Vereinfachung, sondern ein verschwun-
+  // dener Term: nur noch das nackte Vorzeichen bliebe übrig ("- " statt "-1").
+  const zahl = (abs === 1 && einheit !== '') ? '' : formatFn(abs, minimaleNachkommastellen(abs));
   return `${koeff < 0 ? minus : '+'} ${zahl}${einheit}`;
 }
 
@@ -35,6 +39,30 @@ function cdotWennNicht1(koeffizient, ausdruck) {
 // vorzeichenlose Koeffizienten (P1, P2, γ sind hier immer positiv).
 function koeffVariable(koeff, variable) {
   return koeff === 1 ? variable : `${zahlZuLatex(koeff, minimaleNachkommastellen(koeff))}${variable}`;
+}
+
+// "-\dfrac{zaehler}{nenner}", aber ohne doppeltes Minuszeichen, wenn zaehler
+// selbst negativ ist — sonst kürzen sich die beiden Minus zu einem optisch
+// verwirrenden "−(−…)" statt als vereinfachter positiver Bruch zu erscheinen.
+function minusBruch(zaehler, nenner) {
+  const negativ = zaehler < 0;
+  return `${negativ ? '' : '-'}\\dfrac{${zahlZuLatex(Math.abs(zaehler), minimaleNachkommastellen(Math.abs(zaehler)))}}{${nenner}}`;
+}
+
+// "2 \cdot (c)" als Nenner, vereinfacht wenn |c| = 1 ("2" bzw. "-2" statt
+// "2 \cdot (1)" bzw. "2 \cdot (-1)").
+function zweiMalKoeffizient(c) {
+  if (c === 1) return '2';
+  if (c === -1) return '-2';
+  return `2 \\cdot (${zahlZuLatex(c, 0)})`;
+}
+
+// Klammert eine Zahl ein, wenn sie negativ ist — nötig, sobald sie direkt
+// hinter einem eigenen Vorzeichen/Operator eingesetzt wird (sonst entstehen
+// zwei Vorzeichen direkt hintereinander, z. B. "+ -3" statt "+ (-3)").
+function klammerWennNegativ(zahl, nachkommastellen = 0) {
+  const text = zahlZuLatex(zahl, nachkommastellen);
+  return zahl < 0 ? `(${text})` : text;
 }
 
 function bauePolynomAusdruck(paare, formatFn, minus) {
@@ -148,14 +176,18 @@ export const gewinnBreakeven = {
           },
           {
             titel: 'Einsetzen',
-            latex: mehrzeiligeGleichung("K'(x)", [
-              polynomLatex([2 * c, d], [1, 0]),
-            ]) + ` \\;\\Rightarrow\\; K'(${x0}) = ${cdotWennNicht1(2 * c, String(x0))} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), minimaleNachkommastellen(Math.abs(d)))}`,
+            latex: gleichungsKette([
+              `K'(x) = ${polynomLatex([2 * c, d], [1, 0])}`,
+              `K'(${x0}) = ${cdotWennNicht1(2 * c, String(x0))} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), minimaleNachkommastellen(Math.abs(d)))}`,
+            ]),
           },
           { titel: 'Ergebnis', latex: `K'(${x0}) = ${zahlZuLatex(grenzkosten, 2)}` },
           {
             titel: 'Umstellen',
-            latex: `${polynomLatex(gKoeff, [2, 1, 0])} = 0 \\;\\Big/ \\div (${zahlZuLatex(-A, minimaleNachkommastellen(A))}) \\;\\Rightarrow\\; ${polynomLatex([1, -(x1 + x2), x1 * x2], [2, 1, 0])} = 0`,
+            latex: mehrzeiligeKette([
+              `${polynomLatex(gKoeff, [2, 1, 0])} &= 0 \\quad \\Big/ \\div (${zahlZuLatex(-A, minimaleNachkommastellen(A))})`,
+              `\\Rightarrow\\; ${polynomLatex([1, -(x1 + x2), x1 * x2], [2, 1, 0])} &= 0`,
+            ]),
             hinweis: 'Durch den Koeffizienten von x² teilen, damit vor x² eine 1 steht.',
           },
           {
@@ -167,7 +199,7 @@ export const gewinnBreakeven = {
             titel: 'Einsetzen',
             latex: mehrzeiligeGleichung('x_{1,2}', [
               `-\\dfrac{p}{2} \\pm \\sqrt{\\left(\\dfrac{p}{2}\\right)^2 - q}`,
-              `-\\dfrac{${zahlZuLatex(-(x1 + x2), 0)}}{2} \\pm \\sqrt{\\left(\\dfrac{${zahlZuLatex(-(x1 + x2), 0)}}{2}\\right)^2 - ${zahlZuLatex(x1 * x2, 0)}}`,
+              `${minusBruch(-(x1 + x2), 2)} \\pm \\sqrt{\\left(\\dfrac{${zahlZuLatex(-(x1 + x2), 0)}}{2}\\right)^2 - ${zahlZuLatex(x1 * x2, 0)}}`,
               `${zahlZuLatex((x1 + x2) / 2, minimaleNachkommastellen((x1 + x2) / 2))} \\pm \\sqrt{${zahlZuLatex(Math.pow((x1 + x2) / 2, 2), minimaleNachkommastellen(Math.pow((x1 + x2) / 2, 2)))} - ${zahlZuLatex(x1 * x2, 0)}}`,
               `${zahlZuLatex((x1 + x2) / 2, minimaleNachkommastellen((x1 + x2) / 2))} \\pm ${zahlZuLatex((x2 - x1) / 2, minimaleNachkommastellen((x2 - x1) / 2))}`,
             ]),
@@ -290,7 +322,7 @@ export const extremwerteZweiVariablenKubisch = {
           },
           {
             titel: 'Umstellen',
-            latex: `f_y = 0 \\;\\Rightarrow\\; y = -\\dfrac{${zahlZuLatex(a, 0)}}{2 \\cdot (${zahlZuLatex(c, 0)})}x = ${yKoeff < 0 ? '-' : ''}${koeffVariable(Math.abs(yKoeff), 'x')}`,
+            latex: `f_y = 0 \\;\\Rightarrow\\; y = ${minusBruch(a, zweiMalKoeffizient(c))}x = ${yKoeff < 0 ? '-' : ''}${koeffVariable(Math.abs(yKoeff), 'x')}`,
             hinweis: 'Nach y umstellen, dann in die Ableitung nach x einsetzen.',
           },
           {
@@ -388,6 +420,7 @@ export const extremwerteZweiVariablenQuadratisch = {
     const xVonY = bauePolynomAusdruck([[k1, ''], [k2, 'y']], zahlZuLatex, '-');
     const m1 = runde(2 * C + E * k2, 4);
     const n1 = runde(D + E * k1, 4);
+    const m1Term = `${m1 < 0 ? '-' : ''}${koeffVariable(Math.abs(m1), 'y')}`;
 
     return {
       frage: { text: `Bestimmen Sie alle Extremwerte der Funktion ${fText}.` },
@@ -413,15 +446,24 @@ export const extremwerteZweiVariablenQuadratisch = {
           {
             titel: 'Einsetzen',
             latex: mehrzeiligeGleichung('f_y', [
-              `${koeffVariable(2 * C, 'y')}${D === 0 ? '' : ` ${D < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(D), 0)}`} ${E < 0 ? '-' : '+'} ${cdotWennNicht1(Math.abs(E), `(${xVonY})`)}`,
-              `${koeffVariable(m1, 'y')} ${n1 < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(n1), minimaleNachkommastellen(Math.abs(n1)))}`,
-            ]) + ' = 0',
+              `${koeffVariable(2 * C, 'y')}${D === 0 ? '' : ` ${D < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(D), 0)}`}${E === 0 ? '' : ` ${E < 0 ? '-' : '+'} ${cdotWennNicht1(Math.abs(E), `(${xVonY})`)}`}`,
+              `${m1Term} ${n1 < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(n1), minimaleNachkommastellen(Math.abs(n1)))} = 0`,
+            ]),
             hinweis: 'x ersetzen und ausmultiplizieren.',
+          },
+          {
+            titel: 'Umstellen',
+            latex: gleichungsKette([
+              `${m1Term} ${n1 < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(n1), minimaleNachkommastellen(Math.abs(n1)))} = 0`,
+              `${m1Term} = ${zahlZuLatex(-n1, minimaleNachkommastellen(Math.abs(n1)))}`,
+              `y = ${zahlZuLatex(yStern, 0)}`,
+            ]),
+            hinweis: 'Nach y auflösen.',
           },
           { titel: 'Ergebnis', latex: `y = ${zahlZuLatex(yStern, 0)}` },
           {
             titel: 'Einsetzen',
-            latex: `x = ${zahlZuLatex(k1, minimaleNachkommastellen(k1))} ${k2 < 0 ? '-' : '+'} ${cdotWennNicht1(k2, zahlZuLatex(yStern, 0))} = ${zahlZuLatex(xStern, 0)}`,
+            latex: `x = ${zahlZuLatex(k1, minimaleNachkommastellen(k1))} ${k2 < 0 ? '-' : '+'} ${cdotWennNicht1(k2, klammerWennNegativ(yStern))} = ${zahlZuLatex(xStern, 0)}`,
           },
           {
             titel: 'Formel',
