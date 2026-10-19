@@ -161,12 +161,15 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     // Unabhängig: m-fache Aufzinsung per Schleife statt Math.pow, wie in PLAN.md
     // Testkonzept beschrieben ("m-fache Aufzinsung mit j=i_nom/m numerisch").
     if (p.richtung === 'vorwaerts') {
+      // iEff ist jetzt laut Vorlesungsregel auf 4 Nachkommastellen (als
+      // Dezimalzahl) gerundet, daher eine gröbere Toleranz als bei einem
+      // exakten Wert: der Rundungsschritt selbst ist bis zu 0,00005 groß.
       const iEffLoesung = wertVon(aufgabe, 'iEff') / 100;
       const j = p.iNomProzent / 100 / p.m;
       let acc = 1;
       for (let k = 0; k < p.m; k++) acc *= 1 + j;
       pruefe(
-        nahBei(acc - 1, iEffLoesung, 1e-9),
+        nahBei(acc - 1, iEffLoesung, 1e-4),
         `${kennzeichnung}: m-fache Aufzinsung ergibt ${(acc - 1)}, erwartet i_eff=${iEffLoesung}`
       );
     } else {

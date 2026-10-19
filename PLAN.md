@@ -88,7 +88,7 @@ abgeleitet wird (die Parameter der Aufgabe).
 | `fin.rente-aus-kapital` | Rente aus einem Anfangskapital | 3 | MK 1 I, Übung 5c | `R₀` ∈ 50.000…250.000 (Schritt 10.000), `i` ∈ {1; 1,5; 2; 2,5; 3; 4; 5} %, `n` ∈ {10; 12; 15; 20; 25}, Story (Rentenversicherung, Lebenserwartung) | `R₀` runde Summe, `i` ≤ 2 Dezimalen, `n` ganz. Ergebnis `r = R₀·i·qⁿ/(qⁿ−1)` auf Cent; Zwischenwert `qⁿ` mit 6 Dezimalen anzeigen. Prüft `r` ∈ plausibler Spanne |
 | `fin.rente-veraenderlich` | Barwert einer veränderlichen nachschüssigen Rente | 3 | MK 1 II | `n` ∈ {3; 4; 5}, Startzahlung ∈ {40; 50; 100; 200; 500}, Zuwachs `d` ∈ {5; 10; 20; 25; 50}, `i` ∈ {2; 4; 5; 8; 10} % | Zahlungen ganzzahlig, `i` ≤ 2 Dezimalen. Summe einzeln abgezinst, Ergebnis auf 2 Dezimalen. Tabelle `t`/`rₜ` wie in der Klausur |
 | `fin.verdopplungszeit` | Laufzeit bei Zinseszins | 3 | MK 2a, Übung 1d/2a | Variante A: Verdopplung/Verdreifachung, `i` ∈ 1…8 % (Schritt 0,25). Variante B: `K₀` und `Kₙ` gegeben | A: `n = ln2/ln q`, Ergebnis 2 Dezimalen (Klausur: 17,67). B rückwärts wie WS22 1d: `n` ganz wählen, `K₀` rund, `Kₙ = runde(K₀·qⁿ, 2)` → Antwort ≈ ganze Jahre |
-| `fin.effektivzins` | Effektivzins bei unterjährlicher Verzinsung | 3 | MK 2b, Übung 3b/c | `m` ∈ {2; 4; 12; 360}, `i_nom` 1…12 %, Umkehrvariante (`i_nom` aus `i_eff`, Übung 3a) als Untertyp | `i_nom/m` muss endlich dezimal sein: bei `m=12` nur `i_nom` ∈ {1,2; 2,4; 3; 3,6; 4,8; 6; 7,2} %, bei `m=4` ganze %, bei `m=2` beliebig. Ausgabe `3,04 %` **und** exakt `3,0416 %` (Rundungsregel des Dozenten) |
+| `fin.effektivzins` | Effektivzins bei unterjährlicher Verzinsung | 3 | MK 2b, Übung 3b/c | `m` ∈ {2; 4; 12}, `i_nom` 1…12 %, Umkehrvariante (`i_nom` aus `i_eff`, Übung 3a) als Untertyp | `i_nom/m` muss endlich dezimal sein: bei `m=12` nur `i_nom` ∈ {1,2; 2,4; 3; 3,6; 4,8; 6; 7,2} %, bei `m=4` ganze %, bei `m=2` beliebig. Ergebnis nach der Vorlesungsregel (CLAUDE.md Abschnitt 6): `0,0304 = 3,04 %`, ungerundeter Wert nur als kleine Notiz, wenn er abweicht |
 
 Zusammen 4 × 3 P = 12 P, genau Aufgabe 1 + 2 der Musterklausur.
 
@@ -328,7 +328,7 @@ für Schritt mit dem erwarteten Ergebnis (nur Zahlen, kein Aufgabentext, siehe A
 | MK 1 I (100.000; 2 %; 15) | `r = 7.782,55 €` |
 | MK 1 II (50/55/60/65; 10 %) | `R₀ = 180,38` |
 | MK 2a (Verdopplung; 4 %) | `t = 17,67` Jahre |
-| MK 2b (3 %; m = 12) | `i_eff = 3,04 %` (exakt 3,0416 %) |
+| MK 2b (3 %; m = 12) | `i_eff = 0,0304 = 3,04 %` (ungerundet 0,030416) |
 | MK 3 (`p = 25−2x`, `K = 0,4x²−11x+120`) | `E = 25x−2x²`, `G = −2,4x²+36x−120`, `K'(50) = 29`, `x₁ = 5`, `x₂ = 10`, `x_max = 7,5`, `p = 10`, `G_max = 15` |
 | MK 4 (`x³+4xy−x²−y²`) | Sattelpunkt `(0\|0\|0)`, Maximum `(−2\|−4\|4)` |
 | MK 5 (`8x₁+4x₂+2x₁x₂+8`; Y=60; 2/4) | `(x₁; x₂) = (18; 6)`, `λ = −10` |

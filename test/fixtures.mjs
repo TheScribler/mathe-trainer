@@ -47,12 +47,18 @@ export function testeFixtures() {
     faelle.push('MK2a');
   }
 
-  // Musterklausur 2b: i_nom=3 %, m=12 (monatlich) -> i_eff=3,04 % (exakt 3,0416 %).
+  // Musterklausur 2b: i_nom=3 %, m=12 (monatlich) -> i_eff=0,0304=3,04 %
+  // (Vorlesungsregel: Zinssätze als Dezimalzahl auf 4 Nachkommastellen,
+  // exakter Wert vor der Rundung 0,030416 = 3,0416 %).
   {
     const a = effektivzins.baue({ richtung: 'vorwaerts', m: 12, iNomProzent: 3 });
-    const iEff = a.eingaben[0].loesung;
-    pruefe(nahBei(iEff, 3.0416, 0.0001), `MK2b: i_eff=${iEff}, erwartet ≈3.0416`);
-    pruefe(nahBei(Math.round(iEff * 100) / 100, 3.04, 1e-9), `MK2b gerundet: ${Math.round(iEff * 100) / 100}, erwartet 3.04`);
+    const iEffAntwort = a.eingaben[0].loesung;
+    pruefe(
+      nahBei(iEffAntwort, 3.04, 1e-9),
+      `MK2b: Antwort i_eff=${iEffAntwort}, erwartet 3.04 (gerundet laut Vorlesungsregel)`
+    );
+    const iEffExakt = (Math.pow(1 + 0.03 / 12, 12) - 1) * 100;
+    pruefe(nahBei(iEffExakt, 3.0416, 0.0001), `MK2b: exakter Wert ${iEffExakt}, erwartet ≈3,0416`);
     faelle.push('MK2b');
   }
 

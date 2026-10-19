@@ -93,8 +93,33 @@ Formel → Umstellen → Einsetzen → Ergebnis. Fragetexte selbst formulieren (
 siehe Abschnitt 2 — nicht aus den PDFs kopieren).
 
 **Rundung und Toleranz** stehen zentral in `src/konfig.js`, nicht in den Generatoren:
-Geld 2 Dezimalen ±0,05; Prozentsätze 2 Dezimalen ±0,01 pp (exakter Wert mit 4 Stellen
-zusätzlich anzeigen); Jahre ±0,01; Mengen, Koeffizienten und Matrixeinträge exakt.
+Geld 2 Dezimalen ±0,05; Jahre ±0,01; Mengen, Koeffizienten und Matrixeinträge exakt.
+Zinssätze/Prozentsätze als Ergebnis folgen einer eigenen Regel, siehe nächster Absatz.
+Toleranz beim Prüfen eines Zinssatz-Ergebnisses: ±0,01 Prozentpunkte (`KONFIG.toleranz.
+prozentpunkte`) — deckt die Rundung auf 4 Nachkommastellen komfortabel ab.
+
+**Rundungsregel für Zinssätze (Vorlesung, bestätigt aus den Vorlesungsnotizen):**
+„Ergebnisse bei Klausur auf 2 Nachkommastellen, außer bei Prozentsätzen 4 Nachkomma-
+stellen." Die Musterlösung wendet das als Dezimalzahl auf 4 Nachkommastellen an,
+gleichwertig mit 2 Nachkommastellen in Prozent, weil Prozent = Dezimalzahl × 100 den
+Dezimalpunkt um genau 2 Stellen verschiebt — z. B. Übung 1d: `0,0080 = 0,80 %`;
+Musterklausur 2b: `0,0304 = 3,04 %`. Gilt nur für **Ergebnisse** (das, was als Antwort
+hingeschrieben wird), nicht für gegebene Werte in einer Aufgabenstellung — die bleiben
+in ihrer natürlichen, oft kürzeren Schreibweise (z. B. „Effektivzins von 8,16 %" als
+gegebene Größe in einer Umkehraufgabe).
+
+Anzeige in der Lösung: `i_{eff} = 0{,}0304 = 3{,}04\%` als LaTeX-Zeile des Ergebnis-
+Schritts, dazu als `hinweis` (reiner Text, kein LaTeX) „Rundung laut Vorlesung:
+Zinssätze als Dezimalzahl auf 4 Nachkommastellen." — plus „Ungerundet: 0,030416."
+**nur wenn** der ungerundete Wert tatsächlich abweicht (sonst entfällt dieser Zusatz,
+z. B. wenn der Zinssatz schon exakt vorgegeben war). Muster dafür in
+`src/generatoren/finanz.js`: `zinssatzRunden`, `zinssatzErgebnisLatex`,
+`zinssatzRundungsHinweis` — neue Generatoren mit einem Zinssatz-Ergebnis rufen diese
+drei Funktionen auf, statt die Rundung neu zu erfinden. Die Anzahl Nachkommastellen
+(aktuell 4) steht zentral in `KONFIG.nachkommastellen.zinssatzDezimal`.
+
+Alle anderen Ergebnisse (Geldbeträge, Jahre, Mengen, Koeffizienten) bleiben bei den
+oben genannten 2 Dezimalen.
 
 ## 7 Testpflichten
 

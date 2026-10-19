@@ -18,7 +18,14 @@ export const KONFIG = {
   },
   nachkommastellen: {
     geld: 2,
-    prozent: 2,
     jahre: 2,
+    // Zinssatz-ERGEBNISSE (finale Antworten, die ein Zinssatz sind) werden
+    // als Dezimalzahl auf 4 Nachkommastellen angegeben — Vorlesungsregel,
+    // siehe CLAUDE.md Abschnitt 6 ("Rundungsregel für Zinssätze"). Das ist
+    // zahlenmäßig dasselbe wie 2 Nachkommastellen in Prozent (0,0304 = 3,04 %),
+    // weil Prozent = Dezimalzahl × 100 den Dezimalpunkt um genau 2 Stellen
+    // verschiebt. Gilt NICHT für gegebene Werte in einer Aufgabenstellung,
+    // nur für das, was als Ergebnis hingeschrieben wird.
+    zinssatzDezimal: 4,
   },
 };

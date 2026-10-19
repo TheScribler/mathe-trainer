@@ -4,7 +4,7 @@
 
 import { zufallInt, zufallAus, zufallBool } from '../rng.js';
 import { runde, formatDeZahl } from '../zahl.js';
-import { zahlZuLatex, prozentLatex, bruch } from '../latex.js';
+import { zahlZuLatex, bruch } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 const NAMEN = ['Jana', 'Lena', 'Paul', 'Mara', 'Jonas', 'Nina', 'Felix', 'Sophie', 'Tom', 'Clara'];
@@ -35,6 +35,28 @@ function prozentOhneNullenProse(prozent) {
 const HOCHGESTELLTE_ZIFFERN = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 function hochgestelltesExponent(n) {
   return String(n).split('').map((ziffer) => HOCHGESTELLTE_ZIFFERN[Number(ziffer)] ?? ziffer).join('');
+}
+
+// Rundungsregel der Vorlesung für Zinssatz-ERGEBNISSE (nicht für gegebene
+// Werte in der Aufgabenstellung): Dezimalzahl auf KONFIG.nachkommastellen.
+// zinssatzDezimal Nachkommastellen, angezeigt zusammen mit der gleichwertigen
+// Prozentzahl — "0,0304 = 3,04 %". Siehe CLAUDE.md Abschnitt 6.
+function zinssatzRunden(anteil) {
+  return runde(anteil, KONFIG.nachkommastellen.zinssatzDezimal);
+}
+
+function zinssatzErgebnisLatex(anteilGerundet) {
+  const stellenProzent = KONFIG.nachkommastellen.zinssatzDezimal - 2;
+  const prozentGerundet = runde(anteilGerundet * 100, stellenProzent);
+  return `${zahlZuLatex(anteilGerundet, KONFIG.nachkommastellen.zinssatzDezimal)} = ` +
+    `${zahlZuLatex(prozentGerundet, stellenProzent)}\\%`;
+}
+
+function zinssatzRundungsHinweis(anteilExakt, anteilGerundet) {
+  const basis = `Rundung laut Vorlesung: Zinssätze als Dezimalzahl auf ` +
+    `${KONFIG.nachkommastellen.zinssatzDezimal} Nachkommastellen.`;
+  if (Math.abs(anteilGerundet - anteilExakt) < 1e-9) return basis;
+  return `${basis} Ungerundet: ${formatDeZahl(anteilExakt, 6)}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -297,9 +319,8 @@ export const effektivzins = {
     const iEffProzentExakt = iEffExakt * 100;
 
     if (richtung === 'vorwaerts') {
-      const iEff2dp = runde(iEffProzentExakt, 2);
-      const iEff4dp = runde(iEffProzentExakt, 4);
-      const brauchtGenau = iEff2dp !== iEff4dp;
+      const iEffGerundet = zinssatzRunden(iEffExakt);
+      const iEffAntwortProzent = runde(iEffGerundet * 100, 2);
       return {
         frage: {
           text: `Eine Kapitalanlage hat einen Nominalzins von ${formatDeZahl(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)} % ` +
@@ -308,7 +329,7 @@ export const effektivzins = {
         eingaben: [
           {
             id: 'iEff', label: 'Effektivzins (%)', typ: 'zahl', punkte: 3,
-            loesung: iEffProzentExakt, toleranz: KONFIG.toleranz.prozentpunkte,
+            loesung: iEffAntwortProzent, toleranz: KONFIG.toleranz.prozentpunkte,
           },
         ],
         loesung: {
@@ -320,17 +341,11 @@ export const effektivzins = {
             },
             {
               titel: 'Ergebnis',
-              latex: brauchtGenau
-                ? `i_{eff} = ${prozentLatex(iEff2dp / 100, 2)}\\ (\\text{genau } ${prozentLatex(iEff4dp / 100, 4)})`
-                : `i_{eff} = ${prozentLatex(iEff2dp / 100, 2)}`,
+              latex: `i_{eff} = ${zinssatzErgebnisLatex(iEffGerundet)}`,
+              hinweis: zinssatzRundungsHinweis(iEffExakt, iEffGerundet),
             },
           ],
-          ergebnisse: brauchtGenau
-            ? [
-                { label: 'Effektivzins (gerundet)', latex: prozentLatex(iEff2dp / 100, 2) },
-                { label: 'Effektivzins (genau)', latex: prozentLatex(iEff4dp / 100, 4) },
-              ]
-            : [{ label: 'Effektivzins', latex: prozentLatex(iEff2dp / 100, 2) }],
+          ergebnisse: [{ label: 'Effektivzins', latex: zinssatzErgebnisLatex(iEffGerundet) }],
         },
         params,
       };
@@ -360,9 +375,13 @@ export const effektivzins = {
             titel: 'Einsetzen',
             latex: `i_{nom} = \\left(\\left(1 + ${anteilLatexOhneNullen(iEffGegeben / 100)}\\right)^{${bruch('1', String(m))}} - 1\\right) \\cdot ${m}`,
           },
-          { titel: 'Ergebnis', latex: `i_{nom} = ${zahlZuLatex(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)}\\ \\%` },
+          {
+            titel: 'Ergebnis',
+            latex: `i_{nom} = ${zinssatzErgebnisLatex(zinssatzRunden(iNom))}`,
+            hinweis: zinssatzRundungsHinweis(iNom, zinssatzRunden(iNom)),
+          },
         ],
-        ergebnisse: [{ label: 'Nominalzins', latex: `${zahlZuLatex(iNomProzent, iNomProzent % 1 === 0 ? 0 : 2)}\\ \\%` }],
+        ergebnisse: [{ label: 'Nominalzins', latex: zinssatzErgebnisLatex(zinssatzRunden(iNom)) }],
       },
       params: { ...params, iEffGegeben },
     };
