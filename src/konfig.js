@@ -21,12 +21,12 @@ export const KONFIG = {
     prozentpunkte: 0.006,
     jahre: 0.01,
     exakt: 1e-9,
-    // Wie prozentpunkte, aber für Bruch-Koeffizienten (Integralrechnung), die
-    // auf 4 Nachkommastellen angezeigt werden (z. B. 2/3 = 0,6667) — die
-    // Rundung weicht im schlechtesten Fall um genau 0,00005 ab; 0,00006
-    // lässt Spielraum für Gleitkomma-Rauschen, bleibt aber klar unter dem
-    // nächsten Rundungsschritt (0,0001).
-    bruch4: 0.00006,
+    // Für Ergebnisse der Integralrechnung, die ein Bruch sein können (z. B.
+    // 2/3 = 0,6667): dieselbe Überlegung wie bei prozentpunkte, aber für die
+    // normale 2-Dezimalstellen-Rundung (nicht die Sonderregel für Zinssätze).
+    // Deckt sowohl "0,67" als auch "0,667" als Antwort für 2/3 ab — beides
+    // sind plausible Rundungen desselben exakten Werts.
+    bruch: 0.006,
   },
   nachkommastellen: {
     geld: 2,

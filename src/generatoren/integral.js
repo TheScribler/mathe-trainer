@@ -6,7 +6,7 @@
 
 import { zufallInt, zufallAus, zufallBool } from '../rng.js';
 import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
-import { zahlZuLatex, bruch, bruchGekuerzt, bruchMitDezimal, polynomLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette } from '../latex.js';
+import { zahlZuLatex, bruch, bruchGekuerzt, bruchMitDezimal, polynomLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette, auswertungsklammer } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // ---------------------------------------------------------------------------
@@ -130,6 +130,46 @@ function bruchOderZahl({ zaehler, nenner }) {
   return `${negativ ? '-' : ''}${bruch(Math.abs(zaehler), nenner)}`;
 }
 
+// Eine Division "zaehler/nenner" anzeigen, als gekürzten Bruch, wenn beide
+// Seiten ganze Zahlen sind (sonst, bei Dezimalzahlen wie 0,5, ist Kürzen
+// nicht sinnvoll definiert — dann bleibt es eine reine Divisionsanzeige).
+function bruchOderDivision(zaehler, nenner) {
+  if (Number.isInteger(zaehler) && Number.isInteger(nenner)) {
+    const { zaehler: z, nenner: n } = bruchGekuerzt(zaehler, nenner);
+    return n === 1 ? zahlZuLatex(z, 0) : bruch(zahlZuLatex(z, 0), zahlZuLatex(n, 0));
+  }
+  return bruch(zahlZuLatex(zaehler, minimaleNachkommastellen(zaehler)), zahlZuLatex(nenner, minimaleNachkommastellen(nenner)));
+}
+
+// Zusatzterm für int.unbestimmt (1/x -> ln|x|, bzw. e^x -> e^x selbst, siehe
+// Folie 150) — f und F sind beim e^x-Term identisch (Selbstableitung), beim
+// ln-Term bleibt der Koeffizient unverändert (d/dx[c·ln|x|] = c/x). Potenz-
+// regel-Koeffizient-1-Weglassung gilt nur vor e^x (eine Variable), nicht vor
+// ln|x| im Nenner von f — "1/x" ohne die 1 wäre kein gültiger Bruch mehr.
+function sonderTermTexte(sonderterm) {
+  if (!sonderterm) return null;
+  const { typ, koeffizient } = sonderterm;
+  const vz = koeffizient < 0 ? '-' : '+';
+  const vzProse = koeffizient < 0 ? '−' : '+';
+  const abs = Math.abs(koeffizient);
+  if (typ === 'ln') {
+    return {
+      fLatex: `${vz} ${bruch(zahlZuLatex(abs, 0), 'x')}`,
+      fProse: `${vzProse} ${formatDeZahl(abs, 0)}/x`,
+      summenregelLatex: `${vz} ${cdotWennNicht1(koeffizient, '\\int \\dfrac{1}{x}\\,dx')}`,
+      FLatex: `${vz} ${cdotWennNicht1(koeffizient, '\\ln|x|')}`,
+      regel: 'Sonderregel ln|x| statt Potenzregel, da n = −1 (Potenzregel wäre hier eine Division durch 0).',
+    };
+  }
+  return {
+    fLatex: `${vz} ${cdotWennNicht1(koeffizient, 'e^x')}`,
+    fProse: `${vzProse} ${abs === 1 ? '' : formatDeZahl(abs, 0) + '·'}eˣ`,
+    summenregelLatex: `${vz} ${cdotWennNicht1(koeffizient, '\\int e^x\\,dx')}`,
+    FLatex: `${vz} ${cdotWennNicht1(koeffizient, 'e^x')}`,
+    regel: 'eˣ ist seine eigene Stammfunktion.',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // int.unbestimmt — Übung 18 / Folie 152
 // Stammfunktion eines Polynoms f(x) = Σ a_k x^k (k ≥ 0) bestimmen.
@@ -163,12 +203,21 @@ export const integralUnbestimmt = {
       return k + 1; // Rückfall: a_k = k+1 ergibt c_k = 1 (Nenner 1)
     });
 
-    return { exponenten, koeffizienten };
+    // Zusätzlicher 1/x- oder e^x-Term (Folie 150), unabhängig vom Polynomteil.
+    let sonderterm = null;
+    if (zufallBool(rng, 0.35)) {
+      sonderterm = { typ: zufallAus(rng, ['ln', 'exp']), koeffizient: zufallAus(rng, [-3, -2, -1, 1, 2, 3]) };
+    }
+
+    return { exponenten, koeffizienten, sonderterm };
   },
   baue(params) {
-    const { exponenten, koeffizienten } = params;
-    const fLatex = polynomLatex(koeffizienten, exponenten);
-    const fProse = polynomProse(koeffizienten, exponenten);
+    const { exponenten, koeffizienten, sonderterm } = params;
+    const sonder = sonderTermTexte(sonderterm);
+    const fLatexPotenz = polynomLatex(koeffizienten, exponenten);
+    const fProsePotenz = polynomProse(koeffizienten, exponenten);
+    const fLatex = sonder ? `${fLatexPotenz} ${sonder.fLatex}` : fLatexPotenz;
+    const fProse = sonder ? `${fProsePotenz} ${sonder.fProse}` : fProsePotenz;
 
     const terme = koeffizienten
       .map((a, i) => {
@@ -177,7 +226,8 @@ export const integralUnbestimmt = {
       })
       .sort((x, y) => y.exponent - x.exponent);
 
-    const fExakt = bruchPolynomAusdruck(terme);
+    const fExaktPotenz = bruchPolynomAusdruck(terme);
+    const fExakt = sonder ? `${fExaktPotenz} ${sonder.FLatex}` : fExaktPotenz;
     const hatBruch = terme.some((t) => t.nenner !== 1);
     const fExponenten = terme.map((t) => t.exponent);
     const fDezimalWerte = terme.map((t) => t.zaehler / t.nenner);
@@ -185,24 +235,27 @@ export const integralUnbestimmt = {
     const schritte = [
       {
         titel: 'Formel',
-        latex: `\\int x^n\\,dx = ${bruch('x^{n+1}', 'n+1')} + c \\quad (n \\neq -1)`,
-        hinweis: 'Potenzregel der Integration: Potenz um 1 erhöhen, dann durch die neue Potenz teilen.',
+        latex: `\\int x^n\\,dx = ${bruch('x^{n+1}', 'n+1')} + c \\quad (n \\neq -1)` +
+          (sonderterm?.typ === 'ln' ? `, \\qquad \\int \\dfrac{1}{x}\\,dx = \\ln|x| + c` : '') +
+          (sonderterm?.typ === 'exp' ? `, \\qquad \\int e^x\\,dx = e^x + c` : ''),
+        hinweis: 'Potenzregel der Integration: Potenz um 1 erhöhen, dann durch die neue Potenz teilen.' +
+          (sonder ? ` Potenzregel gilt nicht für n = −1: ${sonder.regel}` : ''),
       },
       {
         titel: 'Einsetzen',
         latex: mehrzeiligeGleichung('\\int f(x)\\,dx', [
           `\\int (${fLatex})\\,dx`,
-          summenregelZeile(koeffizienten, exponenten),
+          summenregelZeile(koeffizienten, exponenten) + (sonder ? ` ${sonder.summenregelLatex}` : ''),
           `${fExakt} + c`,
         ]),
         hinweis: 'Summenregel: jeder Summand wird einzeln integriert, konstante Faktoren bleiben stehen.',
       },
-      { titel: 'Ergebnis', latex: `F(x) = ${fExakt} + C` },
+      { titel: 'Ergebnis', latex: `F(x) = ${fExakt} + c` },
     ];
     if (hatBruch) {
       schritte.push({
         titel: 'Ergebnis',
-        latex: `F(x) \\approx ${bruchPolynomDezimalLatex(terme)} + C`,
+        latex: `F(x) \\approx ${sonder ? `${bruchPolynomDezimalLatex(terme)} ${sonder.FLatex}` : bruchPolynomDezimalLatex(terme)} + c`,
         hinweis: 'Dezimalnäherung der Bruchkoeffizienten.',
       });
     }
@@ -212,17 +265,26 @@ export const integralUnbestimmt = {
       hinweis: 'Probe: Die Ableitung der gefundenen Stammfunktion muss wieder die Ausgangsfunktion ergeben.',
     });
 
+    const eingaben = [
+      {
+        id: 'F', label: 'Stammfunktion F(x)', typ: 'koeffizienten', punkte: sonder ? 2 : 3,
+        exponenten: fExponenten, loesung: fDezimalWerte, toleranz: KONFIG.toleranz.bruch,
+      },
+    ];
+    if (sonder) {
+      eingaben.push({
+        id: 'sonder',
+        label: sonderterm.typ === 'ln' ? 'Koeffizient vor ln|x|' : 'Koeffizient vor eˣ',
+        typ: 'zahl', punkte: 1, loesung: sonderterm.koeffizient, toleranz: KONFIG.toleranz.exakt,
+      });
+    }
+
     return {
       frage: { text: `Bestimmen Sie die Stammfunktion von f(x) = ${fProse}.` },
-      eingaben: [
-        {
-          id: 'F', label: 'Stammfunktion F(x)', typ: 'koeffizienten', punkte: 3,
-          exponenten: fExponenten, loesung: fDezimalWerte, toleranz: KONFIG.toleranz.bruch4,
-        },
-      ],
+      eingaben,
       loesung: {
         schritte,
-        ergebnisse: [{ label: 'Stammfunktion', latex: `F(x) = ${fExakt} + C` }],
+        ergebnisse: [{ label: 'Stammfunktion', latex: `F(x) = ${fExakt} + c` }],
       },
       params,
     };
@@ -249,12 +311,23 @@ export const integralBestimmt = {
   punkte: 4,
   vorlage: 'Übung 19 / Folien 155-157',
   waehleParameter(rng) {
+    const art = zufallAus(rng, ['positiv', 'negativ', 'ln']);
+
+    if (art === 'ln') {
+      // 1/x -> ln|x|, Grenzen müssen > 0 sein (Folie 150/152).
+      const koeffizient = zufallAus(rng, [-4, -3, -2, -1, 1, 2, 3, 4]);
+      const grenzenPool = [1, 2, 3, 4, 5];
+      const aIdx = zufallInt(rng, 0, grenzenPool.length - 2);
+      const a = grenzenPool[aIdx];
+      const b = zufallAus(rng, grenzenPool.slice(aIdx + 1));
+      return { art, koeffizient, a, b };
+    }
+
     for (let versuch = 0; versuch < 50; versuch++) {
-      const negativ = zufallBool(rng, 0.5);
       let termeF;
       let a;
       let b;
-      if (negativ) {
+      if (art === 'negativ') {
         a = 1;
         b = zufallAus(rng, [2, 3]);
         const negExponentPool = b === 2 ? [-2, -3] : [-2];
@@ -280,14 +353,63 @@ export const integralBestimmt = {
       const delta = bruchGekuerzt(Fb.zaehler * Fa.nenner - Fa.zaehler * Fb.nenner, Fb.nenner * Fa.nenner);
       if (delta.zaehler === 0) continue;
 
-      return { termeF, a, b };
+      return { art, termeF, a, b };
     }
     // Rückfall: Übung 19c (nur Zahlen, kein Aufgabentext — F(x)=x³+x⁻², Grenzen 1 bis 3).
-    return { termeF: [{ zaehler: 1, nenner: 1, exponent: 3 }, { zaehler: 1, nenner: 1, exponent: -2 }], a: 1, b: 3 };
+    return { art: 'negativ', termeF: [{ zaehler: 1, nenner: 1, exponent: 3 }, { zaehler: 1, nenner: 1, exponent: -2 }], a: 1, b: 3 };
   },
   baue(params) {
+    if (params.art === 'ln') {
+      const { koeffizient, a, b } = params;
+      const abs = Math.abs(koeffizient);
+      const fLatex = `${koeffizient < 0 ? '-' : ''}${bruch(zahlZuLatex(abs, 0), 'x')}`;
+      const fProse = `${koeffizient < 0 ? '−' : ''}${formatDeZahl(abs, 0)}/x`;
+      const deltaExakt = koeffizient * (Math.log(b) - Math.log(a));
+      const deltaDezimal = runde(deltaExakt, 2);
+      const vzLatex = koeffizient < 0 ? '-' : '';
+      const lnAusdruck = `${vzLatex}${cdotWennNicht1(koeffizient, '\\ln|x|')}`;
+      const lnA = `${vzLatex}${cdotWennNicht1(koeffizient, `\\ln ${a}`)}`;
+      const lnB = `${vzLatex}${cdotWennNicht1(koeffizient, `\\ln ${b}`)}`;
+
+      return {
+        frage: { text: `Berechnen Sie das bestimmte Integral von f(x) = ${fProse} in den Grenzen ${a} bis ${b}.` },
+        eingaben: [
+          { id: 'wert', label: 'Wert des Integrals', typ: 'zahl', punkte: 4, loesung: deltaDezimal, toleranz: KONFIG.toleranz.bruch },
+        ],
+        loesung: {
+          schritte: [
+            {
+              titel: 'Formel',
+              latex: `\\int \\dfrac{1}{x}\\,dx = \\ln|x| + c \\quad (x > 0)`,
+              hinweis: 'Potenzregel gilt nicht für n = −1 (das wäre eine Division durch 0) — hier gilt die Sonderregel ln|x|.',
+            },
+            {
+              titel: 'Einsetzen',
+              latex: `\\int_{${a}}^{${b}} ${fLatex}\\,dx = ${auswertungsklammer(lnAusdruck, a, b)}`,
+            },
+            {
+              titel: 'Einsetzen',
+              latex: gleichungsKette([
+                `${lnB} - \\left(${lnA}\\right)`,
+                `\\approx ${zahlZuLatex(deltaDezimal, 2)}`,
+              ]),
+              hinweis: 'ln(b) und ln(a) sind hier keine glatten Zahlen — das Ergebnis ist eine echte Dezimalnäherung, kein Bruch.',
+            },
+          ],
+          ergebnisse: [{ label: 'Wert des Integrals', latex: `\\approx ${zahlZuLatex(deltaDezimal, 2)}` }],
+        },
+        params,
+      };
+    }
+
     const { termeF, a, b } = params;
-    const termeFSortiert = [...termeF].sort((x, y) => y.exponent - x.exponent);
+    // termeF kommt direkt aus waehleParameter — zaehler/nenner sind dort roh
+    // gezogen, nicht notwendig gekürzt (z. B. -3/3 statt -1). Erst hier
+    // kürzen, nicht erst beim Anzeigen, sonst zeigt bruchPolynomAusdruck
+    // einen unreduzierten Bruch wie "\dfrac{3}{3}x^2" statt "x^2".
+    const termeFSortiert = termeF
+      .map(({ zaehler, nenner, exponent }) => ({ ...bruchGekuerzt(zaehler, nenner), exponent }))
+      .sort((x, y) => y.exponent - x.exponent);
 
     // f = F' per Potenzregel: a_k = c_k * exponent, neuer Exponent exponent-1.
     const termeF_abgeleitet = termeFSortiert.map(({ zaehler, nenner, exponent }) => {
@@ -302,19 +424,19 @@ export const integralBestimmt = {
     const Fa = wertAlsBruch(termeFSortiert, a);
     const Fb = wertAlsBruch(termeFSortiert, b);
     const delta = bruchGekuerzt(Fb.zaehler * Fa.nenner - Fa.zaehler * Fb.nenner, Fb.nenner * Fa.nenner);
-    const deltaDezimal = runde(delta.zaehler / delta.nenner, 4);
+    const deltaDezimal = delta.zaehler / delta.nenner; // exakter Wert — die Toleranz deckt die Rundung beim Vergleich ab
 
     return {
       frage: { text: `Berechnen Sie das bestimmte Integral von f(x) = ${fProse} in den Grenzen ${a} bis ${b}.` },
       eingaben: [
-        { id: 'wert', label: 'Wert des Integrals', typ: 'zahl', punkte: 4, loesung: deltaDezimal, toleranz: KONFIG.toleranz.bruch4 },
+        { id: 'wert', label: 'Wert des Integrals', typ: 'zahl', punkte: 4, loesung: deltaDezimal, toleranz: KONFIG.toleranz.bruch },
       ],
       loesung: {
         schritte: [
-          { titel: 'Formel', latex: `\\int_{a}^{b} f(x)\\,dx = F(x)\\Big|_{a}^{b} = F(b) - F(a)` },
+          { titel: 'Formel', latex: `\\int_{a}^{b} f(x)\\,dx = ${auswertungsklammer('F(x)', 'a', 'b')} = F(b) - F(a)` },
           {
             titel: 'Einsetzen',
-            latex: `\\int_{${a}}^{${b}} (${fExakt})\\,dx = ${FExakt}\\Big|_{${a}}^{${b}}`,
+            latex: `\\int_{${a}}^{${b}} (${fExakt})\\,dx = ${auswertungsklammer(FExakt, a, b)}`,
             hinweis: 'Potenzregel anwenden — die Integrationskonstante entfällt beim bestimmten Integral.',
           },
           {
@@ -322,12 +444,12 @@ export const integralBestimmt = {
             latex: gleichungsKette([
               `F(${b}) - F(${a})`,
               `${bruchOderZahl(Fb)} - \\left(${bruchOderZahl(Fa)}\\right)`,
-              bruchMitDezimal(delta.zaehler, delta.nenner, 4),
+              bruchMitDezimal(delta.zaehler, delta.nenner),
             ]),
           },
         ],
         ergebnisse: [
-          { label: 'Wert des Integrals', latex: bruchMitDezimal(delta.zaehler, delta.nenner, 4) },
+          { label: 'Wert des Integrals', latex: bruchMitDezimal(delta.zaehler, delta.nenner) },
         ],
       },
       params,
@@ -393,9 +515,10 @@ export const integralKonsumentenrente = {
             latex: gleichungsKette([
               `${zahlZuLatex(a, minimaleNachkommastellen(a))} - ${cdotWennNicht1(b, 'x')} = ${cdotWennNicht1(c, 'x')}`,
               `${zahlZuLatex(a, minimaleNachkommastellen(a))} = ${cdotWennNicht1(bc, 'x')}`,
-              `x_0 = ${bruch(zahlZuLatex(a, minimaleNachkommastellen(a)), zahlZuLatex(bc, minimaleNachkommastellen(bc)))} = ${zahlZuLatex(x0, 0)}`,
+              `x_0 = ${bruchOderDivision(a, bc)} = ${zahlZuLatex(x0, 0)}`,
             ]),
-            hinweis: 'bx auf die rechte Seite bringen, dann durch den kombinierten Koeffizienten teilen.',
+            hinweis: `${b === 1 ? 'x' : `${formatDeZahl(b, minimaleNachkommastellen(b))}x`} auf die rechte Seite bringen, dann durch ` +
+              `${formatDeZahl(bc, minimaleNachkommastellen(bc))} teilen.`,
           },
           { titel: 'Ergebnis', latex: `x_0 = ${zahlZuLatex(x0, 0)}, \\quad p_0 = ${cdotWennNicht1(c, zahlZuLatex(x0, 0))} = ${zahlZuLatex(p0, minimaleNachkommastellen(p0))}` },
           {
@@ -404,13 +527,13 @@ export const integralKonsumentenrente = {
               `KR = \\int_0^{x_0} p_N(x)\\,dx - x_0 \\cdot p_0`,
               `PR = x_0 \\cdot p_0 - \\int_0^{x_0} p_A(x)\\,dx`,
             ]),
-            hinweis: 'Konsumentenrente: Fläche unter der Nachfragefunktion bis zum Gleichgewichtspreis. Produzentenrente: Fläche über der Angebotsfunktion.',
+            hinweis: 'KR = Fläche zwischen Nachfragekurve pₙ und Gleichgewichtspreis p₀. PR = Fläche zwischen Gleichgewichtspreis p₀ und Angebotskurve pₐ.',
           },
           {
             titel: 'Einsetzen',
             latex: mehrzeiligeGleichung('KR', [
               `\\int_0^{${zahlZuLatex(x0, 0)}} (${polynomLatex([-b, a], [1, 0])})\\,dx - ${zahlZuLatex(x0, 0)} \\cdot ${zahlZuLatex(p0, minimaleNachkommastellen(p0))}`,
-              `${polynomLatex([-halbKR, a], [2, 1])}\\Big|_0^{${zahlZuLatex(x0, 0)}} - ${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))}`,
+              `${auswertungsklammer(polynomLatex([-halbKR, a], [2, 1]), 0, zahlZuLatex(x0, 0))} - ${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))}`,
               `${zahlZuLatex(FKRx0, minimaleNachkommastellen(FKRx0))} - ${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))}`,
               zahlZuLatex(KR, 2),
             ]),
@@ -419,7 +542,7 @@ export const integralKonsumentenrente = {
             titel: 'Einsetzen',
             latex: mehrzeiligeGleichung('PR', [
               `${zahlZuLatex(x0, 0)} \\cdot ${zahlZuLatex(p0, minimaleNachkommastellen(p0))} - \\int_0^{${zahlZuLatex(x0, 0)}} ${cdotWennNicht1(c, 'x')}\\,dx`,
-              `${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))} - ${polynomLatex([halbPR], [2])}\\Big|_0^{${zahlZuLatex(x0, 0)}}`,
+              `${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))} - ${auswertungsklammer(polynomLatex([halbPR], [2]), 0, zahlZuLatex(x0, 0))}`,
               `${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))} - ${zahlZuLatex(FPRx0, minimaleNachkommastellen(FPRx0))}`,
               zahlZuLatex(PR, 2),
             ]),
@@ -450,14 +573,25 @@ export const integralKostenAusGrenzkosten = {
   punkte: 3,
   vorlage: 'Folien 153/154',
   waehleParameter(rng) {
-    let m = zufallInt(rng, -8, 8);
-    if (m === 0) m = 2;
-    const n = zufallInt(rng, -10, 10);
-    const Kf = zufallInt(rng, 2, 30) * 10;
-    const mUngerade = Math.abs(m % 2) === 1;
-    let x0 = zufallInt(rng, 1, 10);
-    if (mUngerade && x0 % 2 !== 0) x0 += 1;
-    return { m, n, Kf, x0 };
+    for (let versuch = 0; versuch < 200; versuch++) {
+      let m = zufallInt(rng, -8, 8);
+      if (m === 0) m = 2;
+      // K'(0) = n muss positiv sein, sonst wären die Grenzkosten am
+      // Produktionsbeginn negativ — ökonomisch unsinnig und von vornherein
+      // ausgeschlossen statt nachträglich verworfen.
+      const n = zufallInt(rng, 1, 10);
+      const Kf = zufallInt(rng, 2, 30) * 10;
+      const mUngerade = Math.abs(m % 2) === 1;
+      let x0 = zufallInt(rng, 1, 10);
+      if (mUngerade && x0 % 2 !== 0) x0 += 1;
+      // K'(x) = mx + n ist linear — ihr Minimum auf [0, x0] liegt an einem
+      // der beiden Ränder. K'(0) = n > 0 ist schon erzwungen, K'(x0) muss
+      // zusätzlich geprüft werden (fällt K' mit wachsendem x, kann es bei
+      // x0 negativ werden).
+      if (m * x0 + n <= 0) continue;
+      return { m, n, Kf, x0 };
+    }
+    return { m: 2, n: 4, Kf: 100, x0: 6 }; // Rückfall: K'(x)=2x+4, auf [0,6] sicher positiv
   },
   baue(params) {
     const { m, n, Kf, x0 } = params;
@@ -488,13 +622,13 @@ export const integralKostenAusGrenzkosten = {
             titel: 'Einsetzen',
             latex: mehrzeiligeGleichung('K(x)', [
               `\\int (${polynomLatex([m, n], [1, 0])})\\,dx`,
-              `${polynomLatex([mHalb, n], [2, 1])} + C`,
+              `${polynomLatex([mHalb, n], [2, 1])} + c`,
             ]),
           },
           {
             titel: 'Ergebnis',
             latex: `K(x) = ${polynomLatex([mHalb, n, Kf], [2, 1, 0])}`,
-            hinweis: `Die Integrationskonstante C entspricht den gegebenen Fixkosten, ${formatDeZahl(Kf, 0)}.`,
+            hinweis: `Die Integrationskonstante c entspricht den gegebenen Fixkosten, ${formatDeZahl(Kf, 0)}.`,
           },
           {
             titel: 'Einsetzen',

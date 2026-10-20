@@ -24,18 +24,41 @@ export function bruchGekuerzt(zaehler, nenner) {
   return { zaehler: zaehler / g, nenner: nenner / g };
 }
 
-// Zeigt einen Bruch als exakten, gekürzten Bruch PLUS die Dezimalzahl, z. B.
-// "\dfrac{2}{3} \approx 0{,}6667" — oder nur die ganze Zahl, wenn der Bruch
-// sich zu einer ganzen Zahl kürzt (Nenner 1, kein Dezimal-Zusatz nötig, da
-// identisch).
-export function bruchMitDezimal(zaehler, nenner, nachkommastellen) {
+// Ob zaehler/nenner als Dezimalbruch abbricht (endlich viele Nachkomma-
+// stellen hat) — das ist genau dann der Fall, wenn der gekürzte Nenner außer
+// den Primfaktoren 2 und 5 nichts weiter enthält (z. B. 6/5=1,2 bricht ab,
+// 2/3=0,6666… nicht).
+function istAbbrechenderDezimalbruch(nenner) {
+  let n = Math.abs(nenner);
+  while (n % 2 === 0) n /= 2;
+  while (n % 5 === 0) n /= 5;
+  return n === 1;
+}
+
+// Zeigt einen Bruch als exakten, gekürzten Bruch PLUS seine Dezimaldarstellung
+// — "=" mit dem exakten Wert, wenn der Bruch als Dezimalzahl abbricht (z. B.
+// "\dfrac{6}{5} = 1{,}2"), sonst "≈" mit einer echten Rundung auf
+// nachkommastellenApprox Stellen (Standard: 2, die normale Rundungsregel —
+// siehe CLAUDE.md Abschnitt 6, die 4-Stellen-Regel gilt nur für Zinssätze).
+// Nenner 1 heißt schon eine ganze Zahl, kein Bruch-Zusatz nötig.
+export function bruchMitDezimal(zaehler, nenner, nachkommastellenApprox = 2) {
   const { zaehler: z, nenner: n } = bruchGekuerzt(zaehler, nenner);
   if (n === 1) return zahlZuLatex(z, 0);
   const negativ = z < 0;
   const dezimalwert = z / n;
-  const stellen = nachkommastellen ?? minimaleNachkommastellen(dezimalwert);
   const bruchText = `${negativ ? '-' : ''}${bruch(Math.abs(z), n)}`;
-  return `${bruchText} \\approx ${zahlZuLatex(dezimalwert, stellen)}`;
+  if (istAbbrechenderDezimalbruch(n)) {
+    return `${bruchText} = ${zahlZuLatex(dezimalwert, minimaleNachkommastellen(dezimalwert))}`;
+  }
+  return `${bruchText} \\approx ${zahlZuLatex(dezimalwert, nachkommastellenApprox)}`;
+}
+
+// Auswertungsklammer für ein bestimmtes Integral: "[ausdruck]_{untere}^{obere}"
+// (deutsche Schreibweise mit eckigen Klammern statt des Strichs auf den
+// Folien — Folie 155 nutzt "F(x)|_a^b", auf dem Papier wird üblicher die
+// eckige Klammer verwendet).
+export function auswertungsklammer(ausdruck, untereGrenze, obereGrenze) {
+  return `\\big[${ausdruck}\\big]_{${untereGrenze}}^{${obereGrenze}}`;
 }
 
 export function potenz(basis, exponent) {

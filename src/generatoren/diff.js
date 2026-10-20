@@ -5,7 +5,7 @@
 
 import { zufallInt, zufallAus } from '../rng.js';
 import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
-import { zahlZuLatex, bruch, polynomLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette } from '../latex.js';
+import { zahlZuLatex, bruch, bruchGekuerzt, polynomLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // Term mit Vorzeichen, Koeffizient 1/-1 wird nicht ausgeschrieben (gleiche
@@ -44,9 +44,43 @@ function koeffVariable(koeff, variable) {
 // "-\dfrac{zaehler}{nenner}", aber ohne doppeltes Minuszeichen, wenn zaehler
 // selbst negativ ist — sonst kürzen sich die beiden Minus zu einem optisch
 // verwirrenden "−(−…)" statt als vereinfachter positiver Bruch zu erscheinen.
-function minusBruch(zaehler, nenner) {
-  const negativ = zaehler < 0;
-  return `${negativ ? '' : '-'}\\dfrac{${zahlZuLatex(Math.abs(zaehler), minimaleNachkommastellen(Math.abs(zaehler)))}}{${nenner}}`;
+// variable: optional, wenn minusBruch direkt einen Koeffizienten vor einer
+// Variable darstellt (z. B. "y = -\dfrac{a}{2c}x") — dann gilt für das
+// gekürzte Ergebnis dieselbe Koeffizient-1-Weglassregel wie überall sonst
+// ("x" statt "1x"). Ohne variable bleibt der nackte Bruchwert stehen (z. B.
+// die p-q-Formel, wo "-\dfrac{p}{2}" für sich steht).
+function minusBruch(zaehler, nenner, variable = '') {
+  // nenner kommt teils als Zahl, teils als Text eines reinen Zahlenwerts
+  // (zweiMalKoeffizient gibt bei |c|=1 die Zeichenkette "2"/"-2" zurück,
+  // nicht die Zahl) — Number(...) liest beides gleich; nur ein wirklich
+  // symbolischer Nenner wie "2 \cdot (-2)" (eine noch nicht ausgewertete
+  // Einsetzung) bleibt NaN und damit unkürzbar.
+  const nennerZahl = Number(nenner);
+  if (!Number.isFinite(nennerZahl)) {
+    const negativ = zaehler < 0;
+    return `${negativ ? '' : '-'}\\dfrac{${zahlZuLatex(Math.abs(zaehler), minimaleNachkommastellen(Math.abs(zaehler)))}}{${nenner}}${variable}`;
+  }
+  // Zähler/Nenner zuerst kürzen (sonst z. B. "-\dfrac{6}{2}" statt "-3"),
+  // erst danach das führende Minus mit dem Vorzeichen des gekürzten Zählers
+  // zusammenführen (negativ/negativ kürzt sich zu einem positiven Ergebnis).
+  const { zaehler: z, nenner: n } = bruchGekuerzt(zaehler, nennerZahl);
+  const wert = -z;
+  if (n === 1) {
+    if (variable && Math.abs(wert) === 1) return `${wert < 0 ? '-' : ''}${variable}`;
+    return `${zahlZuLatex(wert, 0)}${variable}`;
+  }
+  const negativ = z < 0;
+  return `${negativ ? '' : '-'}\\dfrac{${zahlZuLatex(Math.abs(z), 0)}}{${n}}${variable}`;
+}
+
+// Bruch kürzen und anzeigen — ganze Zahl, wenn er sich dazu kürzt, sonst
+// Vorzeichen außerhalb des Bruchs (wie minusBruch/bruchOderZahl in
+// integral.js, hier aber ohne die zusätzliche Negation).
+function bruchAnzeige(zaehler, nenner) {
+  const { zaehler: z, nenner: n } = bruchGekuerzt(zaehler, nenner);
+  if (n === 1) return zahlZuLatex(z, 0);
+  const negativ = z < 0;
+  return `${negativ ? '-' : ''}${bruch(Math.abs(z), n)}`;
 }
 
 // "2 \cdot (c)" als Nenner, vereinfacht wenn |c| = 1 ("2" bzw. "-2" statt
@@ -199,7 +233,7 @@ export const gewinnBreakeven = {
             titel: 'Einsetzen',
             latex: mehrzeiligeGleichung('x_{1,2}', [
               `-\\dfrac{p}{2} \\pm \\sqrt{\\left(\\dfrac{p}{2}\\right)^2 - q}`,
-              `${minusBruch(-(x1 + x2), 2)} \\pm \\sqrt{\\left(\\dfrac{${zahlZuLatex(-(x1 + x2), 0)}}{2}\\right)^2 - ${zahlZuLatex(x1 * x2, 0)}}`,
+              `${minusBruch(-(x1 + x2), 2)} \\pm \\sqrt{\\left(${bruchAnzeige(-(x1 + x2), 2)}\\right)^2 - ${zahlZuLatex(x1 * x2, 0)}}`,
               `${zahlZuLatex((x1 + x2) / 2, minimaleNachkommastellen((x1 + x2) / 2))} \\pm \\sqrt{${zahlZuLatex(Math.pow((x1 + x2) / 2, 2), minimaleNachkommastellen(Math.pow((x1 + x2) / 2, 2)))} - ${zahlZuLatex(x1 * x2, 0)}}`,
               `${zahlZuLatex((x1 + x2) / 2, minimaleNachkommastellen((x1 + x2) / 2))} \\pm ${zahlZuLatex((x2 - x1) / 2, minimaleNachkommastellen((x2 - x1) / 2))}`,
             ]),
@@ -322,7 +356,7 @@ export const extremwerteZweiVariablenKubisch = {
           },
           {
             titel: 'Umstellen',
-            latex: `f_y = 0 \\;\\Rightarrow\\; y = ${minusBruch(a, zweiMalKoeffizient(c))}x = ${yKoeff < 0 ? '-' : ''}${koeffVariable(Math.abs(yKoeff), 'x')}`,
+            latex: `f_y = 0 \\;\\Rightarrow\\; y = ${minusBruch(a, zweiMalKoeffizient(c), 'x')} = ${yKoeff < 0 ? '-' : ''}${koeffVariable(Math.abs(yKoeff), 'x')}`,
             hinweis: 'Nach y umstellen, dann in die Ableitung nach x einsetzen.',
           },
           {

@@ -1,5 +1,5 @@
-// Erzeugt von build.mjs am 2026-10-19 23:51 — nicht von Hand bearbeiten.
-const CACHE = 'mathe-trainer-202610192351';
+// Erzeugt von build.mjs am 2026-10-20 07:39 — nicht von Hand bearbeiten.
+const CACHE = 'mathe-trainer-202610200739';
 const ASSETS = [
   './',
   './index.html',

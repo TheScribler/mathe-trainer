@@ -17,6 +17,21 @@ export function parseDeZahl(eingabe) {
     s = s.slice(1);
   }
   s = s.replace(/\s/g, '').replace(/[€%]/g, '');
+
+  // Bruch-Eingabe ("2/3", "-1/4" — das führende Vorzeichen ist oben schon
+  // abgetrennt). Zähler und Nenner laufen durch denselben Parser, damit sie
+  // selbst wieder Komma/Punkt-Schreibweisen oder ein eigenes Vorzeichen haben
+  // dürfen (z. B. "6/-4"), ohne die Logik zu verdoppeln.
+  if (s.includes('/')) {
+    const teile = s.split('/');
+    if (teile.length !== 2) return NaN;
+    const zaehler = parseDeZahl(teile[0]);
+    const nenner = parseDeZahl(teile[1]);
+    if (!isFinite(zaehler) || !isFinite(nenner) || nenner === 0) return NaN;
+    const wert = zaehler / nenner;
+    return negativ ? -wert : wert;
+  }
+
   if (s.includes(',')) {
     // Komma ist das Dezimaltrennzeichen; Punkte davor sind Tausendertrennzeichen.
     s = s.replace(/\./g, '').replace(',', '.');

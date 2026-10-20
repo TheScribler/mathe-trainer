@@ -3,7 +3,7 @@
 // jede unabhängig nachgerechnet (siehe PLAN.md, Testkonzept).
 
 import { mulberry32 } from '../src/rng.js';
-import { parseDeZahl, nahBei } from '../src/zahl.js';
+import { parseDeZahl, nahBei, ggT } from '../src/zahl.js';
 import { pruefeZahl, bewerteKoeffizientenZeile } from '../src/pruefung.js';
 import { GENERATOREN } from '../src/generatoren/index.js';
 import { effektivzins } from '../src/generatoren/finanz.js';
@@ -40,6 +40,14 @@ function testeZahlenparser() {
     ['10%', 10],
     ['17,67', 17.67],
     ['3,0416', 3.0416],
+    // Brüche (Integralrechnung-Antwortfelder, siehe Phase-3-Nachbesserung):
+    // "Zähler/Nenner", beide Seiten selbst wieder über denselben Parser.
+    ['2/3', 2 / 3],
+    ['-1/4', -0.25],
+    ['6/-4', -1.5],
+    ['-2/3', -2 / 3],
+    ['10/4', 2.5],
+    ['1,5/2', 0.75],
   ];
   for (const [eingabe, erwartet] of faelle) {
     const wert = parseDeZahl(eingabe);
@@ -55,6 +63,8 @@ function testeZahlenparser() {
     Number.isNaN(parseDeZahl('1.234.567')),
     'parseDeZahl("1.234.567") sollte NaN ergeben (mehrdeutig ohne Komma)'
   );
+  pruefe(Number.isNaN(parseDeZahl('2/0')), 'parseDeZahl("2/0") sollte NaN ergeben (Division durch 0)');
+  pruefe(Number.isNaN(parseDeZahl('2/3/4')), 'parseDeZahl("2/3/4") sollte NaN ergeben (mehr als ein "/")');
   console.log(`Zahlenparser: ${faelle.length} Fälle geprüft`);
 }
 
@@ -163,6 +173,21 @@ const KOEFFIZIENT_EINS = /(^|[\s+\-(])1(x\b|y\b|\\lambda\b|\s*\\cdot|·)|\\cdot\
 // "2 + −4". Ein "(" zwischen den beiden Zeichen (bereits korrekt geklammert)
 // matcht nicht, weil dort kein zweites Vorzeichen direkt folgt.
 const DOPPELVORZEICHEN = /[+\-−]\s*[-−]/;
+
+// Jeder "\dfrac{zaehler}{nenner}" mit rein numerischem Zähler/Nenner (keine
+// Variable, kein Dezimalkomma — das wäre kein echter Bruch, sondern eine
+// Division wie "a/2,5") muss bereits gekürzt sein, z. B. "2/5" statt "4/10"
+// (siehe Phase-3-Nachbesserung, int.bestimmt hatte das real aufgetreten).
+const DFRAC_NUMERISCH = /\\dfrac\{(-?\d+)\}\{(\d+)\}/g;
+function pruefeGekuerzteBrueche(text, feld, kennzeichnung) {
+  for (const treffer of text.matchAll(DFRAC_NUMERISCH)) {
+    const zaehler = Number(treffer[1]);
+    const nenner = Number(treffer[2]);
+    if (nenner === 0) continue;
+    const g = ggT(zaehler, nenner);
+    pruefe(g === 1, `${kennzeichnung}: ${feld} zeigt einen ungekürzten Bruch "${treffer[0]}" (ggT=${g}): "${text}"`);
+  }
+}
 
 function sammleAlleTextfelder(aufgabe) {
   // Für den Koeffizient-1-Scan zählen auch echte Formelfelder (im Gegensatz
@@ -369,9 +394,15 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
   if (generator.id === 'int.unbestimmt') {
     // Unabhängig: F'(x) per Differenzenquotient muss wieder f(x) ergeben
     // (der Generator selbst leitet F symbolisch aus f her, nicht umgekehrt).
-    const eingabe = aufgabe.eingaben[0];
-    const FVon = (x) => wertePolynom(eingabe.loesung, eingabe.exponenten, x);
-    const fVon = (x) => wertePolynom(p.koeffizienten, p.exponenten, x);
+    // Ein optionaler Sonderterm (1/x -> ln|x|, bzw. e^x) wird separat über
+    // das 'sonder'-Eingabefeld dazugerechnet, da er kein Potenz-Term ist.
+    const eingabe = aufgabe.eingaben.find((e) => e.id === 'F');
+    const sonderKoeff = p.sonderterm ? wertVon(aufgabe, 'sonder') : 0;
+    const sonderIstLn = p.sonderterm?.typ === 'ln';
+    const FVon = (x) => wertePolynom(eingabe.loesung, eingabe.exponenten, x) +
+      (p.sonderterm ? (sonderIstLn ? sonderKoeff * Math.log(Math.abs(x)) : sonderKoeff * Math.exp(x)) : 0);
+    const fVon = (x) => wertePolynom(p.koeffizienten, p.exponenten, x) +
+      (p.sonderterm ? (sonderIstLn ? sonderKoeff / x : sonderKoeff * Math.exp(x)) : 0);
     for (const x of [-2, -0.5, 0.5, 1, 2.5]) {
       pruefe(nahBei(ableitungNumerisch(FVon, x), fVon(x), 1e-3),
         `${kennzeichnung}: F'(${x}) numerisch ${ableitungNumerisch(FVon, x)}, erwartet f(${x})=${fVon(x)}`);
@@ -380,6 +411,16 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
   }
 
   if (generator.id === 'int.bestimmt') {
+    const wert = wertVon(aufgabe, 'wert');
+    if (p.art === 'ln') {
+      // Unabhängig: Simpson-Quadratur von f(x)=koeffizient/x gegen den
+      // angezeigten (gerundeten) Wert.
+      const fVon = (x) => p.koeffizient / x;
+      const quad = simpson(fVon, p.a, p.b);
+      pruefe(nahBei(quad, wert, 5e-2),
+        `${kennzeichnung}: Simpson-Quadratur ergibt ${quad}, erwartet ${wert}`);
+      return;
+    }
     // Unabhängig: f = F' per Potenzregel neu hergeleitet (separat von baue()),
     // dann per Simpson-Quadratur gegen den angezeigten Wert geprüft.
     const termeF_abgeleitet = p.termeF.map(({ zaehler, nenner, exponent }) => ({
@@ -387,7 +428,6 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     }));
     const fVon = (x) => termeF_abgeleitet.reduce((s, t) => s + t.wert * Math.pow(x, t.exponent), 0);
     const quad = simpson(fVon, p.a, p.b);
-    const wert = wertVon(aufgabe, 'wert');
     pruefe(nahBei(quad, wert, 1e-2),
       `${kennzeichnung}: Simpson-Quadratur ergibt ${quad}, erwartet ${wert}`);
     return;
@@ -477,6 +517,7 @@ function testeGenerator(generator) {
         !DOPPELVORZEICHEN.test(text),
         `${generator.id} seed=${seed}: ${feld} zeigt ein unverschmolzenes Doppelvorzeichen: "${text}"`
       );
+      pruefeGekuerzteBrueche(text, feld, `${generator.id} seed=${seed}`);
     }
 
     // Unabhängige Nachrechnung auf einem anderen Weg als der Generator selbst.
