@@ -118,6 +118,20 @@ function baueVorzeichenBruchKnopfe(feldOderGetter) {
   return knopfPaar;
 }
 
+// Schiebt das (einzige, wiederverwendete) Knopfpaar per margin-left so, dass
+// seine linke Kante mit der linken Kante von feld übereinstimmt — das Paar
+// bleibt dabei ein normales Fließelement NACH der ganzen Reihe/dem Gitter
+// (nie mittendrin eingefügt, das brachte vorher den Zeilenumbruch der
+// Koeffizientenreihe durcheinander und ließ es bei Matrizen immer links
+// kleben). Erst auf 0 zurücksetzen, dann über getBoundingClientRect neu
+// vermessen — robust gegenüber Flex/Grid-Eigenheiten von offsetLeft.
+function positioniereKnopfPaarUnterFeld(knopfPaar, feld) {
+  knopfPaar.style.marginLeft = '0px';
+  const feldLinks = feld.getBoundingClientRect().left;
+  const paarLinks = knopfPaar.getBoundingClientRect().left;
+  knopfPaar.style.marginLeft = `${Math.max(0, feldLinks - paarLinks)}px`;
+}
+
 function baueTabelle(tabelle) {
   const wrapper = document.createElement('div');
   wrapper.className = 'frage-tabelle-wrapper';
@@ -184,6 +198,21 @@ function starteApp() {
 
     if (aktuelleAufgabe.frage.tabelle) {
       karte.appendChild(baueTabelle(aktuelleAufgabe.frage.tabelle));
+    }
+
+    // frage.formel: LaTeX-Inhalt direkt in der Aufgabenstellung (z. B.
+    // Matrizen als echtes pmatrix statt als Fließtext-Kurzschreibweise) —
+    // eigene, kleine Kopie von renderFormel (loesung.js), dieselbe
+    // Begründung wie überall sonst in dieser Datei.
+    if (aktuelleAufgabe.frage.formel) {
+      const formel = document.createElement('div');
+      formel.className = 'frage-formel';
+      if (typeof window !== 'undefined' && window.katex) {
+        window.katex.render(aktuelleAufgabe.frage.formel, formel, { throwOnError: false, displayMode: true });
+      } else {
+        formel.textContent = aktuelleAufgabe.frage.formel;
+      }
+      karte.appendChild(formel);
     }
 
     // mitEigenerHinweis=false: das Feld bekommt keinen eigenen "Eingelesen
@@ -290,11 +319,11 @@ function starteApp() {
         teilfelder.forEach((feld) => {
           feld.addEventListener('focus', () => {
             fokussiertesTeilfeld = feld;
-            // Das Knopfpaar zum fokussierten Kästchen verschieben (ein
-            // einziges DOM-Element wird dazu umgehängt, nicht kopiert) —
-            // sonst klebt es immer unter dem ersten Kästchen, egal welches
-            // gerade bearbeitet wird.
-            feld.closest('.koeffizienten-teil').insertAdjacentElement('afterend', knopfPaarReihe);
+            // Das Knopfpaar bleibt ein normales Element NACH der ganzen
+            // Reihe (nie mittendrin eingefügt — das brachte sonst den
+            // Zeilenumbruch der Reihe durcheinander) und wird per
+            // margin-left unter das fokussierte Kästchen verschoben.
+            positioniereKnopfPaarUnterFeld(knopfPaarReihe, feld);
             knopfPaarReihe.classList.add('aktiv');
           });
           feld.addEventListener('blur', () => {
@@ -333,11 +362,10 @@ function starteApp() {
         }
         zeile.appendChild(gitter);
 
-        // Ein einziges Knopfpaar für die ganze Matrix statt je Zelle eins —
-        // bleibt (anders als bei der Koeffizientenzeile) fest unter dem
-        // Gitter stehen, statt der fokussierten Zelle zu folgen: ein CSS-
-        // Grid zählt jedes eingefügte Element als eigene Zellenposition, ein
-        // umgehängtes Knopfpaar würde das Spaltenraster verschieben.
+        // Ein einziges Knopfpaar für die ganze Matrix statt je Zelle eins,
+        // als normales Element NACH dem Gitter (nie als zusätzliches Grid-
+        // Element eingefügt — das würde das Spaltenraster verschieben) und
+        // per margin-left unter die fokussierte Zelle verschoben.
         const alleZellen = zellen.flat();
         let fokussierteZelle = null;
         const knopfPaarMatrix = baueVorzeichenBruchKnopfe(() => fokussierteZelle);
@@ -351,6 +379,7 @@ function starteApp() {
         alleZellen.forEach((feld) => {
           feld.addEventListener('focus', () => {
             fokussierteZelle = feld;
+            positioniereKnopfPaarUnterFeld(knopfPaarMatrix, feld);
             knopfPaarMatrix.classList.add('aktiv');
           });
           feld.addEventListener('blur', () => {
@@ -446,17 +475,19 @@ function starteApp() {
             if (box.korrekt) richtig += 1;
           });
         } else if (eingabe.typ === 'matrix') {
+          // Anders als bei Koeffizientenzeilen zählt hier jede leere Zelle
+          // für sich als leer (siehe bewerteMatrix) — kein "ganze Matrix leer
+          // -> alles überspringen" mehr: leere und ausgefüllte Zellen können
+          // nebeneinander vorkommen und werden unabhängig behandelt.
           const zellen = feldOderFelder;
           zellen.forEach((zeile) => zeile.forEach((f) => f.classList.remove('gut', 'schlecht')));
           const anzahl = zellen.reduce((s, zeile) => s + zeile.length, 0);
           gesamt += anzahl;
           const werte = zellen.map((zeile) => zeile.map((f) => f.value));
           const bewertung = bewerteMatrix(werte, eingabe.loesung, eingabe.toleranz);
-          if (bewertung.leer > 0) {
-            leer += bewertung.leer;
-            continue;
-          }
+          leer += bewertung.leer;
           bewertung.proZelle.forEach((zeile, i) => zeile.forEach((zelle, j) => {
+            if (!zelle.bewertet) return; // leer: bleibt neutral, keine gut/schlecht-Klasse
             zellen[i][j].classList.add(zelle.korrekt ? 'gut' : 'schlecht');
             if (zelle.korrekt) richtig += 1;
           }));

@@ -61,18 +61,21 @@ export function pruefeMatrix(eingabeMatrix, erwarteteMatrix, toleranz = 1e-9) {
 // bewerteKoeffizientenZeile (siehe dort), auf zwei Dimensionen erweitert: nur
 // eine KOMPLETT leere Matrix gilt als leer; sobald mindestens eine Zelle
 // gefüllt ist, zählt jede leere Zelle darin als eingegebene 0.
+// Anders als bei Koeffizientenzeilen zählt hier JEDE leere Zelle für sich als
+// leer (nicht als eingegebene 0) — ein Matrixeintrag hat keinen impliziten
+// "Nullterm, den man weglässt" wie ein Polynom-Summand ohne Konstante; eine
+// leere Zelle bei einer Lösung von 0 soll also nicht automatisch grün werden.
 export function bewerteMatrix(werteZeilen, erwarteteZeilen, toleranz = 1e-9) {
-  const alleLeer = werteZeilen.every((zeile) => zeile.every((w) => w.trim() === ''));
-  if (alleLeer) {
-    const anzahl = werteZeilen.reduce((s, zeile) => s + zeile.length, 0);
-    return { leer: anzahl, proZelle: werteZeilen.map((zeile) => zeile.map(() => ({ bewertet: false, korrekt: false }))) };
-  }
+  let leer = 0;
   const proZelle = werteZeilen.map((zeile, i) => zeile.map((text, j) => {
-    const gefuellterText = text.trim() === '' ? '0' : text;
-    const ergebnis = pruefeZahl(gefuellterText, erwarteteZeilen[i][j], toleranz);
+    if (text.trim() === '') {
+      leer += 1;
+      return { bewertet: false, korrekt: false };
+    }
+    const ergebnis = pruefeZahl(text, erwarteteZeilen[i][j], toleranz);
     return { bewertet: true, korrekt: ergebnis.korrekt };
   }));
-  return { leer: 0, proZelle };
+  return { leer, proZelle };
 }
 
 export function pruefeAuswahl(eingabe, erwartet) {

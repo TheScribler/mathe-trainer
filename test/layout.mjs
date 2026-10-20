@@ -18,6 +18,9 @@ const INDEX_HTML = join(WURZEL, 'docs', 'index.html');
 const PORT = 9975;
 const BREITE = 375; // WebDriver window/rect setzt die Viewport-Breite exakt (gemessen, kein Chrome-Aufschlag nötig)
 const SEEDS_PRO_GENERATOR = 50;
+// Kleinere Zahl als oben: pro Instanz wird JEDES Eingabefeld einzeln fokussiert
+// (O(Felderzahl²) Rect-Vergleiche), das summiert sich schneller auf.
+const FOKUS_SEEDS_PRO_GENERATOR = 10;
 
 const GENERATOR_IDS = [
   'fin.rente-aus-kapital',
@@ -56,18 +59,20 @@ async function wd(pfad, methode = 'GET', body) {
 
 // Läuft im Browser (per execute/sync übergeben).
 //
-// Wichtig: Wir policen NICHT, ob irgendein Element innen (z. B. .katex-display)
-// breiter ist als sein eigener clientWidth — das ist bei overflow-x:auto
-// erwartet und korrekt so (.katex-display selbst hat overflow:visible, sein
-// scrollWidth > clientWidth ist genau der Inhalt, den der SCROLLBARE Eltern-
-// Container .loesung-formel aufnimmt; das ist kein Bug, das ist der Mechanismus).
-// Was tatsächlich zählt:
-//   1. Die Seite selbst scrollt nie horizontal (document.documentElement).
-//   2. Jede unserer eigenen Scroll-Boxen (.loesung-formel, .loesung-ergebnis-
-//      wert, .frage-tabelle-wrapper) ist selbst nicht breiter als ihr eigener
-//      Elternbereich — genau die Flex-Item-Klasse von Bug, die vorher bei
-//      .loesung-ergebnis-wert aufgetreten ist (kein min-width:0, Box wurde
-//      von ihrem Inhalt aufgedrückt statt zu scrollen).
+// Allgemeine Regel statt einer festen Liste von Klassen, in zwei Teilen:
+//   1. Ein Element mit overflow-x:auto/scroll darf INNEN breiter sein als es
+//      selbst (genau dafür ist es da — z. B. .loesung-formel, dessen
+//      .katex-display-Kind absichtlich breiter sein darf), aber die Box
+//      SELBST darf nicht breiter sein als ihr Elternbereich, sonst passt die
+//      Scrollbox gar nicht erst auf den Bildschirm.
+//   2. Jedes andere Element darf nicht intern überlaufen (scrollWidth >
+//      clientWidth) — das hieße, Inhalt ist abgeschnitten und nirgends
+//      erreichbar. KaTeX-eigene DOM-Struktur (alles innerhalb .katex, z. B.
+//      die nur für Screenreader gedachte katex-mathml mit clientWidth:1)
+//      wird dabei übersprungen — das ist KaTeX' eigener Rendering-Mechanismus,
+//      nicht etwas, das dieses Projekt kontrolliert oder prüfen sollte.
+// clientWidth===0 übersprungen: inline-Elemente haben dort immer 0,
+// unabhängig vom Inhalt, die Prüfung wäre für sie bedeutungslos.
 const LAYOUT_PRUEFSKRIPT = `
   const probleme = [];
   const seitenbreite = document.documentElement.clientWidth;
@@ -75,10 +80,34 @@ const LAYOUT_PRUEFSKRIPT = `
     probleme.push('Seite scrollt horizontal: scrollWidth=' + document.documentElement.scrollWidth + ' > ' + seitenbreite);
   }
 
-  document.querySelectorAll('#app .loesung-formel, #app .loesung-ergebnis-wert, #app .frage-tabelle-wrapper').forEach((box) => {
-    const eltern = box.parentElement;
-    if (box.clientWidth > eltern.clientWidth + 1) {
-      probleme.push(box.className + ': eigene Breite ' + box.clientWidth + ' > Elternbreite ' + eltern.clientWidth);
+  function hatScrollbarenVorfahren(el) {
+    let aktuell = el.parentElement;
+    while (aktuell && aktuell.id !== 'app') {
+      const s = getComputedStyle(aktuell);
+      if (s.overflowX === 'auto' || s.overflowX === 'scroll') return true;
+      aktuell = aktuell.parentElement;
+    }
+    return false;
+  }
+
+  document.querySelectorAll('#app *').forEach((el) => {
+    if (el.clientWidth === 0) return;
+    const stil = getComputedStyle(el);
+    const istScrollbar = stil.overflowX === 'auto' || stil.overflowX === 'scroll';
+    if (istScrollbar) {
+      const eltern = el.parentElement;
+      if (eltern && el.clientWidth > eltern.clientWidth + 1) {
+        probleme.push((el.className || el.tagName) + ': scrollbare Box selbst zu breit (' + el.clientWidth + ' > Elternbreite ' + eltern.clientWidth + ')');
+      }
+      return;
+    }
+    if (el.closest('.katex')) return;
+    // Ein scrollbarer Vorfahre (z. B. .loesung-formel) fängt den Überlauf
+    // bereits ab — genau dafür ist er da, dieses Element selbst ist dann
+    // kein eigenständiges Problem.
+    if (hatScrollbarenVorfahren(el)) return;
+    if (el.scrollWidth > el.clientWidth + 1) {
+      probleme.push((el.className || el.tagName) + ': eigener Inhalt überläuft ohne Scroll-Möglichkeit (scrollWidth=' + el.scrollWidth + ' > clientWidth=' + el.clientWidth + ')');
     }
   });
 
@@ -92,6 +121,40 @@ const LAYOUT_PRUEFSKRIPT = `
   });
 
   return { seitenbreite, probleme };
+`;
+
+// Fokussiert nacheinander jedes Eingabefeld und prüft zwei Dinge (iPhone-
+// Rückmeldung): (1) KEIN Eingabefeld darf sich dabei verschieben — weder
+// das gerade fokussierte noch irgendein anderes auf der Seite — und (2) das
+// zugehörige −/⁄-Knopfpaar muss mit seiner linken Kante am fokussierten Feld
+// ausgerichtet sein (±2px).
+const FOKUS_PRUEFSKRIPT = `
+  const probleme = [];
+  const eingaben = Array.from(document.querySelectorAll('#app input[type="text"]'));
+  const startRects = eingaben.map((f) => f.getBoundingClientRect());
+
+  eingaben.forEach((feld, i) => {
+    feld.focus();
+    eingaben.forEach((anderesFeld, j) => {
+      const rect = anderesFeld.getBoundingClientRect();
+      const start = startRects[j];
+      if (Math.abs(rect.left - start.left) > 0.5 || Math.abs(rect.top - start.top) > 0.5) {
+        probleme.push('Feld ' + j + ' hat sich verschoben, als Feld ' + i + ' fokussiert wurde (von (' + start.left.toFixed(1) + ',' + start.top.toFixed(1) + ') zu (' + rect.left.toFixed(1) + ',' + rect.top.toFixed(1) + '))');
+      }
+    });
+    const zeile = feld.closest('.eingabe-zeile');
+    const paar = zeile ? zeile.querySelector('.vorzeichen-bruch-paar') : null;
+    if (paar) {
+      const paarRect = paar.getBoundingClientRect();
+      const feldRect = feld.getBoundingClientRect();
+      if (Math.abs(paarRect.left - feldRect.left) > 2) {
+        probleme.push('Knopfpaar für Feld ' + i + ' nicht ausgerichtet: paar.left=' + paarRect.left.toFixed(1) + ', feld.left=' + feldRect.left.toFixed(1));
+      }
+    }
+    feld.blur();
+  });
+
+  return probleme;
 `;
 
 async function main() {
@@ -151,6 +214,34 @@ async function main() {
       }
       console.log(`${generatorId}: ${SEEDS_PRO_GENERATOR} Instanzen bei ${tatsaechlicheBreite}px geprüft, ${problemeFuerGenerator} Layout-Probleme`);
     }
+
+    // Fokus-Stabilität: für jeden Generator ein paar Seeds durchgehen und
+    // jedes Eingabefeld einzeln fokussieren (siehe FOKUS_PRUEFSKRIPT oben) —
+    // kein Feld darf sich dabei verschieben, und das −/⁄-Knopfpaar muss dem
+    // fokussierten Feld folgen (iPhone-Rückmeldung: Koeffizientenzeilen
+    // brachen um, Matrix-Knopfpaar blieb immer links kleben).
+    console.log('\nPrüfe Fokus-Stabilität (Eingabefelder dürfen sich nie verschieben) …');
+    let fokusFehler = 0;
+    let fokusGeprueft = 0;
+    for (const generatorId of GENERATOR_IDS) {
+      for (let seed = 0; seed < FOKUS_SEEDS_PRO_GENERATOR; seed++) {
+        await wd(`/session/${id}/execute/sync`, 'POST', {
+          script: 'window.__testErzeugeAufgabe(arguments[0], arguments[1], false);',
+          args: [generatorId, seed],
+        });
+        const probleme = await wd(`/session/${id}/execute/sync`, 'POST', {
+          script: FOKUS_PRUEFSKRIPT, args: [],
+        });
+        fokusGeprueft += 1;
+        for (const problem of probleme) {
+          fehler += 1;
+          fokusFehler += 1;
+          console.error(`FEHLER (Fokus): ${generatorId} seed=${seed}: ${problem}`);
+        }
+      }
+    }
+    console.log(`Fokus-Stabilität: ${fokusGeprueft} Instanzen geprüft, ${fokusFehler} Probleme`);
+    geprueft += fokusGeprueft;
 
     // Dynamic-Island-Simulation: echtes Desktop-Safari liefert immer
     // env(safe-area-inset-*) = 0 (kein Notch), darum lässt sich die Insel nicht

@@ -3,7 +3,7 @@
 // PLAN.md, Katalog "4 Lineare Algebra").
 
 import { zufallAus, zufallBool } from '../rng.js';
-import { zahlZuLatex, matrixLatex, mehrzeiligeGleichung } from '../latex.js';
+import { zahlZuLatex, matrixLatex, mehrzeiligeGleichung, mehrzeiligeKette } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // ---------------------------------------------------------------------------
@@ -63,36 +63,42 @@ function skalarprodukt(a, b) {
   return a.reduce((summe, w, i) => summe + w * b[i], 0);
 }
 
-// Matrix in reinem Fließtext, z. B. "(1 0 1; 2 0 1; 0 2 1)" für eine 3×3-
-// Matrix oder "(3 2)" für einen Zeilenvektor — dieselbe Kurzschreibweise wie
-// in der Musterlösung ("R^T = (106; 208; 206)"), aber ohne das hochgestellte
-// "T" (das wäre LaTeX-Syntax und gehört nicht in reine Prosa).
-function matrixProse(m) {
-  return '(' + m.map((zeile) => zeile.join(' ')).join('; ') + ')';
-}
-
 // Einen Faktor in einem Skalarprodukt klammern, wenn er negativ ist — sonst
 // entstehen zwei Vorzeichen direkt hintereinander ("+ -2" statt "+ (-2)").
 function faktorLatex(w) {
   return w < 0 ? `(${zahlZuLatex(w, 0)})` : zahlZuLatex(w, 0);
 }
 
-// "a_1 \times b_1 + a_2 \times b_2 + ..." mit echten Zahlen — zeigt
-// exemplarisch, wie EIN Eintrag des Produkts berechnet wird (Katalog-
-// Vorgabe: "zeigt, wie mindestens ein Eintrag berechnet wird"). "\times"
-// statt "\cdot": Letzteres ist im ganzen Projekt für "Koeffizient mal
-// Variable/Ausdruck" reserviert (mit der Koeffizient-1-Weglassregel, siehe
-// KOEFFIZIENT_EINS in test/alle.mjs) — hier sind beide Faktoren reine
-// Matrixeinträge, eine "1" ist ein echter Eintrag und darf nicht verschwinden.
+// "a_1 \cdot b_1 + a_2 \cdot b_2 + ..." mit echten Zahlen — ein einzelner
+// Summand eines Matrixprodukt-Eintrags. "\cdot" ist hier eine reine
+// Zahl-mal-Zahl-Multiplikation, keine "Koeffizient mal Variable" — die
+// Koeffizient-1-Weglassregel (KOEFFIZIENT_EINS in test/alle.mjs) kennt diesen
+// Unterschied (lässt "1 \cdot <Zahl>" zu, flaggt nur "1 \cdot <Variable/
+// Funktion>"), eine "1" als echter Matrixeintrag darf also stehen bleiben.
 function skalarproduktLatex(a, b) {
-  return a.map((w, i) => `${faktorLatex(w)} \\times ${faktorLatex(b[i])}`).join(' + ');
+  return a.map((w, i) => `${faktorLatex(w)} \\cdot ${faktorLatex(b[i])}`).join(' + ');
+}
+
+// Zeigt JEDEN Eintrag des Produkts a·b als eigene Zeile "c_{ij} = ... = Wert"
+// (Katalog-Vorgabe: mindestens einen Eintrag vorrechnen — hier alle, damit
+// nichts stillschweigend übersprungen wird).
+function alleEintraegeLatex(a, b, ergebnis) {
+  const zeilen = [];
+  for (let i = 0; i < a.length; i++) {
+    const spalte = b[0].length;
+    for (let k = 0; k < spalte; k++) {
+      const spaltenwerte = b.map((zeile) => zeile[k]);
+      zeilen.push(`c_{${i + 1}${k + 1}} &= ${skalarproduktLatex(a[i], spaltenwerte)} = ${zahlZuLatex(ergebnis[i][k], 0)}`);
+    }
+  }
+  return mehrzeiligeKette(zeilen);
 }
 
 const EINTRAG_POOL = [-3, -2, -1, 0, 0, 0, 1, 2, 3, 4];
 
 // ---------------------------------------------------------------------------
 // alg.matrixprodukt — MK 7 / Übung 22
-// a) Zeilenvektor (1×2 oder 1×3) mal quadratische Matrix — mit 50 %
+// a) Zeilenvektor (1×2 oder 1×3) mal quadratische Matrix — mit 15 %
 //    Wahrscheinlichkeit stattdessen ein nicht definiertes Produkt (Übung 22d).
 // b) 3×3 mal 3×3, immer definiert (MK 7b).
 // Rückwärts: Einträge aus EINTRAG_POOL (mind. 1/3 Nullen), Ergebniseinträge
@@ -105,7 +111,7 @@ export const matrixprodukt = {
   punkte: 4,
   vorlage: 'Musterklausur 7 / Übung 22',
   waehleParameter(rng) {
-    const aUndefiniert = zufallBool(rng, 0.5);
+    const aUndefiniert = zufallBool(rng, 0.15);
     let teilA;
     if (aUndefiniert) {
       // p×q mal r×s mit q garantiert ungleich r — kein Reject-Sampling nötig.
@@ -153,22 +159,18 @@ export const matrixprodukt = {
   baue(params) {
     const { teilA, teilB } = params;
 
-    const aBeschreibung = teilA.art === 'definiert'
-      ? `${matrixProse([teilA.v])} · ${matrixProse(teilA.M)}`
-      : `${matrixProse(teilA.C)} · ${matrixProse(teilA.D)}`;
-    const bBeschreibung = `${matrixProse(teilB.X)} · ${matrixProse(teilB.Y)}`;
-
     const eingaben = [];
     const schritteA = [];
+    let formelA;
 
     if (teilA.art === 'definiert') {
       const { v, M, ergebnis } = teilA;
       const n = v.length;
+      formelA = `\\text{a)}\\quad ${matrixLatex([v])} \\cdot ${matrixLatex(M)}`;
       eingaben.push({
         id: 'a', label: `a) Ergebnis (1×${n})`, typ: 'matrix', zeilen: 1, spalten: n,
         punkte: 2, loesung: [ergebnis], toleranz: KONFIG.toleranz.exakt,
       });
-      const spalte1 = M.map((zeile) => zeile[0]);
       schritteA.push(
         {
           titel: 'Formel',
@@ -177,17 +179,18 @@ export const matrixprodukt = {
         },
         {
           titel: 'Einsetzen',
-          latex: `c_{11} = ${skalarproduktLatex(v, spalte1)} = ${zahlZuLatex(ergebnis[0], 0)}`,
-          hinweis: 'Erster Eintrag: Zeile des ersten Faktors mal erste Spalte des zweiten. Die übrigen Einträge entstehen genauso, mit der jeweils nächsten Spalte.',
+          latex: alleEintraegeLatex([v], M, [ergebnis]),
+          hinweis: 'Jeder Eintrag ist die Zeile des ersten Faktors mal die jeweilige Spalte des zweiten.',
         },
         {
           titel: 'Ergebnis',
-          latex: `${matrixLatex([v])} \\cdot ${matrixLatex(M)} = ${matrixLatex([ergebnis])}`,
+          latex: mehrzeiligeKette([`${matrixLatex([v])} \\cdot ${matrixLatex(M)}`, `= ${matrixLatex([ergebnis])}`]),
         },
       );
     } else {
       const { C, D } = teilA;
       const p = C.length; const q = C[0].length; const r = D.length; const s = D[0].length;
+      formelA = `\\text{a)}\\quad ${matrixLatex(C)} \\cdot ${matrixLatex(D)}`;
       eingaben.push({
         id: 'a', label: 'a) Ist das Produkt definiert?', typ: 'auswahl',
         optionen: ['Definiert', 'Nicht definiert'], punkte: 2, loesung: 'Nicht definiert',
@@ -199,22 +202,27 @@ export const matrixprodukt = {
           hinweis: 'Für ein Produkt muss die Spaltenzahl des ersten Faktors gleich der Zeilenzahl des zweiten sein.',
         },
         {
+          // Die Begründung ist ein langer, erklärender Satz — als reiner
+          // Hinweis (Fließtext) bricht er normal um, statt als eine einzige,
+          // zu breite KaTeX-Zeile über den Bildschirmrand zu laufen.
           titel: 'Ergebnis',
-          latex: `\\text{nicht definiert, da } ${q} \\neq ${r} \\text{ (Spaltenzahl des ersten} \\neq \\text{Zeilenzahl des zweiten Faktors)}`,
+          latex: `\\text{nicht definiert}`,
+          hinweis: `Nicht definiert, da ${q} ≠ ${r} (Spaltenzahl des ersten Faktors ≠ Zeilenzahl des zweiten Faktors).`,
         },
       );
     }
 
     const { X, Y, ergebnis: ergebnisB } = teilB;
-    const spalte1B = Y.map((zeile) => zeile[0]);
     eingaben.push({
       id: 'b', label: 'b) Ergebnis (3×3)', typ: 'matrix', zeilen: 3, spalten: 3,
       punkte: 2, loesung: ergebnisB, toleranz: KONFIG.toleranz.exakt,
     });
+    const formelB = `\\text{b)}\\quad ${matrixLatex(X)} \\cdot ${matrixLatex(Y)}`;
 
     return {
       frage: {
-        text: `Berechnen Sie die folgenden Matrizenprodukte, soweit definiert. a) ${aBeschreibung} b) ${bBeschreibung}`,
+        text: 'Berechnen Sie die folgenden Matrizenprodukte, soweit definiert.',
+        formel: mehrzeiligeKette([formelA, formelB]),
       },
       eingaben,
       loesung: {
@@ -226,12 +234,12 @@ export const matrixprodukt = {
           },
           {
             titel: 'Einsetzen',
-            latex: `c_{11} = ${skalarproduktLatex(X[0], spalte1B)} = ${zahlZuLatex(ergebnisB[0][0], 0)}`,
-            hinweis: 'Erster Eintrag: erste Zeile des ersten Faktors mal erste Spalte des zweiten. Die übrigen Einträge entstehen genauso.',
+            latex: alleEintraegeLatex(X, Y, ergebnisB),
+            hinweis: 'Jeder Eintrag ist eine Zeile des ersten Faktors mal eine Spalte des zweiten.',
           },
           {
             titel: 'Ergebnis',
-            latex: `${matrixLatex(X)} \\cdot ${matrixLatex(Y)} = ${matrixLatex(ergebnisB)}`,
+            latex: mehrzeiligeKette([`${matrixLatex(X)} \\cdot ${matrixLatex(Y)}`, `= ${matrixLatex(ergebnisB)}`]),
           },
         ],
         ergebnisse: [
@@ -310,10 +318,13 @@ export const produktionsprozess = {
     return {
       frage: {
         text: `In einem zweistufigen Produktionsprozess werden aus ${anzahlRohstoffe} Rohstoffen über die Produktionskoeffizienten in A ` +
-          `${anzahlZwischenprodukte} Zwischenprodukte und aus diesen über B ${anzahlEndprodukte} Endprodukte hergestellt. A = ${matrixProse(A)}, B = ${matrixProse(B)}, ` +
-          `die herzustellenden Mengen der Endprodukte sind E = ${matrixProse(E)}. ` +
-          `a) Wie viele Einheiten der ${anzahlRohstoffe} Rohstoffe werden für die Mengen E benötigt? ` +
-          `b) Die Endprodukte kosten je Einheit PE = ${matrixProse([PE])}, die Rohstoffe je Einheit PR = ${matrixProse([PR])}. Wie hoch ist der Gewinn?`,
+          `${anzahlZwischenprodukte} Zwischenprodukte und aus diesen über B ${anzahlEndprodukte} Endprodukte hergestellt, die in den Mengen E ` +
+          `hergestellt werden sollen. a) Wie viele Einheiten der ${anzahlRohstoffe} Rohstoffe werden dafür benötigt? ` +
+          `b) Die Endprodukte kosten je Einheit PE, die Rohstoffe je Einheit PR. Wie hoch ist der Gewinn?`,
+        formel: mehrzeiligeKette([
+          `A = ${matrixLatex(A)}, \\quad B = ${matrixLatex(B)}, \\quad E = ${matrixLatex(E)}`,
+          `P_E^T = ${matrixLatex([PE])}, \\quad P_R^T = ${matrixLatex([PR])}`,
+        ]),
       },
       eingaben: [
         {
@@ -329,8 +340,8 @@ export const produktionsprozess = {
             latex: `R = A \\cdot B \\cdot E`,
             hinweis: 'Erst A·B als Gesamtbedarfsmatrix bilden (wie viele Rohstoffe je Einheit jedes Endprodukts nötig sind), dann mit E multiplizieren — Reihenfolge wie in der Musterlösung.',
           },
-          { titel: 'Einsetzen', latex: `A \\cdot B = ${matrixLatex(A)} \\cdot ${matrixLatex(B)} = ${matrixLatex(AB)}` },
-          { titel: 'Einsetzen', latex: `R = ${matrixLatex(AB)} \\cdot ${matrixLatex(E)} = ${matrixLatex(R)}` },
+          { titel: 'Einsetzen', latex: mehrzeiligeKette([`A \\cdot B = ${matrixLatex(A)} \\cdot ${matrixLatex(B)}`, `= ${matrixLatex(AB)}`]) },
+          { titel: 'Einsetzen', latex: mehrzeiligeKette([`R = ${matrixLatex(AB)} \\cdot ${matrixLatex(E)}`, `= ${matrixLatex(R)}`]) },
           { titel: 'Ergebnis', latex: `R = ${matrixLatex(R)}` },
           {
             titel: 'Formel',

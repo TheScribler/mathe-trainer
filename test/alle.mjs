@@ -181,7 +181,14 @@ const LATEX_RESTE = /\{,\}|_|\^|\\(?:[a-zA-Z]|;)/;
 // Mediopunkt "·" statt "\cdot") zusätzlich, weil ein nicht-vereinfachter
 // Nenner wie "2 \cdot (1)" von der ursprünglichen Regel nicht erfasst wurde
 // (die "1" steht dort in Klammern, nicht direkt vor der Variable).
-const KOEFFIZIENT_EINS = /(^|[\s+\-(])1(x\b|y\b|\\lambda\b|\s*\\cdot|·)|\\cdot\s*\(1\)|\(1\)\s*\\cdot|·\s*\(1\)|\(1\)\s*·/;
+//
+// "1 \cdot"/"1·" wird NUR geflaggt, wenn danach keine (optional geklammerte,
+// optional negative) Zahl folgt — (?!\s*\(?-?\d) schließt genau das aus.
+// Grund: in algebra.js steht "1 \cdot (-2)" als echter Skalarprodukt-Summand
+// (zwei Matrixeinträge, von denen einer zufällig 1 ist) — dort ist die "1"
+// kein weglassbarer Koeffizient vor einer Variable, sondern ein Operand wie
+// jeder andere, und MUSS stehen bleiben.
+const KOEFFIZIENT_EINS = /(^|[\s+\-(])1(x\b|y\b|\\lambda\b|\s*\\cdot(?!\s*\(?-?\d)|·(?!\s*\(?-?\d))|\\cdot\s*\(1\)|\(1\)\s*\\cdot|·\s*\(1\)|\(1\)\s*·/;
 
 // "+ -3" oder "- -3" (zwei Vorzeichen direkt hintereinander, mit oder ohne
 // Leerzeichen, ASCII "-" oder Unicode "−" in jeder Mischung) lesen sich
@@ -211,6 +218,7 @@ function sammleAlleTextfelder(aufgabe) {
   // zu sammlePlainTextFelder, das genau die NICHT prüft) — die Regel gilt
   // überall, nicht nur in reiner Prosa.
   const felder = sammlePlainTextFelder(aufgabe);
+  if (aufgabe.frage.formel) felder.push({ feld: 'frage.formel', text: aufgabe.frage.formel });
   for (const schritt of aufgabe.loesung.schritte) {
     felder.push({ feld: `loesung.schritte[${schritt.titel}].latex`, text: schritt.latex });
   }
@@ -674,9 +682,12 @@ function testeBewerteMatrix() {
   let b = bewerteMatrix([['1', '0'], ['0', '2']], loesung);
   pruefe(b.leer === 0 && b.proZelle.every((zeile) => zeile.every((z) => z.korrekt)), 'Matrix: voll ausgefüllt und richtig wird als 0 leer erkannt');
 
-  // Eine Null-Zelle leer gelassen statt "0" einzutippen: muss als richtig gelten.
+  // Anders als bei Koeffizientenzeilen zählt eine leere Null-Zelle HIER als
+  // leer, nicht als richtige 0 — sonst würde ein unbeantwortetes Feld bei
+  // Lösung 0 fälschlich grün erscheinen (iPhone-Rückmeldung).
   b = bewerteMatrix([['1', ''], ['0', '2']], loesung);
-  pruefe(b.leer === 0 && b.proZelle[0][1].korrekt === true, 'Matrix: leere Null-Zelle in einer sonst ausgefüllten Matrix zählt als richtige 0');
+  pruefe(b.leer === 1 && b.proZelle[0][1].bewertet === false, 'Matrix: eine leere Zelle zählt als leer, auch wenn die Lösung dort 0 ist');
+  pruefe(b.proZelle[0][0].korrekt && b.proZelle[1][0].korrekt && b.proZelle[1][1].korrekt, 'Matrix: die übrigen, ausgefüllten Zellen werden normal bewertet');
 
   // Komplett leere Matrix: alle Zellen zählen als leer.
   b = bewerteMatrix([['', ''], ['', '']], loesung);

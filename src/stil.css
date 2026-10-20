@@ -47,6 +47,7 @@ body {
 .aufgabe-karte h2 { font-size: 1rem; margin: 0 0 .6rem; }
 .frage-text { margin: 0 0 1rem; }
 .frage-tabelle-wrapper { overflow-x: auto; max-width: 100%; margin: 0 0 1rem; }
+.frage-formel { overflow-x: auto; max-width: 100%; margin: 0 0 1rem; }
 .frage-tabelle { border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .frage-tabelle th, .frage-tabelle td {
   border: 1px solid var(--rand); padding: 6px 12px; text-align: center;
@@ -151,22 +152,24 @@ body {
 .eingabe-zeile select.schlecht { border-color: var(--schlecht); }
 
 .vorzeichen-bruch-paar {
-  /* Unsichtbar, bis das zugehörige Feld fokussiert ist (Klasse "aktiv",
-     per JS gesetzt) — erscheint direkt neben/unter dem gerade benutzten
-     Feld statt als feste Leiste am Seitenende, die bei langen Aufgaben
-     (z. B. Koeffizientenreihen) hinter der iOS-Tastatur verschwindet. */
-  display: none;
+  /* Immer im normalen Fluss (display:flex bleibt konstant) — nur
+     visibility wechselt, nicht display. Das reserviert die Höhe des Paares
+     PERMANENT (auch wenn es gerade unsichtbar ist), damit nichts auf der
+     Seite springt, sobald ein Feld fokussiert wird. Erscheint per JS
+     (margin-left, siehe positioniereKnopfPaarUnterFeld in app.js) unter dem
+     gerade fokussierten Feld statt als feste Leiste am Seitenende, die bei
+     langen Aufgaben (z. B. Koeffizientenreihen) hinter der iOS-Tastatur
+     verschwindet. Bleibt dabei immer ein Element NACH der ganzen Reihe/dem
+     Gitter — nie mittendrin eingefügt, das brachte vorher den Zeilenumbruch
+     der Koeffizientenreihe durcheinander und störte bei Matrizen das
+     CSS-Grid-Spaltenraster. */
+  display: flex;
+  visibility: hidden;
   gap: 8px;
   margin-top: .3rem;
+  width: fit-content;
 }
-.vorzeichen-bruch-paar.aktiv { display: flex; }
-.koeffizienten-reihe .vorzeichen-bruch-paar {
-  /* flex-basis:100% zwingt in der umbrechenden Koeffizientenzeile einen
-     Zeilenumbruch davor — das Paar steht dadurch unter dem Kästchen, nach
-     dem es im DOM gerade eingefügt wurde (siehe app.js, insertAdjacentElement
-     bei jedem Fokuswechsel), statt irgendwo in der Mitte der Zeile zu kleben. */
-  flex-basis: 100%;
-}
+.vorzeichen-bruch-paar.aktiv { visibility: visible; }
 .vorzeichen-bruch-paar button {
   font: inherit; font-weight: 700; font-size: 1.05rem;
   padding: 6px 18px; border-radius: 8px; border: 1px solid var(--rand);
