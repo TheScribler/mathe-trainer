@@ -317,6 +317,63 @@ function starteApp() {
         });
 
         felder[eingabe.id] = teilfelder;
+      } else if (eingabe.typ === 'matrix') {
+        const gitter = document.createElement('div');
+        gitter.className = 'matrix-gitter';
+        gitter.style.gridTemplateColumns = `repeat(${eingabe.spalten}, auto)`;
+        const zellen = [];
+        for (let i = 0; i < eingabe.zeilen; i++) {
+          const zeilenFelder = [];
+          for (let j = 0; j < eingabe.spalten; j++) {
+            const feld = baueZahlenfeld(gitter, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
+            feld.classList.add('matrix-zelle');
+            zeilenFelder.push(feld);
+          }
+          zellen.push(zeilenFelder);
+        }
+        zeile.appendChild(gitter);
+
+        // Ein einziges Knopfpaar für die ganze Matrix statt je Zelle eins —
+        // bleibt (anders als bei der Koeffizientenzeile) fest unter dem
+        // Gitter stehen, statt der fokussierten Zelle zu folgen: ein CSS-
+        // Grid zählt jedes eingefügte Element als eigene Zellenposition, ein
+        // umgehängtes Knopfpaar würde das Spaltenraster verschieben.
+        const alleZellen = zellen.flat();
+        let fokussierteZelle = null;
+        const knopfPaarMatrix = baueVorzeichenBruchKnopfe(() => fokussierteZelle);
+        zeile.appendChild(knopfPaarMatrix);
+
+        const eingelesenAls = document.createElement('span');
+        eingelesenAls.className = 'eingelesen-als eingelesen-als-reihe';
+        eingelesenAls.textContent = ' ';
+        zeile.appendChild(eingelesenAls);
+
+        alleZellen.forEach((feld) => {
+          feld.addEventListener('focus', () => {
+            fokussierteZelle = feld;
+            knopfPaarMatrix.classList.add('aktiv');
+          });
+          feld.addEventListener('blur', () => {
+            knopfPaarMatrix.classList.remove('aktiv');
+          });
+          feld.addEventListener('input', function () {
+            const alleLeer = alleZellen.every((f) => f.value.trim() === '');
+            if (alleLeer) {
+              eingelesenAls.textContent = ' ';
+              return;
+            }
+            const geparst = alleZellen.map((f) => {
+              const w = f.value.trim();
+              if (w === '') return '–';
+              const z = parseDeZahl(w);
+              if (!isFinite(z)) return '?';
+              return w.includes('/') ? `${w} ${bruchVergleichUndWert(w, z)}` : formatDeZahlFrei(z);
+            });
+            eingelesenAls.textContent = 'Eingelesen als: ' + geparst.join(', ');
+          });
+        });
+
+        felder[eingabe.id] = zellen;
       } else if (eingabe.typ === 'auswahl') {
         const auswahl = document.createElement('select');
         const platzhalter = document.createElement('option');
@@ -388,6 +445,21 @@ function starteApp() {
             feldOderFelder[i].classList.add(box.korrekt ? 'gut' : 'schlecht');
             if (box.korrekt) richtig += 1;
           });
+        } else if (eingabe.typ === 'matrix') {
+          const zellen = feldOderFelder;
+          zellen.forEach((zeile) => zeile.forEach((f) => f.classList.remove('gut', 'schlecht')));
+          const anzahl = zellen.reduce((s, zeile) => s + zeile.length, 0);
+          gesamt += anzahl;
+          const werte = zellen.map((zeile) => zeile.map((f) => f.value));
+          const bewertung = bewerteMatrix(werte, eingabe.loesung, eingabe.toleranz);
+          if (bewertung.leer > 0) {
+            leer += bewertung.leer;
+            continue;
+          }
+          bewertung.proZelle.forEach((zeile, i) => zeile.forEach((zelle, j) => {
+            zellen[i][j].classList.add(zelle.korrekt ? 'gut' : 'schlecht');
+            if (zelle.korrekt) richtig += 1;
+          }));
         } else if (eingabe.typ === 'auswahl') {
           gesamt += 1;
           feldOderFelder.classList.remove('gut', 'schlecht');

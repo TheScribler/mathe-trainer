@@ -4,7 +4,7 @@
 
 import { mulberry32 } from '../src/rng.js';
 import { parseDeZahl, nahBei, ggT } from '../src/zahl.js';
-import { pruefeZahl, bewerteKoeffizientenZeile } from '../src/pruefung.js';
+import { pruefeZahl, bewerteKoeffizientenZeile, bewerteMatrix } from '../src/pruefung.js';
 import { GENERATOREN } from '../src/generatoren/index.js';
 import { effektivzins } from '../src/generatoren/finanz.js';
 import { testeFixtures } from './fixtures.mjs';
@@ -96,6 +96,22 @@ function simpson(f, a, b, n = 2000) {
     summe += (i % 2 === 0 ? 2 : 4) * f(a + i * h);
   }
   return (h / 3) * summe;
+}
+
+// Separat geschriebene Dreifachschleife für die Lineare Algebra (PLAN.md
+// Testkonzept) — unabhängig von der gleichnamigen Funktion in algebra.js.
+function matrixMalUnabhaengig(a, b) {
+  const ergebnis = [];
+  for (let i = 0; i < a.length; i++) {
+    const zeile = [];
+    for (let k = 0; k < b[0].length; k++) {
+      let summe = 0;
+      for (let j = 0; j < b.length; j++) summe += a[i][j] * b[j][k];
+      zeile.push(summe);
+    }
+    ergebnis.push(zeile);
+  }
+  return ergebnis;
 }
 
 function partielleAbleitungNumerisch(f, x, y, nachX, h = 1e-4) {
@@ -459,6 +475,44 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     return;
   }
 
+  if (generator.id === 'alg.matrixprodukt') {
+    // Unabhängig: separat geschriebene Dreifachschleife statt der
+    // Generator-eigenen matrixMal-Funktion (PLAN.md Testkonzept).
+    if (p.teilA.art === 'definiert') {
+      const { v, M } = p.teilA;
+      const nachgerechnet = matrixMalUnabhaengig([v], M)[0];
+      pruefe(nachgerechnet.every((w, i) => nahBei(w, wertVon(aufgabe, 'a')[0][i], 1e-6)),
+        `${kennzeichnung}: a) nachgerechnet ${nachgerechnet}, erwartet ${wertVon(aufgabe, 'a')[0]}`);
+    } else {
+      const { C, D } = p.teilA;
+      pruefe(C[0].length !== D.length,
+        `${kennzeichnung}: a) als "nicht definiert" markiert, aber Spalten von C (${C[0].length}) = Zeilen von D (${D.length})`);
+    }
+    const nachgerechnetB = matrixMalUnabhaengig(p.teilB.X, p.teilB.Y);
+    const erwartetB = wertVon(aufgabe, 'b');
+    pruefe(nachgerechnetB.every((zeile, i) => zeile.every((w, j) => nahBei(w, erwartetB[i][j], 1e-6))),
+      `${kennzeichnung}: b) nachgerechnet ${JSON.stringify(nachgerechnetB)}, erwartet ${JSON.stringify(erwartetB)}`);
+    return;
+  }
+
+  if (generator.id === 'alg.produktionsprozess') {
+    const AB = matrixMalUnabhaengig(p.A, p.B);
+    const R = matrixMalUnabhaengig(AB, p.E);
+    const erwartetR = wertVon(aufgabe, 'R');
+    pruefe(R.every((zeile, i) => nahBei(zeile[0], erwartetR[i][0], 1e-6)),
+      `${kennzeichnung}: R nachgerechnet ${JSON.stringify(R)}, erwartet ${JSON.stringify(erwartetR)}`);
+    pruefe(R.every((zeile) => zeile[0] > 0), `${kennzeichnung}: Rohstoffbedarf muss positiv sein, ist ${JSON.stringify(R)}`);
+    pruefe(p.A.every((zeile) => zeile.every((w) => w >= 0)) && p.B.every((zeile) => zeile.every((w) => w >= 0)),
+      `${kennzeichnung}: A und B müssen nicht-negativ sein`);
+    let kosten = 0;
+    for (let i = 0; i < p.PR.length; i++) kosten += p.PR[i] * R[i][0];
+    let erloes = 0;
+    for (let i = 0; i < p.PE.length; i++) erloes += p.PE[i] * p.E[i][0];
+    pruefe(nahBei(erloes - kosten, wertVon(aufgabe, 'G'), 1e-6),
+      `${kennzeichnung}: G nachgerechnet ${erloes - kosten}, erwartet ${wertVon(aufgabe, 'G')}`);
+    return;
+  }
+
   throw new Error(`Kein unabhängiger Prüfweg für Generator "${generator.id}" hinterlegt.`);
 }
 
@@ -610,10 +664,32 @@ function testeBewerteKoeffizientenZeile() {
   console.log('Koeffizientenzeile-Bewertung: 5 Fälle geprüft');
 }
 
+// ---------------------------------------------------------------------------
+// Box-weise Bewertung von Matrizen (app.js-Prüflogik) — dieselbe Regel wie
+// bei Koeffizientenzeilen, nur auf zwei Dimensionen.
+// ---------------------------------------------------------------------------
+function testeBewerteMatrix() {
+  const loesung = [[1, 0], [0, 2]];
+
+  let b = bewerteMatrix([['1', '0'], ['0', '2']], loesung);
+  pruefe(b.leer === 0 && b.proZelle.every((zeile) => zeile.every((z) => z.korrekt)), 'Matrix: voll ausgefüllt und richtig wird als 0 leer erkannt');
+
+  // Eine Null-Zelle leer gelassen statt "0" einzutippen: muss als richtig gelten.
+  b = bewerteMatrix([['1', ''], ['0', '2']], loesung);
+  pruefe(b.leer === 0 && b.proZelle[0][1].korrekt === true, 'Matrix: leere Null-Zelle in einer sonst ausgefüllten Matrix zählt als richtige 0');
+
+  // Komplett leere Matrix: alle Zellen zählen als leer.
+  b = bewerteMatrix([['', ''], ['', '']], loesung);
+  pruefe(b.leer === 4 && b.proZelle.every((zeile) => zeile.every((z) => z.bewertet === false)), 'Matrix: komplett leer zählt als leer, nicht als falsch');
+
+  console.log('Matrix-Bewertung: 3 Fälle geprüft');
+}
+
 testeZahlenparser();
 testeEffektivzinsToleranz();
 testeBruchToleranz();
 testeBewerteKoeffizientenZeile();
+testeBewerteMatrix();
 fehler += testeFixtures();
 for (const generator of GENERATOREN) {
   testeGenerator(generator);

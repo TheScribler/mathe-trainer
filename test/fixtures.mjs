@@ -22,6 +22,7 @@ import {
   integralBestimmt,
   integralKonsumentenrente,
 } from '../src/generatoren/integral.js';
+import { matrixprodukt, produktionsprozess } from '../src/generatoren/algebra.js';
 
 export function testeFixtures() {
   let fehler = 0;
@@ -232,6 +233,56 @@ export function testeFixtures() {
       }
     }
     faelle.push('Übung 20a-e');
+  }
+
+  // MK 7a: (3 2)·((1,2)(2,-2)) = (7 2). MK 7b: 3×3-Produkt, Ergebnis
+  // ((4,1,4)(8,2,5)(4,4,3)) — beide direkt aus der Musterlösung (nur Zahlen).
+  {
+    const teilA = { art: 'definiert', v: [3, 2], M: [[1, 2], [2, -2]], ergebnis: [7, 2] };
+    const teilB = {
+      X: [[1, 0, 1], [2, 0, 1], [0, 2, 1]], Y: [[4, 1, 1], [2, 2, 0], [0, 0, 3]],
+      ergebnis: [[4, 1, 4], [8, 2, 5], [4, 4, 3]],
+    };
+    const a7 = matrixprodukt.baue({ teilA, teilB });
+    const wA = a7.eingaben.find((e) => e.id === 'a').loesung;
+    const wB = a7.eingaben.find((e) => e.id === 'b').loesung;
+    pruefe(JSON.stringify(wA) === JSON.stringify([[7, 2]]), `MK7a: ${JSON.stringify(wA)}, erwartet [[7,2]]`);
+    pruefe(JSON.stringify(wB) === JSON.stringify([[4, 1, 4], [8, 2, 5], [4, 4, 3]]), `MK7b: ${JSON.stringify(wB)}`);
+    faelle.push('MK7a/b');
+  }
+
+  // MK 8: A=((1,0,2)(2,1,3)(3,1,2)), B=((1,2)(2,1)(0,3)), E=(10;12) ->
+  // R=(106;208;206), PE=(80;90), PR=(2;3;2) -> G=632.
+  {
+    const a8 = produktionsprozess.baue({
+      A: [[1, 0, 2], [2, 1, 3], [3, 1, 2]], B: [[1, 2], [2, 1], [0, 3]],
+      E: [[10], [12]], PR: [2, 3, 2], PE: [80, 90],
+    });
+    const wR = a8.eingaben.find((e) => e.id === 'R').loesung;
+    const wG = a8.eingaben.find((e) => e.id === 'G').loesung;
+    pruefe(JSON.stringify(wR) === JSON.stringify([[106], [208], [206]]), `MK8a: R=${JSON.stringify(wR)}, erwartet [[106],[208],[206]]`);
+    pruefe(nahBei(wG, 632, 1e-9), `MK8b: G=${wG}, erwartet 632`);
+    faelle.push('MK8a/b');
+  }
+
+  // Übung 24a/b: zweistufiger Prozess mit Dezimal-Koeffizienten in A/B —
+  // derselbe Rechenweg wie MK 8, nur mit anderen (teils nicht-ganzen) Zahlen,
+  // reproduziert hier direkt als baue()-Aufruf (nur Zahlen, kein Aufgabentext).
+  {
+    const a24a = produktionsprozess.baue({
+      A: [[0.2, 0.5, 0.1], [0.4, 0.3, 0.2]], B: [[0.5, 0.5], [1, 0], [0, 1]],
+      E: [[30], [40]], PR: [1, 3], PE: [2, 2],
+    });
+    const wG24a = a24a.eingaben.find((e) => e.id === 'G').loesung;
+    pruefe(nahBei(wG24a, 21, 1e-9), `Übung 24a: G=${wG24a}, erwartet 21`);
+
+    const a24b = produktionsprozess.baue({
+      A: [[3, 1, 2], [4, 2, 5]], B: [[2, 3], [2, 1], [1, 2]],
+      E: [[30], [40]], PR: [1, 2], PE: [50, 60],
+    });
+    const wG24b = a24b.eingaben.find((e) => e.id === 'G').loesung;
+    pruefe(nahBei(wG24b, 100, 1e-9), `Übung 24b: G=${wG24b}, erwartet 100`);
+    faelle.push('Übung 24a/b');
   }
 
   console.log(`Fixtures: ${faelle.length} geprüft (${faelle.join(', ')})`);

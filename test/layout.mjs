@@ -33,6 +33,8 @@ const GENERATOR_IDS = [
   'int.bestimmt',
   'int.konsumentenrente',
   'int.kosten-aus-grenzkosten',
+  'alg.matrixprodukt',
+  'alg.produktionsprozess',
 ];
 
 function warte(ms) {

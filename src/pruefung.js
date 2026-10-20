@@ -57,6 +57,24 @@ export function pruefeMatrix(eingabeMatrix, erwarteteMatrix, toleranz = 1e-9) {
   return { korrekt: true };
 }
 
+// Bewertet eine Matrix Zelle für Zelle statt als Ganzes — dieselbe Regel wie
+// bewerteKoeffizientenZeile (siehe dort), auf zwei Dimensionen erweitert: nur
+// eine KOMPLETT leere Matrix gilt als leer; sobald mindestens eine Zelle
+// gefüllt ist, zählt jede leere Zelle darin als eingegebene 0.
+export function bewerteMatrix(werteZeilen, erwarteteZeilen, toleranz = 1e-9) {
+  const alleLeer = werteZeilen.every((zeile) => zeile.every((w) => w.trim() === ''));
+  if (alleLeer) {
+    const anzahl = werteZeilen.reduce((s, zeile) => s + zeile.length, 0);
+    return { leer: anzahl, proZelle: werteZeilen.map((zeile) => zeile.map(() => ({ bewertet: false, korrekt: false }))) };
+  }
+  const proZelle = werteZeilen.map((zeile, i) => zeile.map((text, j) => {
+    const gefuellterText = text.trim() === '' ? '0' : text;
+    const ergebnis = pruefeZahl(gefuellterText, erwarteteZeilen[i][j], toleranz);
+    return { bewertet: true, korrekt: ergebnis.korrekt };
+  }));
+  return { leer: 0, proZelle };
+}
+
 export function pruefeAuswahl(eingabe, erwartet) {
   return { korrekt: eingabe === erwartet };
 }
