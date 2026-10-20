@@ -5,8 +5,9 @@
 import { mulberry32 } from '../src/rng.js';
 import { parseDeZahl, nahBei, ggT } from '../src/zahl.js';
 import { pruefeZahl, bewerteKoeffizientenZeile, bewerteMatrix } from '../src/pruefung.js';
-import { GENERATOREN } from '../src/generatoren/index.js';
+import { GENERATOREN, GENERATOREN_NACH_TEIL } from '../src/generatoren/index.js';
 import { effektivzins } from '../src/generatoren/finanz.js';
+import { komponiereKlausur } from '../src/komposer.js';
 import { testeFixtures } from './fixtures.mjs';
 import { KONFIG } from '../src/konfig.js';
 
@@ -700,11 +701,41 @@ function testeBewerteMatrix() {
   console.log('Matrix-Bewertung: 3 Fälle geprüft');
 }
 
+// ---------------------------------------------------------------------------
+// Komposer (Probeklausur, Phase 5): je Preset muss über viele Seeds hinweg
+// eine Generator-Kombination gefunden werden, deren Punkte JE TEIL exakt die
+// Zielsumme aus KONFIG.presets treffen (die Kataloge sind so klein und so
+// gebaut, dass eine exakte Teilmenge immer existiert — kein Generator kommt
+// dabei doppelt vor, weil eine Teilmenge ihn ohnehin nur einmal enthält).
+// Außerdem: gleicher Seed ergibt dieselbe Zusammenstellung (Determinismus).
+// ---------------------------------------------------------------------------
+function testeKomposer() {
+  const KOMPOSER_SEEDS = 200;
+  for (const [presetName, split] of Object.entries(KONFIG.presets)) {
+    for (let seed = 0; seed < KOMPOSER_SEEDS; seed++) {
+      const teile = komponiereKlausur(split, GENERATOREN_NACH_TEIL, mulberry32(seed));
+      for (const teil of teile) {
+        pruefe(teil.exakt, `Komposer (${presetName}) seed=${seed}: Teil "${teil.teil}" trifft das Ziel ${teil.ziel} nicht exakt (Summe ${teil.summe})`);
+        pruefe(teil.summe === teil.ziel, `Komposer (${presetName}) seed=${seed}: Teil "${teil.teil}" Summe ${teil.summe} ≠ Ziel ${teil.ziel}`);
+        const ids = teil.generatoren.map((g) => g.id);
+        pruefe(new Set(ids).size === ids.length, `Komposer (${presetName}) seed=${seed}: Teil "${teil.teil}" enthält einen Generator doppelt (${JSON.stringify(ids)})`);
+      }
+
+      const teile2 = komponiereKlausur(split, GENERATOREN_NACH_TEIL, mulberry32(seed));
+      const idsVon = (t) => t.map((teil) => teil.generatoren.map((g) => g.id));
+      pruefe(JSON.stringify(idsVon(teile)) === JSON.stringify(idsVon(teile2)),
+        `Komposer (${presetName}) seed=${seed}: gleicher Seed ergibt unterschiedliche Zusammenstellungen`);
+    }
+  }
+  console.log(`Komposer: ${Object.keys(KONFIG.presets).length} Presets × ${KOMPOSER_SEEDS} Seeds geprüft`);
+}
+
 testeZahlenparser();
 testeEffektivzinsToleranz();
 testeBruchToleranz();
 testeBewerteKoeffizientenZeile();
 testeBewerteMatrix();
+testeKomposer();
 fehler += testeFixtures();
 for (const generator of GENERATOREN) {
   testeGenerator(generator);

@@ -10,3 +10,11 @@ export const GENERATOREN = [...FINANZ_GENERATOREN, ...DIFF_GENERATOREN, ...INTEG
 export function findeGenerator(id) {
   return GENERATOREN.find((g) => g.id === id);
 }
+
+// Für den Komposer (Probeklausur, Phase 5): Generatoren gruppiert nach Teil,
+// damit je Teil eine Kombination gesucht werden kann, die dessen Punkte-Ziel
+// trifft (siehe komposer.js).
+export const GENERATOREN_NACH_TEIL = GENERATOREN.reduce((gruppen, g) => {
+  (gruppen[g.teil] ??= []).push(g);
+  return gruppen;
+}, {});
