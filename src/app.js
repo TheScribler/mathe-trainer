@@ -54,6 +54,44 @@ function fuegeBruchstrichEin(feld) {
   feld.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+// feldOderGetter: entweder direkt das Feld (Standard-Zahlenfeld, immer
+// dasselbe) oder eine Funktion, die das aktuell relevante Feld liefert
+// (Koeffizientenreihe — mehrere Teilfelder teilen sich ein Knopfpaar, das
+// auf das zuletzt fokussierte Teilfeld wirkt).
+function werkzeugKnopf(text, titel, aktion, feldOderGetter) {
+  const knopf = document.createElement('button');
+  knopf.type = 'button';
+  knopf.textContent = text;
+  knopf.setAttribute('aria-label', titel);
+  // mousedown/touchstart statt click: preventDefault hier verhindert, dass
+  // der Tap dem fokussierten Eingabefeld den Fokus entzieht (sonst klappt
+  // die iOS-Tastatur zu, bevor die Aktion überhaupt ausgeführt wird).
+  // Beide Events bekommen denselben Handler — auf Touch-Geräten unterdrückt
+  // preventDefault auf touchstart die synthetische Maus-Event-Folge, auf
+  // reinen Zeigegeräten feuert nur mousedown — nie beide für denselben Tap.
+  const verarbeiten = (ereignis) => {
+    ereignis.preventDefault();
+    const ziel = typeof feldOderGetter === 'function' ? feldOderGetter() : feldOderGetter;
+    aktion(ziel);
+  };
+  knopf.addEventListener('mousedown', verarbeiten);
+  knopf.addEventListener('touchstart', verarbeiten);
+  return knopf;
+}
+
+// Knopfpaar "−"/"/", standardmäßig unsichtbar (siehe .vorzeichen-bruch-paar
+// in stil.css) — wird vom Aufrufer per focus/blur auf dem betroffenen Feld
+// sichtbar geschaltet (Klasse "aktiv"), erscheint also direkt neben/unter
+// dem gerade fokussierten Feld statt als feste Leiste am Seitenende (dort
+// landet sie bei langen Aufgaben hinter der aufklappenden iOS-Tastatur).
+function baueVorzeichenBruchKnopfe(feldOderGetter) {
+  const knopfPaar = document.createElement('span');
+  knopfPaar.className = 'vorzeichen-bruch-paar';
+  knopfPaar.appendChild(werkzeugKnopf('−', 'Vorzeichen umschalten', schalteVorzeichenUm, feldOderGetter));
+  knopfPaar.appendChild(werkzeugKnopf('/', 'Bruchstrich einfügen', fuegeBruchstrichEin, feldOderGetter));
+  return knopfPaar;
+}
+
 function baueTabelle(tabelle) {
   const wrapper = document.createElement('div');
   wrapper.className = 'frage-tabelle-wrapper';
@@ -95,39 +133,6 @@ function starteApp() {
   karte.className = 'aufgabe-karte';
   wurzel.appendChild(karte);
 
-  // Feste Werkzeugleiste für "−" und "/" (siehe schalteVorzeichenUm/
-  // fuegeBruchstrichEin oben) — ein einziges Exemplar statt je Feld eins,
-  // wirkt auf aktivesFeld (das zuletzt fokussierte Eingabefeld). Bleibt
-  // über Aufgabenwechsel hinweg bestehen (liegt außerhalb von karte, das
-  // bei jeder neuen Aufgabe neu aufgebaut wird).
-  let aktivesFeld = null;
-  const werkzeugLeiste = document.createElement('div');
-  werkzeugLeiste.className = 'vorzeichen-bruch-leiste';
-  werkzeugLeiste.style.display = 'none';
-
-  function werkzeugKnopf(text, titel, aktion) {
-    const knopf = document.createElement('button');
-    knopf.type = 'button';
-    knopf.textContent = text;
-    knopf.setAttribute('aria-label', titel);
-    // mousedown/touchstart statt click: preventDefault hier verhindert, dass
-    // der Tap dem fokussierten Eingabefeld den Fokus entzieht (sonst klappt
-    // die iOS-Tastatur zu, bevor die Aktion überhaupt ausgeführt wird).
-    // Beide Events bekommen denselben Handler — auf Touch-Geräten unterdrückt
-    // preventDefault auf touchstart die synthetische Maus-Event-Folge, auf
-    // reinen Zeigegeräten feuert nur mousedown — nie beide für denselben Tap.
-    const verarbeiten = (ereignis) => {
-      ereignis.preventDefault();
-      aktion(aktivesFeld);
-    };
-    knopf.addEventListener('mousedown', verarbeiten);
-    knopf.addEventListener('touchstart', verarbeiten);
-    return knopf;
-  }
-  werkzeugLeiste.appendChild(werkzeugKnopf('−', 'Vorzeichen umschalten', schalteVorzeichenUm));
-  werkzeugLeiste.appendChild(werkzeugKnopf('/', 'Bruchstrich einfügen', fuegeBruchstrichEin));
-  wurzel.appendChild(werkzeugLeiste);
-
   let aktuelleAufgabe = null;
 
   function neueAufgabe() {
@@ -141,7 +146,6 @@ function starteApp() {
 
   function zeichneAufgabe(generator) {
     karte.innerHTML = '';
-    aktivesFeld = null; // Felder der vorigen Aufgabe sind gleich nicht mehr im DOM
 
     const titel = document.createElement('h2');
     titel.textContent = generator.name + ' (' + generator.punkte + ' P)';
@@ -160,7 +164,7 @@ function starteApp() {
     // als"-Hinweis direkt daneben (für Koeffizientenreihen, wo das die Zeile
     // zum Umbrechen bringen würde — ein gemeinsamer Hinweis unter der ganzen
     // Reihe wird stattdessen vom Aufrufer gebaut, siehe unten).
-    function baueZahlenfeld(zeile, { mitEigenerHinweis = true } = {}) {
+    function baueZahlenfeld(zeile, { mitEigenerHinweis = true, mitEigenenKnopfen = true } = {}) {
       const feld = document.createElement('input');
       feld.type = 'text';
       feld.inputMode = 'decimal';
@@ -168,9 +172,13 @@ function starteApp() {
       feld.autocorrect = 'off';
       feld.spellcheck = false;
       zeile.appendChild(feld);
-      feld.addEventListener('focus', function () {
-        aktivesFeld = feld;
-      });
+
+      if (mitEigenenKnopfen) {
+        const knopfPaar = baueVorzeichenBruchKnopfe(feld);
+        zeile.appendChild(knopfPaar);
+        feld.addEventListener('focus', () => knopfPaar.classList.add('aktiv'));
+        feld.addEventListener('blur', () => knopfPaar.classList.remove('aktiv'));
+      }
 
       if (mitEigenerHinweis) {
         const eingelesenAls = document.createElement('span');
@@ -195,9 +203,16 @@ function starteApp() {
         return;
       }
       const wert = parseDeZahl(getrimmt);
-      ziel.textContent = isFinite(wert)
-        ? 'Eingelesen als ' + formatDeZahlFrei(wert)
-        : 'Eingelesen als: keine Zahl erkannt';
+      if (!isFinite(wert)) {
+        ziel.textContent = 'Eingelesen als: keine Zahl erkannt';
+        return;
+      }
+      // Bei einem Bruch die eingegebene Schreibweise selbst zeigen (z. B.
+      // "2/3 ≈ 0,67") statt nur die lange Dezimalzahl (0,666667) — sonst ist
+      // nicht sofort zu erkennen, dass der Bruch richtig gelesen wurde.
+      ziel.textContent = getrimmt.includes('/')
+        ? `Eingelesen als ${getrimmt} ≈ ${formatDeZahl(wert, 2)}`
+        : 'Eingelesen als ' + formatDeZahlFrei(wert);
     }
 
     const form = document.createElement('div');
@@ -223,7 +238,7 @@ function starteApp() {
           }
           const teilZeile = document.createElement('span');
           teilZeile.className = 'koeffizienten-teil';
-          const feld = baueZahlenfeld(teilZeile, { mitEigenerHinweis: false });
+          const feld = baueZahlenfeld(teilZeile, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
           const potenzLabel = document.createElement('span');
           potenzLabel.className = 'koeffizienten-potenz';
           potenzLabel.textContent = potenzBeschriftung(exponent);
@@ -233,6 +248,13 @@ function starteApp() {
         });
         zeile.appendChild(reihe);
 
+        // Ein einziges Knopfpaar für die ganze Reihe statt je Teilfeld eins
+        // (in der engen Koeffizientenzeile wäre das zu beengt) — wirkt auf
+        // das zuletzt fokussierte Teilfeld.
+        let fokussiertesTeilfeld = null;
+        const knopfPaarReihe = baueVorzeichenBruchKnopfe(() => fokussiertesTeilfeld);
+        zeile.appendChild(knopfPaarReihe);
+
         // Ein gemeinsamer Hinweis unter der ganzen Reihe, nicht je Feld —
         // zeigt alle Koeffizienten zusammen, z. B. "Eingelesen als: -2, 25, 0".
         const eingelesenAls = document.createElement('span');
@@ -240,6 +262,13 @@ function starteApp() {
         eingelesenAls.textContent = ' ';
         zeile.appendChild(eingelesenAls);
         teilfelder.forEach((feld) => {
+          feld.addEventListener('focus', () => {
+            fokussiertesTeilfeld = feld;
+            knopfPaarReihe.classList.add('aktiv');
+          });
+          feld.addEventListener('blur', () => {
+            knopfPaarReihe.classList.remove('aktiv');
+          });
           feld.addEventListener('input', function () {
             const werte = teilfelder.map((f) => f.value.trim());
             if (werte.every((w) => w === '')) {
@@ -249,7 +278,8 @@ function starteApp() {
             const geparst = werte.map((w) => {
               if (w === '') return '–';
               const z = parseDeZahl(w);
-              return isFinite(z) ? formatDeZahlFrei(z) : '?';
+              if (!isFinite(z)) return '?';
+              return w.includes('/') ? `${w} ≈ ${formatDeZahl(z, 2)}` : formatDeZahlFrei(z);
             });
             eingelesenAls.textContent = 'Eingelesen als: ' + geparst.join(', ');
           });
@@ -289,11 +319,6 @@ function starteApp() {
       form.appendChild(zeile);
     }
     karte.appendChild(form);
-
-    // Nur anzeigen, wenn es überhaupt ein Zahlenfeld gibt — bei reinen
-    // Auswahl-/Textaufgaben wäre die Leiste nutzlos.
-    const hatZahlenfeld = aktuelleAufgabe.eingaben.some((e) => e.typ === 'zahl' || e.typ === 'koeffizienten');
-    werkzeugLeiste.style.display = hatZahlenfeld ? 'flex' : 'none';
 
     const ergebnisZeile = document.createElement('p');
     ergebnisZeile.className = 'pruef-ergebnis';

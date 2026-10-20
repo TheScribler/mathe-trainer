@@ -132,26 +132,20 @@ body {
 .eingabe-zeile select.gut { border-color: var(--gut); }
 .eingabe-zeile select.schlecht { border-color: var(--schlecht); }
 
-.vorzeichen-bruch-leiste {
-  /* sticky statt fixed: bleibt beim Scrollen am unteren Bildschirmrand,
-     ohne eigene Positionierungs-/Safe-Area-Mathematik gegenüber der
-     einblendenden iOS-Tastatur — die Tastatur schiebt die Seite ohnehin
-     nach oben, sticky folgt dem einfach mit. */
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  gap: 10px;
-  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
-  margin-top: .5rem;
-  background: var(--bg);
-  border-top: 1px solid var(--rand);
-  z-index: 5;
+.vorzeichen-bruch-paar {
+  /* Unsichtbar, bis das zugehörige Feld fokussiert ist (Klasse "aktiv",
+     per JS gesetzt) — erscheint direkt neben/unter dem gerade benutzten
+     Feld statt als feste Leiste am Seitenende, die bei langen Aufgaben
+     (z. B. Koeffizientenreihen) hinter der iOS-Tastatur verschwindet. */
+  display: none;
+  gap: 8px;
+  margin-top: .3rem;
 }
-.vorzeichen-bruch-leiste button {
-  flex: 1;
-  font: inherit; font-weight: 700; font-size: 1.1rem; padding: 8px;
-  border-radius: 8px; border: 1px solid var(--rand);
+.vorzeichen-bruch-paar.aktiv { display: flex; }
+.vorzeichen-bruch-paar button {
+  font: inherit; font-weight: 700; font-size: 1.05rem;
+  padding: 6px 18px; border-radius: 8px; border: 1px solid var(--rand);
   background: var(--karte); color: var(--fg);
-  -webkit-appearance: none; min-height: 44px;
+  -webkit-appearance: none; min-height: 40px; min-width: 48px;
 }
-.vorzeichen-bruch-leiste button:active { transform: translateY(1px); }
+.vorzeichen-bruch-paar button:active { transform: translateY(1px); }
