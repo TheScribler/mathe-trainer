@@ -120,6 +120,21 @@ const LAYOUT_PRUEFSKRIPT = `
     probleme.push('KaTeX-Fehler: ' + (fehler.title || fehler.textContent));
   });
 
+  // .frage-formel (die gegebenen Werte, z. B. A/B/E/PE/PR) darf NIE
+  // horizontal scrollen müssen, auch wenn overflow-x:auto das technisch
+  // abfinge — anders als bei .loesung-formel (lange Herleitungen, wo
+  // Scrollen als Rückfall bewusst akzeptiert ist, siehe stil.css), müssen
+  // die Vorgaben einer Aufgabe auf einen Blick sichtbar sein, ohne zu
+  // wischen (iPhone-Rückmeldung: E und P_R liefen bei produktionsprozess
+  // ab dem Bildschirmrand ab). Prüft sowohl die Box selbst als auch jedes
+  // .katex-display darin, falls KaTeX intern noch einen eigenen Scroll-
+  // Container baut.
+  document.querySelectorAll('#app .frage-formel, #app .frage-formel .katex-display').forEach((el) => {
+    if (el.scrollWidth > el.clientWidth + 1) {
+      probleme.push('frage-formel: Vorgaben überlaufen (scrollWidth=' + el.scrollWidth + ' > clientWidth=' + el.clientWidth + ') — müssen ohne Scrollen sichtbar sein');
+    }
+  });
+
   return { seitenbreite, probleme };
 `;
 

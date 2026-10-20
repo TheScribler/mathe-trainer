@@ -518,6 +518,10 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     for (let i = 0; i < p.PE.length; i++) erloes += p.PE[i] * p.E[i][0];
     pruefe(nahBei(erloes - kosten, wertVon(aufgabe, 'G'), 1e-6),
       `${kennzeichnung}: G nachgerechnet ${erloes - kosten}, erwartet ${wertVon(aufgabe, 'G')}`);
+    const gewinn = erloes - kosten;
+    pruefe(gewinn > 0, `${kennzeichnung}: Gewinn muss positiv sein, ist ${gewinn}`);
+    pruefe(gewinn >= 0.1 * erloes - 1e-9,
+      `${kennzeichnung}: Gewinn ${gewinn} ist unplausibel klein gegenüber Erlös ${erloes} (< 10 %)`);
     return;
   }
 

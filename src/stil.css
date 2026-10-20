@@ -162,11 +162,14 @@ body {
      verschwindet. Bleibt dabei immer ein Element NACH der ganzen Reihe/dem
      Gitter — nie mittendrin eingefügt, das brachte vorher den Zeilenumbruch
      der Koeffizientenreihe durcheinander und störte bei Matrizen das
-     CSS-Grid-Spaltenraster. */
+     CSS-Grid-Spaltenraster. Kein eigenes margin-top: der umgebende Flex-
+     Container (.eingabe-zeile gap) liefert den Abstand zum vorherigen
+     Element schon — ein zusätzliches margin-top zählte die reservierte
+     Höhe doppelt (Lücke + Margin) und machte die permanente Reservierung
+     spürbar größer als die tatsächliche Höhe des Knopfpaares. */
   display: flex;
   visibility: hidden;
   gap: 8px;
-  margin-top: .3rem;
   width: fit-content;
 }
 .vorzeichen-bruch-paar.aktiv { visibility: visible; }

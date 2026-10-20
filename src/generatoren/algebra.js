@@ -174,12 +174,15 @@ export const matrixprodukt = {
 
     const eingaben = [];
     const schritteA = [];
-    let formelA;
+    let formelZeilenA;
 
     if (teilA.art === 'definiert') {
       const { v, M, ergebnis } = teilA;
       const n = v.length;
-      formelA = `\\text{a)}\\quad ${matrixLatexFormatiert([v])} \\cdot ${matrixLatexFormatiert(M)}`;
+      // Faktoren auf getrennte Zeilen statt nebeneinander — zwei 3×3-
+      // Matrizen (oder sogar nur eine, falls Einträge zweistellig sind)
+      // liefen bei 375px sonst gelegentlich ab (iPhone-Rückmeldung).
+      formelZeilenA = [`\\text{a)}\\quad ${matrixLatexFormatiert([v])}`, `\\cdot ${matrixLatexFormatiert(M)}`];
       eingaben.push({
         id: 'a', label: `a) Ergebnis (1×${n})`, typ: 'matrix', zeilen: 1, spalten: n,
         punkte: 2, loesung: [ergebnis], toleranz: KONFIG.toleranz.exakt,
@@ -197,13 +200,13 @@ export const matrixprodukt = {
         },
         {
           titel: 'Ergebnis',
-          latex: mehrzeiligeKette([`${matrixLatexFormatiert([v])} \\cdot ${matrixLatexFormatiert(M)}`, `= ${matrixLatexFormatiert([ergebnis])}`]),
+          latex: mehrzeiligeKette([`${matrixLatexFormatiert([v])}`, `\\cdot ${matrixLatexFormatiert(M)}`, `= ${matrixLatexFormatiert([ergebnis])}`]),
         },
       );
     } else {
       const { C, D } = teilA;
       const p = C.length; const q = C[0].length; const r = D.length; const s = D[0].length;
-      formelA = `\\text{a)}\\quad ${matrixLatexFormatiert(C)} \\cdot ${matrixLatexFormatiert(D)}`;
+      formelZeilenA = [`\\text{a)}\\quad ${matrixLatexFormatiert(C)}`, `\\cdot ${matrixLatexFormatiert(D)}`];
       eingaben.push({
         id: 'a', label: 'a) Ist das Produkt definiert?', typ: 'auswahl',
         optionen: ['Definiert', 'Nicht definiert'], punkte: 2, loesung: 'Nicht definiert',
@@ -230,12 +233,12 @@ export const matrixprodukt = {
       id: 'b', label: 'b) Ergebnis (3×3)', typ: 'matrix', zeilen: 3, spalten: 3,
       punkte: 2, loesung: ergebnisB, toleranz: KONFIG.toleranz.exakt,
     });
-    const formelB = `\\text{b)}\\quad ${matrixLatexFormatiert(X)} \\cdot ${matrixLatexFormatiert(Y)}`;
+    const formelZeilenB = [`\\text{b)}\\quad ${matrixLatexFormatiert(X)}`, `\\cdot ${matrixLatexFormatiert(Y)}`];
 
     return {
       frage: {
         text: 'Berechnen Sie die folgenden Matrizenprodukte, soweit definiert.',
-        formel: mehrzeiligeKette([formelA, formelB]),
+        formel: mehrzeiligeKette([...formelZeilenA, ...formelZeilenB]),
       },
       eingaben,
       loesung: {
@@ -252,7 +255,7 @@ export const matrixprodukt = {
           },
           {
             titel: 'Ergebnis',
-            latex: mehrzeiligeKette([`${matrixLatexFormatiert(X)} \\cdot ${matrixLatexFormatiert(Y)}`, `= ${matrixLatexFormatiert(ergebnisB)}`]),
+            latex: mehrzeiligeKette([`${matrixLatexFormatiert(X)}`, `\\cdot ${matrixLatexFormatiert(Y)}`, `= ${matrixLatexFormatiert(ergebnisB)}`]),
           },
         ],
         ergebnisse: [
@@ -303,7 +306,10 @@ export const produktionsprozess = {
         const kandidat = zufallsMatrix(rng, 1, 2, PREIS_POOL)[0];
         const erloes = kandidat[0] * e1 + kandidat[1] * e2;
         const gewinn = erloes - kosten;
-        if (gewinn > 0 && gewinn <= 9999) { PE = kandidat; break; }
+        // Gewinn nicht nur positiv, sondern plausibel: mindestens 10 % des
+        // Erlöses, sonst wirkt ein Gewinn von z. B. 2 bei einem Erlös von
+        // mehreren Hundert wie ein Rechenfehler statt ein echtes Ergebnis.
+        if (gewinn > 0 && gewinn >= 0.1 * erloes && gewinn <= 9999) { PE = kandidat; break; }
       }
       if (!PE) continue;
 
@@ -348,9 +354,16 @@ export const produktionsprozess = {
           `${anzahlZwischenprodukte} Zwischenprodukte und aus diesen über B ${anzahlEndprodukte} Endprodukte hergestellt, die in den Mengen E ` +
           `hergestellt werden sollen. a) Wie viele Einheiten der ${anzahlRohstoffe} Rohstoffe werden dafür benötigt? ` +
           `b) Die Endprodukte werden zu Verkaufspreisen je Einheit PE verkauft, die Rohstoffe kosten je Einheit PR. Wie hoch ist der Gewinn?`,
+        // Jede Vorgabe auf einer eigenen Zeile statt mehrere pro Zeile
+        // gebündelt — zwei oder mehr Matrizen nebeneinander liefen bei
+        // 375px ab dem Bildschirmrand (iPhone-Rückmeldung: E und P_R
+        // waren abgeschnitten), eine einzelne Matrix passt dagegen immer.
         formel: mehrzeiligeKette([
-          `A = ${matrixLatexFormatiert(A)}, \\quad B = ${matrixLatexFormatiert(B)}, \\quad E = ${matrixLatexFormatiert(E)}`,
-          `P_E = ${matrixLatexFormatiert(peSpalte)}, \\quad P_R = ${matrixLatexFormatiert(prSpalte)}`,
+          `A = ${matrixLatexFormatiert(A)}`,
+          `B = ${matrixLatexFormatiert(B)}`,
+          `E = ${matrixLatexFormatiert(E)}`,
+          `P_E = ${matrixLatexFormatiert(peSpalte)}`,
+          `P_R = ${matrixLatexFormatiert(prSpalte)}`,
         ]),
       },
       eingaben: [
