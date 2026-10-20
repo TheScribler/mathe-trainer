@@ -3,6 +3,7 @@
 // PLAN.md, Katalog "4 Lineare Algebra").
 
 import { zufallAus, zufallBool } from '../rng.js';
+import { minimaleNachkommastellen } from '../zahl.js';
 import { zahlZuLatex, matrixLatex, mehrzeiligeGleichung, mehrzeiligeKette } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
@@ -81,17 +82,29 @@ function skalarproduktLatex(a, b) {
 
 // Zeigt JEDEN Eintrag des Produkts a·b als eigene Zeile "c_{ij} = ... = Wert"
 // (Katalog-Vorgabe: mindestens einen Eintrag vorrechnen — hier alle, damit
-// nichts stillschweigend übersprungen wird).
-function alleEintraegeLatex(a, b, ergebnis) {
+// nichts stillschweigend übersprungen wird). praefix austauschbar (z. B. "r"
+// für einen Rohstoffbedarfsvektor statt der generischen "c"); bei genau einer
+// Ergebnisspalte (Spaltenvektor) heißt der Index nur "_i" statt "_{i1}" —
+// "r_1" liest sich natürlicher als "r_11".
+function alleEintraegeLatex(a, b, ergebnis, praefix = 'c') {
   const zeilen = [];
+  const spaltenzahl = b[0].length;
   for (let i = 0; i < a.length; i++) {
-    const spalte = b[0].length;
-    for (let k = 0; k < spalte; k++) {
+    for (let k = 0; k < spaltenzahl; k++) {
       const spaltenwerte = b.map((zeile) => zeile[k]);
-      zeilen.push(`c_{${i + 1}${k + 1}} &= ${skalarproduktLatex(a[i], spaltenwerte)} = ${zahlZuLatex(ergebnis[i][k], 0)}`);
+      const index = spaltenzahl === 1 ? `${i + 1}` : `${i + 1}${k + 1}`;
+      zeilen.push(`${praefix}_{${index}} &= ${skalarproduktLatex(a[i], spaltenwerte)} = ${zahlZuLatex(ergebnis[i][k], 0)}`);
     }
   }
   return mehrzeiligeKette(zeilen);
+}
+
+// Matrix mit deutsch formatierten Einträgen (Komma statt Punkt bei
+// Dezimalzahlen) — matrixLatex selbst formatiert nicht, reicht Werte 1:1
+// durch (siehe latex.js); ohne das würde z. B. ein Produktionskoeffizient
+// von 0,2 als "0.2" erscheinen.
+function matrixLatexFormatiert(werte) {
+  return matrixLatex(werte.map((zeile) => zeile.map((w) => zahlZuLatex(w, minimaleNachkommastellen(w)))));
 }
 
 const EINTRAG_POOL = [-3, -2, -1, 0, 0, 0, 1, 2, 3, 4];
@@ -166,7 +179,7 @@ export const matrixprodukt = {
     if (teilA.art === 'definiert') {
       const { v, M, ergebnis } = teilA;
       const n = v.length;
-      formelA = `\\text{a)}\\quad ${matrixLatex([v])} \\cdot ${matrixLatex(M)}`;
+      formelA = `\\text{a)}\\quad ${matrixLatexFormatiert([v])} \\cdot ${matrixLatexFormatiert(M)}`;
       eingaben.push({
         id: 'a', label: `a) Ergebnis (1×${n})`, typ: 'matrix', zeilen: 1, spalten: n,
         punkte: 2, loesung: [ergebnis], toleranz: KONFIG.toleranz.exakt,
@@ -184,13 +197,13 @@ export const matrixprodukt = {
         },
         {
           titel: 'Ergebnis',
-          latex: mehrzeiligeKette([`${matrixLatex([v])} \\cdot ${matrixLatex(M)}`, `= ${matrixLatex([ergebnis])}`]),
+          latex: mehrzeiligeKette([`${matrixLatexFormatiert([v])} \\cdot ${matrixLatexFormatiert(M)}`, `= ${matrixLatexFormatiert([ergebnis])}`]),
         },
       );
     } else {
       const { C, D } = teilA;
       const p = C.length; const q = C[0].length; const r = D.length; const s = D[0].length;
-      formelA = `\\text{a)}\\quad ${matrixLatex(C)} \\cdot ${matrixLatex(D)}`;
+      formelA = `\\text{a)}\\quad ${matrixLatexFormatiert(C)} \\cdot ${matrixLatexFormatiert(D)}`;
       eingaben.push({
         id: 'a', label: 'a) Ist das Produkt definiert?', typ: 'auswahl',
         optionen: ['Definiert', 'Nicht definiert'], punkte: 2, loesung: 'Nicht definiert',
@@ -217,7 +230,7 @@ export const matrixprodukt = {
       id: 'b', label: 'b) Ergebnis (3×3)', typ: 'matrix', zeilen: 3, spalten: 3,
       punkte: 2, loesung: ergebnisB, toleranz: KONFIG.toleranz.exakt,
     });
-    const formelB = `\\text{b)}\\quad ${matrixLatex(X)} \\cdot ${matrixLatex(Y)}`;
+    const formelB = `\\text{b)}\\quad ${matrixLatexFormatiert(X)} \\cdot ${matrixLatexFormatiert(Y)}`;
 
     return {
       frage: {
@@ -239,14 +252,14 @@ export const matrixprodukt = {
           },
           {
             titel: 'Ergebnis',
-            latex: mehrzeiligeKette([`${matrixLatex(X)} \\cdot ${matrixLatex(Y)}`, `= ${matrixLatex(ergebnisB)}`]),
+            latex: mehrzeiligeKette([`${matrixLatexFormatiert(X)} \\cdot ${matrixLatexFormatiert(Y)}`, `= ${matrixLatexFormatiert(ergebnisB)}`]),
           },
         ],
         ergebnisse: [
           teilA.art === 'definiert'
-            ? { label: 'Ergebnis a)', latex: matrixLatex([teilA.ergebnis]) }
+            ? { label: 'Ergebnis a)', latex: matrixLatexFormatiert([teilA.ergebnis]) }
             : { label: 'Ergebnis a)', latex: '\\text{nicht definiert}' },
-          { label: 'Ergebnis b)', latex: matrixLatex(ergebnisB) },
+          { label: 'Ergebnis b)', latex: matrixLatexFormatiert(ergebnisB) },
         ],
       },
       params,
@@ -315,15 +328,29 @@ export const produktionsprozess = {
     const anzahlZwischenprodukte = A[0].length;
     const anzahlEndprodukte = B[0].length;
 
+    // P_E, P_R sind laut Musterlösung als Spaltenvektoren definiert (die
+    // Formel braucht darum "P_E^T", die Transponierte, für das Skalar-
+    // produkt mit E bzw. R) — in der Aufgabenstellung darum als Spalte
+    // gezeigt, nicht als die schon transponierte Zeile.
+    const peSpalte = PE.map((w) => [w]);
+    const prSpalte = PR.map((w) => [w]);
+
+    // Jeden Summanden des Skalarprodukts einzeln ausrechnen, bevor sie
+    // zusammengezählt werden ("80·10 + 90·12 = 800 + 1.080 = 1.880").
+    const erloesTerme = PE.map((w, i) => `${faktorLatex(w)} \\cdot ${faktorLatex(E[i][0])}`).join(' + ');
+    const erloesTeilprodukte = PE.map((w, i) => w * E[i][0]);
+    const kostenTerme = PR.map((w, i) => `${faktorLatex(w)} \\cdot ${faktorLatex(R[i][0])}`).join(' + ');
+    const kostenTeilprodukte = PR.map((w, i) => w * R[i][0]);
+
     return {
       frage: {
         text: `In einem zweistufigen Produktionsprozess werden aus ${anzahlRohstoffe} Rohstoffen über die Produktionskoeffizienten in A ` +
           `${anzahlZwischenprodukte} Zwischenprodukte und aus diesen über B ${anzahlEndprodukte} Endprodukte hergestellt, die in den Mengen E ` +
           `hergestellt werden sollen. a) Wie viele Einheiten der ${anzahlRohstoffe} Rohstoffe werden dafür benötigt? ` +
-          `b) Die Endprodukte kosten je Einheit PE, die Rohstoffe je Einheit PR. Wie hoch ist der Gewinn?`,
+          `b) Die Endprodukte werden zu Verkaufspreisen je Einheit PE verkauft, die Rohstoffe kosten je Einheit PR. Wie hoch ist der Gewinn?`,
         formel: mehrzeiligeKette([
-          `A = ${matrixLatex(A)}, \\quad B = ${matrixLatex(B)}, \\quad E = ${matrixLatex(E)}`,
-          `P_E^T = ${matrixLatex([PE])}, \\quad P_R^T = ${matrixLatex([PR])}`,
+          `A = ${matrixLatexFormatiert(A)}, \\quad B = ${matrixLatexFormatiert(B)}, \\quad E = ${matrixLatexFormatiert(E)}`,
+          `P_E = ${matrixLatexFormatiert(peSpalte)}, \\quad P_R = ${matrixLatexFormatiert(prSpalte)}`,
         ]),
       },
       eingaben: [
@@ -338,28 +365,40 @@ export const produktionsprozess = {
           {
             titel: 'Formel',
             latex: `R = A \\cdot B \\cdot E`,
-            hinweis: 'Erst A·B als Gesamtbedarfsmatrix bilden (wie viele Rohstoffe je Einheit jedes Endprodukts nötig sind), dann mit E multiplizieren — Reihenfolge wie in der Musterlösung.',
+            hinweis: 'Erst A·B als Gesamtbedarfsmatrix bilden (wie viele Rohstoffe je Einheit jedes Endprodukts nötig sind), dann mit E multiplizieren.',
           },
-          { titel: 'Einsetzen', latex: mehrzeiligeKette([`A \\cdot B = ${matrixLatex(A)} \\cdot ${matrixLatex(B)}`, `= ${matrixLatex(AB)}`]) },
-          { titel: 'Einsetzen', latex: mehrzeiligeKette([`R = ${matrixLatex(AB)} \\cdot ${matrixLatex(E)}`, `= ${matrixLatex(R)}`]) },
-          { titel: 'Ergebnis', latex: `R = ${matrixLatex(R)}` },
+          { titel: 'Einsetzen', latex: mehrzeiligeKette([`A \\cdot B = ${matrixLatexFormatiert(A)} \\cdot ${matrixLatexFormatiert(B)}`, `= ${matrixLatexFormatiert(AB)}`]) },
+          {
+            titel: 'Einsetzen',
+            latex: alleEintraegeLatex(A, B, AB),
+            hinweis: 'Jeder Eintrag von A·B ist eine Zeile von A mal eine Spalte von B.',
+          },
+          { titel: 'Einsetzen', latex: mehrzeiligeKette([`R = ${matrixLatexFormatiert(AB)} \\cdot ${matrixLatexFormatiert(E)}`, `= ${matrixLatexFormatiert(R)}`]) },
+          {
+            titel: 'Einsetzen',
+            latex: alleEintraegeLatex(AB, E, R, 'r'),
+            hinweis: 'Jeder Eintrag von R ist eine Zeile von A·B mal die (einzige) Spalte von E.',
+          },
+          { titel: 'Ergebnis', latex: `R = ${matrixLatexFormatiert(R)}` },
           {
             titel: 'Formel',
             latex: `G = P_E^T \\cdot E - P_R^T \\cdot R`,
-            hinweis: 'Gewinn ist Erlös (Preise mal Endproduktmengen) minus Kosten (Rohstoffpreise mal benötigter Rohstoffmenge).',
+            hinweis: 'Gewinn ist Erlös (Verkaufspreise mal Endproduktmengen) minus Kosten (Rohstoffpreise mal benötigter Rohstoffmenge).',
           },
           {
             titel: 'Einsetzen',
             latex: mehrzeiligeGleichung('G', [
-              `${matrixLatex([PE])} \\cdot ${matrixLatex(E)} - ${matrixLatex([PR])} \\cdot ${matrixLatex(R)}`,
-              `${zahlZuLatex(erloes, 0)} - ${zahlZuLatex(kosten, 0)}`,
-              zahlZuLatex(gewinn, 0),
+              `${matrixLatexFormatiert([PE])} \\cdot ${matrixLatexFormatiert(E)} - ${matrixLatexFormatiert([PR])} \\cdot ${matrixLatexFormatiert(R)}`,
+              `\\left(${erloesTerme}\\right) - \\left(${kostenTerme}\\right)`,
+              `\\left(${erloesTeilprodukte.map((p) => zahlZuLatex(p, minimaleNachkommastellen(p))).join(' + ')}\\right) - \\left(${kostenTeilprodukte.map((p) => zahlZuLatex(p, minimaleNachkommastellen(p))).join(' + ')}\\right)`,
+              `${zahlZuLatex(erloes, minimaleNachkommastellen(erloes))} - ${zahlZuLatex(kosten, minimaleNachkommastellen(kosten))}`,
+              zahlZuLatex(gewinn, minimaleNachkommastellen(gewinn)),
             ]),
           },
         ],
         ergebnisse: [
-          { label: 'Rohstoffbedarf', latex: `R = ${matrixLatex(R)}` },
-          { label: 'Gewinn', latex: zahlZuLatex(gewinn, 2) },
+          { label: 'Rohstoffbedarf', latex: `R = ${matrixLatexFormatiert(R)}` },
+          { label: 'Gewinn', latex: zahlZuLatex(gewinn, minimaleNachkommastellen(gewinn)) },
         ],
       },
       params,
