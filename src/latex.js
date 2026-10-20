@@ -28,7 +28,7 @@ export function bruchGekuerzt(zaehler, nenner) {
 // stellen hat) — das ist genau dann der Fall, wenn der gekürzte Nenner außer
 // den Primfaktoren 2 und 5 nichts weiter enthält (z. B. 6/5=1,2 bricht ab,
 // 2/3=0,6666… nicht).
-function istAbbrechenderDezimalbruch(nenner) {
+export function istAbbrechenderDezimalbruch(nenner) {
   let n = Math.abs(nenner);
   while (n % 2 === 0) n /= 2;
   while (n % 5 === 0) n /= 5;

@@ -276,6 +276,7 @@ ${stilCss}
 </style>
 </head>
 <body>
+<div id="status-leiste"></div>
 <main id="app"></main>
 <footer class="build-stamp">Version ${BUILD_ZEITSTEMPEL}</footer>
 <script>

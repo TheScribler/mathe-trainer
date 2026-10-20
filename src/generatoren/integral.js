@@ -6,7 +6,7 @@
 
 import { zufallInt, zufallAus, zufallBool } from '../rng.js';
 import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
-import { zahlZuLatex, bruch, bruchGekuerzt, bruchMitDezimal, polynomLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette, auswertungsklammer } from '../latex.js';
+import { zahlZuLatex, bruch, bruchGekuerzt, bruchMitDezimal, polynomLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette, auswertungsklammer, istAbbrechenderDezimalbruch } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // ---------------------------------------------------------------------------
@@ -228,7 +228,11 @@ export const integralUnbestimmt = {
 
     const fExaktPotenz = bruchPolynomAusdruck(terme);
     const fExakt = sonder ? `${fExaktPotenz} ${sonder.FLatex}` : fExaktPotenz;
-    const hatBruch = terme.some((t) => t.nenner !== 1);
+    // Nur ein Bruch, der NICHT als Dezimalzahl abbricht, braucht wirklich
+    // eine Näherung ("≈") — ein Bruch wie 1/2 (=0,5) ist exakt, keine
+    // Näherung, und die Toleranz beim Prüfen darf dafür nicht großzügiger
+    // sein als bei einem ganzzahligen Koeffizienten (siehe KONFIG.toleranz).
+    const hatNichtAbbrechendenBruch = terme.some((t) => t.nenner !== 1 && !istAbbrechenderDezimalbruch(t.nenner));
     const fExponenten = terme.map((t) => t.exponent);
     const fDezimalWerte = terme.map((t) => t.zaehler / t.nenner);
 
@@ -252,7 +256,7 @@ export const integralUnbestimmt = {
       },
       { titel: 'Ergebnis', latex: `F(x) = ${fExakt} + c` },
     ];
-    if (hatBruch) {
+    if (hatNichtAbbrechendenBruch) {
       schritte.push({
         titel: 'Ergebnis',
         latex: `F(x) \\approx ${sonder ? `${bruchPolynomDezimalLatex(terme)} ${sonder.FLatex}` : bruchPolynomDezimalLatex(terme)} + c`,
@@ -268,7 +272,8 @@ export const integralUnbestimmt = {
     const eingaben = [
       {
         id: 'F', label: 'Stammfunktion F(x)', typ: 'koeffizienten', punkte: sonder ? 2 : 3,
-        exponenten: fExponenten, loesung: fDezimalWerte, toleranz: KONFIG.toleranz.bruch,
+        exponenten: fExponenten, loesung: fDezimalWerte,
+        toleranz: hatNichtAbbrechendenBruch ? KONFIG.toleranz.bruch : KONFIG.toleranz.exakt,
       },
     ];
     if (sonder) {
@@ -393,7 +398,7 @@ export const integralBestimmt = {
                 `${lnB} - \\left(${lnA}\\right)`,
                 `\\approx ${zahlZuLatex(deltaDezimal, 2)}`,
               ]),
-              hinweis: 'ln(b) und ln(a) sind hier keine glatten Zahlen — das Ergebnis ist eine echte Dezimalnäherung, kein Bruch.',
+              hinweis: `ln(${b}) und ln(${a}) sind hier keine glatten Zahlen — das Ergebnis ist eine echte Dezimalnäherung, kein Bruch.`,
             },
           ],
           ergebnisse: [{ label: 'Wert des Integrals', latex: `\\approx ${zahlZuLatex(deltaDezimal, 2)}` }],
@@ -425,11 +430,17 @@ export const integralBestimmt = {
     const Fb = wertAlsBruch(termeFSortiert, b);
     const delta = bruchGekuerzt(Fb.zaehler * Fa.nenner - Fa.zaehler * Fb.nenner, Fb.nenner * Fa.nenner);
     const deltaDezimal = delta.zaehler / delta.nenner; // exakter Wert — die Toleranz deckt die Rundung beim Vergleich ab
+    // Ein Ergebnis, das als Dezimalzahl abbricht (z. B. 91/4 = 22,75), ist
+    // exakt — keine echte Rundung, also auch keine großzügige Toleranz dafür
+    // (sonst würde z. B. "1,24" bei einem exakten Ergebnis von 1,25 fälschlich
+    // akzeptiert). Nur ein wirklich nicht abbrechender Bruch (z. B. 25 1/9)
+    // braucht die lockerere Rundungstoleranz.
+    const deltaToleranz = istAbbrechenderDezimalbruch(delta.nenner) ? KONFIG.toleranz.exakt : KONFIG.toleranz.bruch;
 
     return {
       frage: { text: `Berechnen Sie das bestimmte Integral von f(x) = ${fProse} in den Grenzen ${a} bis ${b}.` },
       eingaben: [
-        { id: 'wert', label: 'Wert des Integrals', typ: 'zahl', punkte: 4, loesung: deltaDezimal, toleranz: KONFIG.toleranz.bruch },
+        { id: 'wert', label: 'Wert des Integrals', typ: 'zahl', punkte: 4, loesung: deltaDezimal, toleranz: deltaToleranz },
       ],
       loesung: {
         schritte: [

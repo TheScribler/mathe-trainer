@@ -8,6 +8,7 @@ import { pruefeZahl, bewerteKoeffizientenZeile } from '../src/pruefung.js';
 import { GENERATOREN } from '../src/generatoren/index.js';
 import { effektivzins } from '../src/generatoren/finanz.js';
 import { testeFixtures } from './fixtures.mjs';
+import { KONFIG } from '../src/konfig.js';
 
 let fehler = 0;
 
@@ -552,6 +553,30 @@ function testeEffektivzinsToleranz() {
 }
 
 // ---------------------------------------------------------------------------
+// Bruch-Toleranz (Integralrechnung, Phase-3-Nachbesserung): ein Ergebnis,
+// das als Dezimalzahl abbricht (z. B. 1,25), ist exakt — keine Rundung,
+// also auch keine großzügige Toleranz dafür. Nur ein wirklich nicht
+// abbrechender Bruch (z. B. 2/3) braucht die lockerere Rundungstoleranz.
+// ---------------------------------------------------------------------------
+function testeBruchToleranz() {
+  const faelle = [
+    ['1,25', 1.25, KONFIG.toleranz.exakt, true], // exakter Treffer
+    ['1,24', 1.25, KONFIG.toleranz.exakt, false], // exaktes Ergebnis, aber falsch — darf nicht durchrutschen
+    ['0,67', 2 / 3, KONFIG.toleranz.bruch, true], // 2/3 auf 2 Nachkommastellen gerundet
+    ['0,667', 2 / 3, KONFIG.toleranz.bruch, true], // 2/3 auf 3 Nachkommastellen gerundet
+    ['0,7', 2 / 3, KONFIG.toleranz.bruch, false], // zu grob gerundet — darf nicht akzeptiert werden
+  ];
+  for (const [eingabe, erwartet, toleranz, sollRichtigSein] of faelle) {
+    const ergebnis = pruefeZahl(eingabe, erwartet, toleranz);
+    pruefe(
+      ergebnis.korrekt === sollRichtigSein,
+      `Bruchtoleranz: "${eingabe}" korrekt=${ergebnis.korrekt}, erwartet ${sollRichtigSein} (Antwort=${erwartet}, Toleranz=${toleranz})`
+    );
+  }
+  console.log(`Bruchtoleranz: ${faelle.length} Fälle geprüft`);
+}
+
+// ---------------------------------------------------------------------------
 // Box-weise Bewertung von Koeffizientenzeilen (app.js-Prüflogik, hier als
 // reine Funktion in pruefung.js getestet statt im Browser): nur eine KOMPLETT
 // leere Zeile zählt als leer; sobald mindestens eine Box gefüllt ist, zählt
@@ -587,6 +612,7 @@ function testeBewerteKoeffizientenZeile() {
 
 testeZahlenparser();
 testeEffektivzinsToleranz();
+testeBruchToleranz();
 testeBewerteKoeffizientenZeile();
 fehler += testeFixtures();
 for (const generator of GENERATOREN) {

@@ -54,6 +54,32 @@ function fuegeBruchstrichEin(feld) {
   feld.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+// Ob zaehler/nenner als Dezimalbruch abbricht — eigene, kleine Kopie der
+// gleichnamigen Funktion in latex.js (dieselbe Begründung wie überall sonst
+// in dieser Datei: echte Modul-Grenzen unter Node, keine stille Kopplung an
+// private Hilfsfunktionen eines anderen Moduls).
+function istAbbrechenderDezimalbruchApp(nenner) {
+  let rest = Math.abs(nenner);
+  while (rest % 2 === 0) rest /= 2;
+  while (rest % 5 === 0) rest /= 5;
+  return rest === 1;
+}
+
+// "=" mit dem exakten Dezimalwert, wenn der eingetippte Bruch abbricht
+// (z. B. "-1/2 = -0,5"), sonst "≈" mit einer echten Rundung auf 2 Nachkomma-
+// stellen ("2/3 ≈ 0,67") — dieselbe Regel wie in den Lösungen (bruchMitDezimal,
+// latex.js). text ist die Rohschreibweise ("-1/2"), wert ihr Zahlenwert.
+function bruchVergleichUndWert(text, wert) {
+  const teile = text.split('/');
+  if (teile.length === 2) {
+    const nenner = parseDeZahl(teile[1]);
+    if (Number.isInteger(nenner) && nenner !== 0 && istAbbrechenderDezimalbruchApp(nenner)) {
+      return `= ${formatDeZahl(wert, minimaleNachkommastellen(wert))}`;
+    }
+  }
+  return `≈ ${formatDeZahl(wert, 2)}`;
+}
+
 // feldOderGetter: entweder direkt das Feld (Standard-Zahlenfeld, immer
 // dasselbe) oder eine Funktion, die das aktuell relevante Feld liefert
 // (Koeffizientenreihe — mehrere Teilfelder teilen sich ein Knopfpaar, das
@@ -211,7 +237,7 @@ function starteApp() {
       // "2/3 ≈ 0,67") statt nur die lange Dezimalzahl (0,666667) — sonst ist
       // nicht sofort zu erkennen, dass der Bruch richtig gelesen wurde.
       ziel.textContent = getrimmt.includes('/')
-        ? `Eingelesen als ${getrimmt} ≈ ${formatDeZahl(wert, 2)}`
+        ? `Eingelesen als ${getrimmt} ${bruchVergleichUndWert(getrimmt, wert)}`
         : 'Eingelesen als ' + formatDeZahlFrei(wert);
     }
 
@@ -264,6 +290,11 @@ function starteApp() {
         teilfelder.forEach((feld) => {
           feld.addEventListener('focus', () => {
             fokussiertesTeilfeld = feld;
+            // Das Knopfpaar zum fokussierten Kästchen verschieben (ein
+            // einziges DOM-Element wird dazu umgehängt, nicht kopiert) —
+            // sonst klebt es immer unter dem ersten Kästchen, egal welches
+            // gerade bearbeitet wird.
+            feld.closest('.koeffizienten-teil').insertAdjacentElement('afterend', knopfPaarReihe);
             knopfPaarReihe.classList.add('aktiv');
           });
           feld.addEventListener('blur', () => {
@@ -279,7 +310,7 @@ function starteApp() {
               if (w === '') return '–';
               const z = parseDeZahl(w);
               if (!isFinite(z)) return '?';
-              return w.includes('/') ? `${w} ≈ ${formatDeZahl(z, 2)}` : formatDeZahlFrei(z);
+              return w.includes('/') ? `${w} ${bruchVergleichUndWert(w, z)}` : formatDeZahlFrei(z);
             });
             eingelesenAls.textContent = 'Eingelesen als: ' + geparst.join(', ');
           });

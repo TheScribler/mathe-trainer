@@ -26,6 +26,18 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 #app { max-width: 36rem; margin: 0 auto; }
+#status-leiste {
+  /* Im Standalone-Modus (Home-Bildschirm) ist die Statusleiste laut
+     apple-mobile-web-app-status-bar-style "black-translucent" (siehe
+     build.mjs) — also durchsichtig über dem Inhalt, nicht eine eigene
+     Zeile. Ohne diesen fest positionierten, blickdichten Streifen
+     scrollt der Inhalt sichtbar hinter der Uhr vorbei. */
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: env(safe-area-inset-top);
+  background: var(--bg);
+  z-index: 1000;
+}
 .kopf h1 { font-size: 1.3rem; margin: 0 0 .2rem; }
 .kopf .unter { color: var(--gedaempft); margin: 0 0 1.25rem; font-size: .9rem; }
 .aufgabe-karte {
@@ -142,6 +154,13 @@ body {
   margin-top: .3rem;
 }
 .vorzeichen-bruch-paar.aktiv { display: flex; }
+.koeffizienten-reihe .vorzeichen-bruch-paar {
+  /* flex-basis:100% zwingt in der umbrechenden Koeffizientenzeile einen
+     Zeilenumbruch davor — das Paar steht dadurch unter dem Kästchen, nach
+     dem es im DOM gerade eingefügt wurde (siehe app.js, insertAdjacentElement
+     bei jedem Fokuswechsel), statt irgendwo in der Mitte der Zeile zu kleben. */
+  flex-basis: 100%;
+}
 .vorzeichen-bruch-paar button {
   font: inherit; font-weight: 700; font-size: 1.05rem;
   padding: 6px 18px; border-radius: 8px; border: 1px solid var(--rand);
