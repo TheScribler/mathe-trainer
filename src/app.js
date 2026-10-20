@@ -17,6 +17,43 @@ function potenzBeschriftung(exponent) {
   return 'x' + String(exponent).split('').map((z) => APP_HOCHGESTELLTE_ZIFFERN[Number(z)]).join('');
 }
 
+// iOS' inputMode="decimal"-Tastatur hat weder "−" noch "/" — ohne diese
+// zwei Funktionen ließen sich negative Antworten oder Brüche auf dem iPhone
+// gar nicht eingeben. Arbeiten direkt auf dem übergebenen Feld, lösen selbst
+// ein "input"-Event aus (damit "Eingelesen als" und die gut/schlecht-Klassen
+// wie bei echter Tastatureingabe aktualisiert werden).
+function schalteVorzeichenUm(feld) {
+  if (!feld) return;
+  const startPos = feld.selectionStart ?? feld.value.length;
+  const wert = feld.value;
+  let neuerWert;
+  let verschiebung;
+  if (wert[0] === '-' || wert[0] === '−') {
+    neuerWert = wert.slice(1);
+    verschiebung = -1;
+  } else {
+    neuerWert = '-' + wert;
+    verschiebung = 1;
+  }
+  feld.value = neuerWert;
+  feld.focus();
+  const neuePos = Math.max(0, startPos + verschiebung);
+  feld.setSelectionRange(neuePos, neuePos);
+  feld.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function fuegeBruchstrichEin(feld) {
+  if (!feld) return;
+  const start = feld.selectionStart ?? feld.value.length;
+  const end = feld.selectionEnd ?? feld.value.length;
+  const wert = feld.value;
+  feld.value = wert.slice(0, start) + '/' + wert.slice(end);
+  feld.focus();
+  const neuePos = start + 1;
+  feld.setSelectionRange(neuePos, neuePos);
+  feld.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 function baueTabelle(tabelle) {
   const wrapper = document.createElement('div');
   wrapper.className = 'frage-tabelle-wrapper';
@@ -58,6 +95,39 @@ function starteApp() {
   karte.className = 'aufgabe-karte';
   wurzel.appendChild(karte);
 
+  // Feste Werkzeugleiste für "−" und "/" (siehe schalteVorzeichenUm/
+  // fuegeBruchstrichEin oben) — ein einziges Exemplar statt je Feld eins,
+  // wirkt auf aktivesFeld (das zuletzt fokussierte Eingabefeld). Bleibt
+  // über Aufgabenwechsel hinweg bestehen (liegt außerhalb von karte, das
+  // bei jeder neuen Aufgabe neu aufgebaut wird).
+  let aktivesFeld = null;
+  const werkzeugLeiste = document.createElement('div');
+  werkzeugLeiste.className = 'vorzeichen-bruch-leiste';
+  werkzeugLeiste.style.display = 'none';
+
+  function werkzeugKnopf(text, titel, aktion) {
+    const knopf = document.createElement('button');
+    knopf.type = 'button';
+    knopf.textContent = text;
+    knopf.setAttribute('aria-label', titel);
+    // mousedown/touchstart statt click: preventDefault hier verhindert, dass
+    // der Tap dem fokussierten Eingabefeld den Fokus entzieht (sonst klappt
+    // die iOS-Tastatur zu, bevor die Aktion überhaupt ausgeführt wird).
+    // Beide Events bekommen denselben Handler — auf Touch-Geräten unterdrückt
+    // preventDefault auf touchstart die synthetische Maus-Event-Folge, auf
+    // reinen Zeigegeräten feuert nur mousedown — nie beide für denselben Tap.
+    const verarbeiten = (ereignis) => {
+      ereignis.preventDefault();
+      aktion(aktivesFeld);
+    };
+    knopf.addEventListener('mousedown', verarbeiten);
+    knopf.addEventListener('touchstart', verarbeiten);
+    return knopf;
+  }
+  werkzeugLeiste.appendChild(werkzeugKnopf('−', 'Vorzeichen umschalten', schalteVorzeichenUm));
+  werkzeugLeiste.appendChild(werkzeugKnopf('/', 'Bruchstrich einfügen', fuegeBruchstrichEin));
+  wurzel.appendChild(werkzeugLeiste);
+
   let aktuelleAufgabe = null;
 
   function neueAufgabe() {
@@ -71,6 +141,7 @@ function starteApp() {
 
   function zeichneAufgabe(generator) {
     karte.innerHTML = '';
+    aktivesFeld = null; // Felder der vorigen Aufgabe sind gleich nicht mehr im DOM
 
     const titel = document.createElement('h2');
     titel.textContent = generator.name + ' (' + generator.punkte + ' P)';
@@ -97,6 +168,9 @@ function starteApp() {
       feld.autocorrect = 'off';
       feld.spellcheck = false;
       zeile.appendChild(feld);
+      feld.addEventListener('focus', function () {
+        aktivesFeld = feld;
+      });
 
       if (mitEigenerHinweis) {
         const eingelesenAls = document.createElement('span');
@@ -215,6 +289,11 @@ function starteApp() {
       form.appendChild(zeile);
     }
     karte.appendChild(form);
+
+    // Nur anzeigen, wenn es überhaupt ein Zahlenfeld gibt — bei reinen
+    // Auswahl-/Textaufgaben wäre die Leiste nutzlos.
+    const hatZahlenfeld = aktuelleAufgabe.eingaben.some((e) => e.typ === 'zahl' || e.typ === 'koeffizienten');
+    werkzeugLeiste.style.display = hatZahlenfeld ? 'flex' : 'none';
 
     const ergebnisZeile = document.createElement('p');
     ergebnisZeile.className = 'pruef-ergebnis';
