@@ -318,6 +318,84 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     return;
   }
 
+  if (generator.id === 'fin.verzinsung-grundformen') {
+    const Kn = wertVon(aufgabe, 'Kn');
+    const i = p.iProzent / 100;
+    if (p.art === 'einfach') {
+      // Unabhängig: Jahr für Jahr denselben Zins auf K0 aufaddieren (Schleife)
+      // statt der geschlossenen Form K0*(1+i*n).
+      let K = p.K0;
+      for (let jahr = 0; jahr < p.n; jahr++) K += p.K0 * i;
+      pruefe(nahBei(K, Kn, 0.01), `${kennzeichnung}: einfache Verzinsung schrittweise ${K.toFixed(2)}, erwartet Kn=${Kn}`);
+    } else if (p.art === 'unterjaehrig') {
+      // Unabhängig: s Einzelperioden per Schleife aufzinsen statt Math.pow.
+      const j = i / p.m;
+      let K = p.K0;
+      for (let periode = 0; periode < p.n * p.m; periode++) K *= 1 + j;
+      pruefe(nahBei(K, Kn, 0.01), `${kennzeichnung}: unterjährige Verzinsung schrittweise ${K.toFixed(2)}, erwartet Kn=${Kn}`);
+    } else {
+      // Unabhängig: stetige Verzinsung als Grenzwert sehr vieler, sehr kleiner
+      // Zinsperioden (statt e^(i·n) direkt) — Schrittzahl so hoch, dass die
+      // Näherung an e^(i·n) auf 2 Nachkommastellen sicher trägt.
+      const schritte = 200000;
+      const j = (i * p.n) / schritte;
+      let K = p.K0;
+      for (let schritt = 0; schritt < schritte; schritt++) K *= 1 + j;
+      pruefe(nahBei(K, Kn, 0.2), `${kennzeichnung}: stetige Verzinsung als Grenzwert ${K.toFixed(2)}, erwartet Kn=${Kn}`);
+    }
+    return;
+  }
+
+  if (generator.id === 'fin.endwert-rente') {
+    // Unabhängig: Jahr für Jahr die Zahlung verbuchen und den Kontostand
+    // aufzinsen (Schleife) statt der geschlossenen Rentenendwertformel.
+    const Rn = wertVon(aufgabe, 'Rn');
+    const q = 1 + p.iProzent / 100;
+    let bestand = 0;
+    for (let jahr = 0; jahr < p.n; jahr++) {
+      bestand = p.variante === 'vorschuessig' ? (bestand + p.r) * q : bestand * q + p.r;
+    }
+    pruefe(nahBei(bestand, Rn, 0.01), `${kennzeichnung}: Kontostand schrittweise ${bestand.toFixed(2)}, erwartet Rn=${Rn}`);
+    return;
+  }
+
+  if (generator.id === 'fin.ewige-rente') {
+    // Unabhängig: endliche Summe über sehr viele Perioden (Grenzwert n → ∞)
+    // statt der geschlossenen Formel r/i bzw. r'+r'/i.
+    const R0 = wertVon(aufgabe, 'R0');
+    const q = 1 + p.iProzent / 100;
+    const N = 4000;
+    let summe = 0;
+    for (let t = p.variante === 'vorschuessig' ? 0 : 1; t <= (p.variante === 'vorschuessig' ? N - 1 : N); t++) {
+      summe += p.r / Math.pow(q, t);
+    }
+    pruefe(nahBei(summe, R0, 0.5), `${kennzeichnung}: endliche Summe (N=${N}) ${summe.toFixed(2)}, erwartet R0=${R0}`);
+    return;
+  }
+
+  if (generator.id === 'fin.tilgungsplan') {
+    // Unabhängig: die Tabelle frisch nachrechnen (eigene Schleife, nicht die
+    // baueTilgungstabelle-Hilfsfunktion des Generators selbst).
+    const plan = wertVon(aufgabe, 'plan');
+    const i = p.iProzent / 100;
+    const q = 1 + i;
+    const annuitaet = p.art === 'annuitaet' ? (p.K0 * Math.pow(q, p.n) * i) / (Math.pow(q, p.n) - 1) : null;
+    const tilgungKonstant = p.art === 'raten' ? p.K0 / p.n : null;
+    let restschuld = p.K0;
+    for (let jahr = 1; jahr <= p.n; jahr++) {
+      const zinsen = restschuld * i;
+      const tilgung = p.art === 'raten' ? tilgungKonstant : annuitaet - zinsen;
+      const jahresAnnuitaet = p.art === 'raten' ? zinsen + tilgung : annuitaet;
+      restschuld -= tilgung;
+      const zeile = plan[jahr - 1];
+      pruefe(nahBei(zeile[0], restschuld, 0.5), `${kennzeichnung}: Jahr ${jahr} Restschuld nachgerechnet ${restschuld.toFixed(2)}, erwartet ${zeile[0]}`);
+      pruefe(nahBei(zeile[1], zinsen, 0.5), `${kennzeichnung}: Jahr ${jahr} Zinsen nachgerechnet ${zinsen.toFixed(2)}, erwartet ${zeile[1]}`);
+      pruefe(nahBei(zeile[2], tilgung, 0.5), `${kennzeichnung}: Jahr ${jahr} Tilgung nachgerechnet ${tilgung.toFixed(2)}, erwartet ${zeile[2]}`);
+      pruefe(nahBei(zeile[3], jahresAnnuitaet, 0.5), `${kennzeichnung}: Jahr ${jahr} Annuität nachgerechnet ${jahresAnnuitaet.toFixed(2)}, erwartet ${zeile[3]}`);
+    }
+    return;
+  }
+
   if (generator.id === 'diff.gewinn-breakeven') {
     const eKoeff = wertVon(aufgabe, 'E');
     const gKoeff = wertVon(aufgabe, 'G');

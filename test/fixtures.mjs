@@ -9,6 +9,10 @@ import {
   renteVeraenderlich,
   verdopplungszeit,
   effektivzins,
+  verzinsungGrundformen,
+  endwertRente,
+  ewigeRente,
+  tilgungsplan,
 } from '../src/generatoren/finanz.js';
 import {
   gewinnBreakeven,
@@ -289,6 +293,78 @@ export function testeFixtures() {
     const wG24b = a24b.eingaben.find((e) => e.id === 'G').loesung;
     pruefe(nahBei(wG24b, 100, 1e-9), `Übung 24b: G=${wG24b}, erwartet 100`);
     faelle.push('Übung 24a/b');
+  }
+
+  // Übung 4e: K0=20.000, i=6 %, n=5, stetig -> Kn=26.997,18 €.
+  {
+    const a = verzinsungGrundformen.baue({ art: 'stetig', K0: 20000, iProzent: 6, n: 5 });
+    const Kn = a.eingaben[0].loesung;
+    pruefe(nahBei(Kn, 26997.18, 0.01), `Übung 4e: Kn=${Kn}, erwartet 26997.18`);
+    faelle.push('Übung 4e');
+  }
+
+  // Übung 4b: K0=20.000, inom=6 %, m=2, s=10 -> Ks=26.878,33 €.
+  {
+    const a = verzinsungGrundformen.baue({ art: 'unterjaehrig', K0: 20000, iProzent: 6, n: 5, m: 2 });
+    const Kn = a.eingaben[0].loesung;
+    pruefe(nahBei(Kn, 26878.33, 0.01), `Übung 4b: Kn=${Kn}, erwartet 26878.33`);
+    faelle.push('Übung 4b');
+  }
+
+  // Übung 4c: K0=20.000, inom=6 %, m=12, s=60 -> Ks=26.977,00 €.
+  {
+    const a = verzinsungGrundformen.baue({ art: 'unterjaehrig', K0: 20000, iProzent: 6, n: 5, m: 12 });
+    const Kn = a.eingaben[0].loesung;
+    pruefe(nahBei(Kn, 26977.00, 0.01), `Übung 4c: Kn=${Kn}, erwartet 26977.00`);
+    faelle.push('Übung 4c');
+  }
+
+  // Übung 5a: r=3.000, i=2,2 %, n=27, nachschüssig -> Rn=109.035,35 €.
+  {
+    const a = endwertRente.baue({ variante: 'nachschuessig', r: 3000, iProzent: 2.2, n: 27 });
+    const Rn = a.eingaben[0].loesung;
+    pruefe(nahBei(Rn, 109035.35, 0.01), `Übung 5a: Rn=${Rn}, erwartet 109035.35`);
+    faelle.push('Übung 5a');
+  }
+
+  // Übung 6a: r'=5.000, i=3,75 %, n=42, vorschüssig -> Rn=510.939,55 €.
+  {
+    const a = endwertRente.baue({ variante: 'vorschuessig', r: 5000, iProzent: 3.75, n: 42 });
+    const Rn = a.eingaben[0].loesung;
+    pruefe(nahBei(Rn, 510939.55, 0.01), `Übung 6a: Rn=${Rn}, erwartet 510939.55`);
+    faelle.push('Übung 6a');
+  }
+
+  // Übung 7a: r=40.000, i=8 %, nachschüssig -> R0=500.000 €.
+  {
+    const a = ewigeRente.baue({ variante: 'nachschuessig', r: 40000, iProzent: 8 });
+    const R0 = a.eingaben[0].loesung;
+    pruefe(nahBei(R0, 500000, 0.01), `Übung 7a: R0=${R0}, erwartet 500000`);
+    faelle.push('Übung 7a');
+  }
+
+  // Übung 7b: r'=40.000, i=5 %, vorschüssig -> R0=840.000 €.
+  {
+    const a = ewigeRente.baue({ variante: 'vorschuessig', r: 40000, iProzent: 5 });
+    const R0 = a.eingaben[0].loesung;
+    pruefe(nahBei(R0, 840000, 0.01), `Übung 7b: R0=${R0}, erwartet 840000`);
+    faelle.push('Übung 7b');
+  }
+
+  // Übung 8: K0=500.000, i=7 %, n=5, Ratentilgung -> Tabelle wie im Skript.
+  {
+    const a = tilgungsplan.baue({ art: 'raten', K0: 500000, iProzent: 7, n: 5 });
+    const plan = a.eingaben[0].loesung;
+    const erwartet = [
+      [400000, 35000, 100000, 135000],
+      [300000, 28000, 100000, 128000],
+      [200000, 21000, 100000, 121000],
+      [100000, 14000, 100000, 114000],
+      [0, 7000, 100000, 107000],
+    ];
+    pruefe(plan.length === erwartet.length && plan.every((zeile, i) => zeile.every((w, j) => nahBei(w, erwartet[i][j], 0.01))),
+      `Übung 8: Tilgungsplan=${JSON.stringify(plan)}, erwartet ${JSON.stringify(erwartet)}`);
+    faelle.push('Übung 8');
   }
 
   console.log(`Fixtures: ${faelle.length} geprüft (${faelle.join(', ')})`);

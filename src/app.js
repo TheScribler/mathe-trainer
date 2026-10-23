@@ -736,9 +736,23 @@ function baueAufgabenliste(teile) {
   return aufgaben;
 }
 
+// Zusatzthemen-Generatoren (g.zusatz === true) stehen in der Probeklausur
+// standardmäßig nicht zur Verfügung — die Klausur folgt dem Aufbau der
+// Musterklausur, Zusatzthemen sind nur im Übungsmodus (dort ohnehin alle
+// GENERATOREN gleich wahrscheinlich, siehe starteUebungsmodus) gedacht.
+// KONFIG.zusatzthemenInKlausur schaltet sie bei Bedarf dazu.
+function generatorenFuerProbeklausur() {
+  if (KONFIG.zusatzthemenInKlausur) return GENERATOREN_NACH_TEIL;
+  const gefiltert = {};
+  for (const [teil, generatoren] of Object.entries(GENERATOREN_NACH_TEIL)) {
+    gefiltert[teil] = generatoren.filter((g) => !g.zusatz);
+  }
+  return gefiltert;
+}
+
 function erzeugeNeueProbeklausur(punkteSplit) {
   const rngKomposer = mulberry32(erzeugeSeed());
-  const teile = komponiereKlausur(punkteSplit, GENERATOREN_NACH_TEIL, rngKomposer);
+  const teile = komponiereKlausur(punkteSplit, generatorenFuerProbeklausur(), rngKomposer);
   const aufgaben = baueAufgabenliste(teile);
   const zustand = {
     version: 1,
