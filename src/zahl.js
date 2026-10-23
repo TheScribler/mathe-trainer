@@ -76,6 +76,17 @@ export function minimaleNachkommastellen(zahl, maxStellen = 4) {
   return maxStellen;
 }
 
+// Eigene Regel für Geldbeträge, abweichend von minimaleNachkommastellen:
+// ein glatter Betrag zeigt 0 Nachkommastellen ("68.000 €"), ein unglatter
+// IMMER genau 2 — nie 1 (minimaleNachkommastellen hätte 48733,2 mit nur
+// einer Nachkommastelle gezeigt statt der bei Geld üblichen zwei,
+// "48.733,20 €") und nie mehr als 2 (Geld wird immer auf den Cent
+// gerundet, siehe CLAUDE.md Abschnitt 6 — ungerundete Zwischenwerte
+// gehören hier ohnehin nicht her).
+export function geldNachkommastellen(zahl) {
+  return Number.isInteger(runde(zahl, 2)) ? 0 : 2;
+}
+
 // Größter gemeinsamer Teiler (immer ≥ 0) — Grundlage fürs Kürzen von Brüchen
 // (bruchGekuerzt/bruchMitDezimal in latex.js, Integralrechnung).
 export function ggT(a, b) {

@@ -203,7 +203,14 @@ body {
 .modus-leiste button.modus-aktiv { color: var(--fg); border-color: var(--akzent); background: var(--karte); }
 
 .themen-filter { margin-bottom: 1rem; }
-.themen-filter-teile { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: .5rem; }
+.themen-filter-zusammenfassung {
+  display: block; width: 100%; text-align: left;
+  font: inherit; font-size: .9rem; font-weight: 600; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--rand); background: var(--bg); color: var(--gedaempft);
+  cursor: pointer; -webkit-appearance: none; min-height: 40px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.themen-filter-teile { display: flex; flex-wrap: wrap; gap: 6px; margin-top: .5rem; margin-bottom: .5rem; }
 .themen-filter-knopf {
   font: inherit; font-size: .85rem; font-weight: 600; padding: 6px 12px; border-radius: 8px;
   border: 1px solid var(--rand); background: var(--bg); color: var(--gedaempft);

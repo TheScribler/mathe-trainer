@@ -214,6 +214,23 @@ function pruefeGekuerzteBrueche(text, feld, kennzeichnung) {
   }
 }
 
+// Jeder Euro-Betrag braucht entweder 0 Nachkommastellen (glatter Betrag,
+// "68.000 €") oder genau 2 ("48.733,20 €") — nie 1 ("48.733,2 €", das hätte
+// minimaleNachkommastellen liefern können) und nie mehr als 2 (Geld wird
+// immer auf den Cent gerundet, siehe CLAUDE.md Abschnitt 6). Matcht sowohl
+// die LaTeX-Form ("48.733{,}20\ \text{€}") als auch reinen Fließtext
+// ("48.733,20 €") — iPhone-Rückmeldung.
+const GELD_BETRAG = /(\d{1,3}(?:\.\d{3})*)(?:(?:\{,\}|,)(\d+))?\s*(?:€|\\text\{€\})/g;
+function pruefeGeldFormat(text, feld, kennzeichnung) {
+  for (const treffer of text.matchAll(GELD_BETRAG)) {
+    const nachkommastellen = treffer[2] ? treffer[2].length : 0;
+    pruefe(
+      nachkommastellen === 0 || nachkommastellen === 2,
+      `${kennzeichnung}: ${feld} zeigt einen Euro-Betrag mit ${nachkommastellen} Nachkommastellen statt 0 oder 2 ("${treffer[0]}"): "${text}"`
+    );
+  }
+}
+
 function sammleAlleTextfelder(aufgabe) {
   // Für den Koeffizient-1-Scan zählen auch echte Formelfelder (im Gegensatz
   // zu sammlePlainTextFelder, das genau die NICHT prüft) — die Regel gilt
@@ -717,6 +734,7 @@ function testeGenerator(generator) {
         `${generator.id} seed=${seed}: ${feld} zeigt ein unverschmolzenes Doppelvorzeichen: "${text}"`
       );
       pruefeGekuerzteBrueche(text, feld, `${generator.id} seed=${seed}`);
+      pruefeGeldFormat(text, feld, `${generator.id} seed=${seed}`);
     }
 
     // Unabhängige Nachrechnung auf einem anderen Weg als der Generator selbst.

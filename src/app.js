@@ -642,8 +642,9 @@ function starteUebungsmodus(wurzel) {
   let filterZustand = ladeUebungFilter();
   if (!filterZustand || !Array.isArray(filterZustand.ausgeschlossen) ||
     (filterZustand.teil !== 'alle' && !TEIL_NAMEN[filterZustand.teil])) {
-    filterZustand = { teil: 'alle', ausgeschlossen: [] };
+    filterZustand = { teil: 'alle', ausgeschlossen: [], offen: false };
   }
+  if (typeof filterZustand.offen !== 'boolean') filterZustand.offen = false;
 
   const filterContainer = document.createElement('div');
   filterContainer.className = 'themen-filter';
@@ -662,8 +663,34 @@ function starteUebungsmodus(wurzel) {
     return basis.filter((g) => !filterZustand.ausgeschlossen.includes(g.id));
   }
 
+  // "X von Y Typen" für die Zusammenfassungs-Zeile: Y ist die Größe des
+  // aktuell gewählten Teils (oder aller Generatoren bei "Alle"), X davon
+  // abzüglich der einzeln abgewählten.
+  function filterZusammenfassung() {
+    const basis = filterZustand.teil === 'alle' ? GENERATOREN : (GENERATOREN_NACH_TEIL[filterZustand.teil] || []);
+    const aktiv = basis.filter((g) => !filterZustand.ausgeschlossen.includes(g.id)).length;
+    const teilName = filterZustand.teil === 'alle' ? 'Alle' : TEIL_NAMEN[filterZustand.teil];
+    return `${teilName} · ${aktiv} von ${basis.length} Typen`;
+  }
+
   function zeichneFilter() {
     filterContainer.innerHTML = '';
+
+    // Eingeklappt (Standard) nimmt der Filter nur eine Zeile ein — eine
+    // Zusammenfassung mit Pfeil, antippen klappt auf/zu (iPhone-Rückmeldung:
+    // die ausgeklappte Liste nahm sonst dauerhaft Platz über jeder Aufgabe weg).
+    const zusammenfassung = document.createElement('button');
+    zusammenfassung.type = 'button';
+    zusammenfassung.className = 'themen-filter-zusammenfassung';
+    zusammenfassung.textContent = filterZusammenfassung() + (filterZustand.offen ? ' ▴' : ' ▾');
+    zusammenfassung.addEventListener('click', () => {
+      filterZustand = { ...filterZustand, offen: !filterZustand.offen };
+      speichereUebungFilter(filterZustand);
+      zeichneFilter();
+    });
+    filterContainer.appendChild(zusammenfassung);
+
+    if (!filterZustand.offen) return;
 
     const teilReihe = document.createElement('div');
     teilReihe.className = 'themen-filter-teile';
@@ -674,7 +701,7 @@ function starteUebungsmodus(wurzel) {
       knopf.className = 'themen-filter-knopf' + (filterZustand.teil === teil ? ' aktiv' : '');
       knopf.addEventListener('click', () => {
         if (filterZustand.teil === teil) return;
-        filterZustand = { teil, ausgeschlossen: filterZustand.ausgeschlossen };
+        filterZustand = { ...filterZustand, teil };
         speichereUebungFilter(filterZustand);
         zeichneFilter();
         neueAufgabe();
@@ -699,8 +726,9 @@ function starteUebungsmodus(wurzel) {
         checkbox.addEventListener('change', () => {
           const ausgeschlossen = new Set(filterZustand.ausgeschlossen);
           if (checkbox.checked) ausgeschlossen.delete(g.id); else ausgeschlossen.add(g.id);
-          filterZustand = { teil: filterZustand.teil, ausgeschlossen: [...ausgeschlossen] };
+          filterZustand = { ...filterZustand, ausgeschlossen: [...ausgeschlossen] };
           speichereUebungFilter(filterZustand);
+          zusammenfassung.textContent = filterZusammenfassung() + (filterZustand.offen ? ' ▴' : ' ▾');
         });
         zeile.appendChild(checkbox);
         const text = document.createElement('span');

@@ -139,6 +139,36 @@ const LAYOUT_PRUEFSKRIPT = `
     }
   });
 
+  // Ein mit "Ergebnis" betitelter Schritt ist die fertige Endantwort, keine
+  // lange Herleitung — dort ist Scrollen (anders als bei "Formel"/"Einsetzen",
+  // siehe stil.css) kein akzeptabler Rückfall, die Antwort muss auf einen
+  // Blick lesbar sein (iPhone-Rückmeldung: fin.tilgungsplans Ergebnis-Tabelle
+  // schnitt die letzte Spalte "Annuität" ab). .loesung-formel selbst erlaubt
+  // überall overflow-x:auto, darum hier gezielt nur für "Ergebnis"-Schritte
+  // verschärft statt die allgemeine Ausnahme ganz zu entfernen.
+  document.querySelectorAll('#app .loesung-schritt').forEach((schritt) => {
+    const titel = schritt.querySelector('.loesung-titel');
+    if (!titel || titel.textContent !== 'Ergebnis') return;
+    const formel = schritt.querySelector('.loesung-formel');
+    if (!formel) return;
+    if (formel.scrollWidth > formel.clientWidth + 1) {
+      probleme.push('Ergebnis-Schritt überläuft (scrollWidth=' + formel.scrollWidth + ' > clientWidth=' + formel.clientWidth + ') — Endantwort muss ohne Scrollen sichtbar sein');
+    }
+  });
+
+  // Dieselbe Regel für die abschließende Ergebnis-Zusammenfassung
+  // (loesung.ergebnisse, eigene .loesung-ergebnis-wert-Box) — auch das ist
+  // eine fertige Endantwort, kein Rückfall-Scrollen akzeptabel. Toleranz +3
+  // statt +1: ein pmatrix-Ergebnis (z. B. alg.produktionsprozess/
+  // matrixprodukt) zeigt hier durchgängig ein konstantes 2px-Sub-Pixel-
+  // Rauschen beim Klammer-Rendering, kein inhaltliches Überlaufen — anders
+  // als fin.tilgungsplan, das mit 4 bis 59px tatsächlich beschnitten wurde.
+  document.querySelectorAll('#app .loesung-ergebnis-wert').forEach((el) => {
+    if (el.scrollWidth > el.clientWidth + 3) {
+      probleme.push('loesung-ergebnis-wert überläuft (scrollWidth=' + el.scrollWidth + ' > clientWidth=' + el.clientWidth + ') — Endantwort muss ohne Scrollen sichtbar sein');
+    }
+  });
+
   // Lücke zwischen dem letzten Eingabefeld-Block und der Prüfen/Lösung/
   // Neue-Aufgabe-Zeile (Übungsmodus) darf nicht größer sein als die reale
   // Höhe des −/⁄-Knopfpaars plus normaler Abstand — zuvor stapelten sich

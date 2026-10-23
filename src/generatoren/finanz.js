@@ -3,7 +3,7 @@
 // Lösung, dann die Parameter (siehe PLAN.md, Katalog "1 Finanzmathematik").
 
 import { zufallInt, zufallAus, zufallBool } from '../rng.js';
-import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
+import { runde, formatDeZahl, minimaleNachkommastellen, geldNachkommastellen } from '../zahl.js';
 import { zahlZuLatex, bruch, mehrzeiligeKette, mehrzeiligeGleichung } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
@@ -115,9 +115,9 @@ export const renteAusKapital = {
             latex: `r = ${zahlZuLatex(R0, 0)} \\cdot ${bruch(`${iLatex} \\cdot ${qLatex}^{${n}}`, `${qLatex}^{${n}} - 1`)}`,
             hinweis: `Zwischenwert: q${hochgestelltesExponent(n)} = ${formatDeZahl(qn, 6)}`,
           },
-          { titel: 'Ergebnis', latex: `r = ${zahlZuLatex(r, minimaleNachkommastellen(r))}\\ \\text{€}` },
+          { titel: 'Ergebnis', latex: `r = ${zahlZuLatex(r, geldNachkommastellen(r))}\\ \\text{€}` },
         ],
-        ergebnisse: [{ label: 'Jährliche Rente r', latex: `${zahlZuLatex(r, minimaleNachkommastellen(r))}\\ \\text{€}` }],
+        ergebnisse: [{ label: 'Jährliche Rente r', latex: `${zahlZuLatex(r, geldNachkommastellen(r))}\\ \\text{€}` }],
       },
       params,
     };
@@ -260,7 +260,7 @@ export const verdopplungszeit = {
       frage: {
         text: `Eine Kapitalanlage von ${formatDeZahl(K0, 0)} € wächst bei einem Zinssatz von ` +
           `${formatDeZahl(iProzent, iProzent % 1 === 0 ? 0 : 2)} % p.a. (Zinseszins) auf ` +
-          `${formatDeZahl(Kn, 2)} € an. Wie viele Jahre liegen dazwischen?`,
+          `${formatDeZahl(Kn, geldNachkommastellen(Kn))} € an. Wie viele Jahre liegen dazwischen?`,
       },
       eingaben: [
         { id: 'n', label: 'Laufzeit n (Jahre)', typ: 'zahl', punkte: 3, loesung: n, toleranz: KONFIG.toleranz.jahre },
@@ -440,11 +440,11 @@ export const verzinsungGrundformen = {
               latex: mehrzeiligeGleichung('K_n', [
                 `${zahlZuLatex(K0, 0)} \\cdot (1 + ${iLatex} \\cdot ${n})`,
                 `${zahlZuLatex(K0, 0)} \\cdot ${zahlZuLatex(faktor, minimaleNachkommastellen(faktor))}`,
-                `${zahlZuLatex(Kn, minimaleNachkommastellen(Kn))}\\ \\text{€}`,
+                `${zahlZuLatex(Kn, geldNachkommastellen(Kn))}\\ \\text{€}`,
               ]),
             },
           ],
-          ergebnisse: [{ label: 'Endkapital Kₙ', latex: `${zahlZuLatex(Kn, minimaleNachkommastellen(Kn))}\\ \\text{€}` }],
+          ergebnisse: [{ label: 'Endkapital Kₙ', latex: `${zahlZuLatex(Kn, geldNachkommastellen(Kn))}\\ \\text{€}` }],
         },
         params,
       };
@@ -479,11 +479,11 @@ export const verzinsungGrundformen = {
               latex: mehrzeiligeGleichung('K_n', [
                 `${zahlZuLatex(K0, 0)} \\cdot \\left(1 + ${jLatex}\\right)^{${s}}`,
                 `${zahlZuLatex(K0, 0)} \\cdot ${zahlZuLatex(faktor, minimaleNachkommastellen(faktor))}`,
-                `${zahlZuLatex(Kn, minimaleNachkommastellen(Kn))}\\ \\text{€}`,
+                `${zahlZuLatex(Kn, geldNachkommastellen(Kn))}\\ \\text{€}`,
               ]),
             },
           ],
-          ergebnisse: [{ label: 'Endkapital Kₙ', latex: `${zahlZuLatex(Kn, minimaleNachkommastellen(Kn))}\\ \\text{€}` }],
+          ergebnisse: [{ label: 'Endkapital Kₙ', latex: `${zahlZuLatex(Kn, geldNachkommastellen(Kn))}\\ \\text{€}` }],
         },
         params,
       };
@@ -513,11 +513,11 @@ export const verzinsungGrundformen = {
             latex: mehrzeiligeGleichung('K_n', [
               `${zahlZuLatex(K0, 0)} \\cdot e^{${iLatex} \\cdot ${n}}`,
               `${zahlZuLatex(K0, 0)} \\cdot ${zahlZuLatex(expFaktor, minimaleNachkommastellen(expFaktor))}`,
-              `${zahlZuLatex(Kn, minimaleNachkommastellen(Kn))}\\ \\text{€}`,
+              `${zahlZuLatex(Kn, geldNachkommastellen(Kn))}\\ \\text{€}`,
             ]),
           },
         ],
-        ergebnisse: [{ label: 'Endkapital Kₙ', latex: `${zahlZuLatex(Kn, minimaleNachkommastellen(Kn))}\\ \\text{€}` }],
+        ergebnisse: [{ label: 'Endkapital Kₙ', latex: `${zahlZuLatex(Kn, geldNachkommastellen(Kn))}\\ \\text{€}` }],
       },
       params,
     };
@@ -569,8 +569,8 @@ export const endwertRente = {
     // (iPhone-Rückmeldung: direkt vom Bruch mit q^n zum Endwert zu springen
     // ließ die Zwischenwerte fehlen).
     const letzteZeile = vorschuessig
-      ? `R_n = ${zahlZuLatex(r, 0)} \\cdot ${qLatex} \\cdot ${zahlZuLatex(faktor, minimaleNachkommastellen(faktor))} = ${zahlZuLatex(Rn, minimaleNachkommastellen(Rn))}\\ \\text{€}`
-      : `R_n = ${zahlZuLatex(r, 0)} \\cdot ${zahlZuLatex(faktor, minimaleNachkommastellen(faktor))} = ${zahlZuLatex(Rn, minimaleNachkommastellen(Rn))}\\ \\text{€}`;
+      ? `R_n = ${zahlZuLatex(r, 0)} \\cdot ${qLatex} \\cdot ${zahlZuLatex(faktor, minimaleNachkommastellen(faktor))} = ${zahlZuLatex(Rn, geldNachkommastellen(Rn))}\\ \\text{€}`
+      : `R_n = ${zahlZuLatex(r, 0)} \\cdot ${zahlZuLatex(faktor, minimaleNachkommastellen(faktor))} = ${zahlZuLatex(Rn, geldNachkommastellen(Rn))}\\ \\text{€}`;
 
     return {
       titel: vorschuessig ? 'Rentenendwert (vorschüssig)' : 'Rentenendwert (nachschüssig)',
@@ -599,7 +599,7 @@ export const endwertRente = {
             ]),
           },
         ],
-        ergebnisse: [{ label: 'Rentenendwert Rₙ', latex: `${zahlZuLatex(Rn, minimaleNachkommastellen(Rn))}\\ \\text{€}` }],
+        ergebnisse: [{ label: 'Rentenendwert Rₙ', latex: `${zahlZuLatex(Rn, geldNachkommastellen(Rn))}\\ \\text{€}` }],
       },
       params,
     };
@@ -662,12 +662,12 @@ export const ewigeRente = {
               ? mehrzeiligeGleichung('R_0', [
                 `${zahlZuLatex(r, 0)} + ${bruch(zahlZuLatex(r, 0), iLatex)}`,
                 `${zahlZuLatex(r, 0)} + ${zahlZuLatex(rDurchI, minimaleNachkommastellen(rDurchI))}`,
-                `${zahlZuLatex(R0, minimaleNachkommastellen(R0))}\\ \\text{€}`,
+                `${zahlZuLatex(R0, geldNachkommastellen(R0))}\\ \\text{€}`,
               ])
-              : `R_0 = ${bruch(zahlZuLatex(r, 0), iLatex)} = ${zahlZuLatex(R0, minimaleNachkommastellen(R0))}\\ \\text{€}`,
+              : `R_0 = ${bruch(zahlZuLatex(r, 0), iLatex)} = ${zahlZuLatex(R0, geldNachkommastellen(R0))}\\ \\text{€}`,
           },
         ],
-        ergebnisse: [{ label: 'Barwert R₀', latex: `${zahlZuLatex(R0, minimaleNachkommastellen(R0))}\\ \\text{€}` }],
+        ergebnisse: [{ label: 'Barwert R₀', latex: `${zahlZuLatex(R0, geldNachkommastellen(R0))}\\ \\text{€}` }],
       },
       params,
     };
@@ -735,13 +735,13 @@ export const tilgungsplan = {
     // Jahr zeigen, nicht nur Jahr 1"). Die Konstante (T bzw. A) wird einmal
     // vorher hergeleitet, darum in jedem Jahresblock nur noch eingesetzt.
     const jahresSchritte = zeilen.map((z) => {
-      const sStart = zahlZuLatex(z.restschuldStart, minimaleNachkommastellen(z.restschuldStart));
-      const zinsenLatex = zahlZuLatex(z.zinsen, minimaleNachkommastellen(z.zinsen));
-      const tilgungLatex = zahlZuLatex(z.tilgung, minimaleNachkommastellen(z.tilgung));
-      const sEnde = zahlZuLatex(z.restschuldEnde, minimaleNachkommastellen(z.restschuldEnde));
+      const sStart = zahlZuLatex(z.restschuldStart, geldNachkommastellen(z.restschuldStart));
+      const zinsenLatex = zahlZuLatex(z.zinsen, geldNachkommastellen(z.zinsen));
+      const tilgungLatex = zahlZuLatex(z.tilgung, geldNachkommastellen(z.tilgung));
+      const sEnde = zahlZuLatex(z.restschuldEnde, geldNachkommastellen(z.restschuldEnde));
       const dritteZeile = art === 'raten'
-        ? `A_{${z.jahr}} = ${zinsenLatex} + ${tilgungLatex} = ${zahlZuLatex(z.annuitaet, minimaleNachkommastellen(z.annuitaet))}`
-        : `T_{${z.jahr}} = ${zahlZuLatex(z.annuitaet, minimaleNachkommastellen(z.annuitaet))} - ${zinsenLatex} = ${tilgungLatex}`;
+        ? `A_{${z.jahr}} = ${zinsenLatex} + ${tilgungLatex} = ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))}`
+        : `T_{${z.jahr}} = ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))} - ${zinsenLatex} = ${tilgungLatex}`;
       return {
         titel: 'Einsetzen',
         latex: mehrzeiligeKette([
@@ -749,7 +749,7 @@ export const tilgungsplan = {
           dritteZeile,
           `S_{${z.jahr}} = ${sStart} - ${tilgungLatex} = ${sEnde}`,
         ]),
-        hinweis: `Jahr ${z.jahr} (Restschuld zu Jahresbeginn: ${formatDeZahl(z.restschuldStart, minimaleNachkommastellen(z.restschuldStart))} €).`,
+        hinweis: `Jahr ${z.jahr} (Restschuld zu Jahresbeginn: ${formatDeZahl(z.restschuldStart, geldNachkommastellen(z.restschuldStart))} €).`,
       };
     });
 
@@ -789,24 +789,34 @@ export const tilgungsplan = {
           {
             titel: 'Einsetzen',
             latex: art === 'raten'
-              ? `T = ${bruch(zahlZuLatex(K0, 0), String(n))} = ${zahlZuLatex(konstante, minimaleNachkommastellen(konstante))}`
-              : `A = ${zahlZuLatex(K0, 0)} \\cdot ${bruch(`${qLatex}^{${n}} \\cdot ${iLatex}`, `${qLatex}^{${n}} - 1`)} = ${zahlZuLatex(konstante, minimaleNachkommastellen(konstante))}`,
+              ? `T = ${bruch(zahlZuLatex(K0, 0), String(n))} = ${zahlZuLatex(konstante, geldNachkommastellen(konstante))}`
+              : `A = ${zahlZuLatex(K0, 0)} \\cdot ${bruch(`${qLatex}^{${n}} \\cdot ${iLatex}`, `${qLatex}^{${n}} - 1`)} = ${zahlZuLatex(konstante, geldNachkommastellen(konstante))}`,
             hinweis: art === 'raten'
               ? 'Die Tilgung T ist jedes Jahr gleich — einmal berechnet, in jedem Jahresblock unten nur noch eingesetzt.'
               : 'Die Annuität A ist jedes Jahr gleich — einmal berechnet, in jedem Jahresblock unten nur noch eingesetzt.',
           },
           ...jahresSchritte,
           {
+            // Statt einer 5-spaltigen Tabelle (lief bei großen Beträgen über
+            // den Bildschirmrand, letzte Spalte "Annuität" abgeschnitten —
+            // iPhone-Rückmeldung) jedes Jahr auf zwei schmaleren Zeilen:
+            // S/Z zusammen, T/A zusammen.
             titel: 'Ergebnis',
-            latex: `\\begin{array}{c|cccc} \\text{Jahr} & \\text{Restschuld} & \\text{Zinsen} & \\text{Tilgung} & \\text{Annuität} \\\\ \\hline ` +
-              zeilen.map((z) => `${z.jahr} & ${zahlZuLatex(z.restschuldEnde, minimaleNachkommastellen(z.restschuldEnde))} & ${zahlZuLatex(z.zinsen, minimaleNachkommastellen(z.zinsen))} & ${zahlZuLatex(z.tilgung, minimaleNachkommastellen(z.tilgung))} & ${zahlZuLatex(z.annuitaet, minimaleNachkommastellen(z.annuitaet))}`).join(' \\\\ ') +
-              ` \\end{array}`,
+            latex: mehrzeiligeKette(
+              zeilen.flatMap((z) => [
+                `\\text{Jahr } ${z.jahr}:\\ S=${zahlZuLatex(z.restschuldEnde, geldNachkommastellen(z.restschuldEnde))},\\ Z=${zahlZuLatex(z.zinsen, geldNachkommastellen(z.zinsen))}`,
+                `\\qquad T=${zahlZuLatex(z.tilgung, geldNachkommastellen(z.tilgung))},\\ A=${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))}`,
+              ])
+            ),
             hinweis: 'Kleine Cent-Abweichungen durch Rundung je Zeile sind laut Vorlesung zulässig (Toleranz ±0,01 € je Tabellenzelle).',
           },
         ],
         ergebnisse: zeilen.map((z) => ({
           label: `Jahr ${z.jahr}`,
-          latex: `S=${zahlZuLatex(z.restschuldEnde, minimaleNachkommastellen(z.restschuldEnde))},\\ Z=${zahlZuLatex(z.zinsen, minimaleNachkommastellen(z.zinsen))},\\ T=${zahlZuLatex(z.tilgung, minimaleNachkommastellen(z.tilgung))},\\ A=${zahlZuLatex(z.annuitaet, minimaleNachkommastellen(z.annuitaet))}`,
+          latex: mehrzeiligeKette([
+            `S=${zahlZuLatex(z.restschuldEnde, geldNachkommastellen(z.restschuldEnde))},\\ Z=${zahlZuLatex(z.zinsen, geldNachkommastellen(z.zinsen))}`,
+            `T=${zahlZuLatex(z.tilgung, geldNachkommastellen(z.tilgung))},\\ A=${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))}`,
+          ]),
         })),
       },
       params,
