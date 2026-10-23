@@ -3,7 +3,7 @@
 // jede unabhängig nachgerechnet (siehe PLAN.md, Testkonzept).
 
 import { mulberry32 } from '../src/rng.js';
-import { parseDeZahl, nahBei, ggT } from '../src/zahl.js';
+import { parseDeZahl, nahBei, ggT, minimaleNachkommastellen } from '../src/zahl.js';
 import { pruefeZahl, bewerteKoeffizientenZeile, bewerteMatrix, rundePunkteAbwaerts } from '../src/pruefung.js';
 import { GENERATOREN, GENERATOREN_NACH_TEIL } from '../src/generatoren/index.js';
 import { effektivzins } from '../src/generatoren/finanz.js';
@@ -410,9 +410,13 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     const fbWert = wertVon(aufgabe, 'b_check');
     const faVon = (x) => p.a * x * x + 1 / x;
     const fbVon = (x) => (x - p.b) * Math.sqrt(x * x - p.c);
-    pruefe(nahBei(ableitungNumerisch(faVon, p.x0a), faWert, 1e-3),
+    // 0,01 statt 1e-3: faWert/fbWert sind auf 2 Nachkommastellen gerundete
+    // Klausur-Ergebnisse (CLAUDE.md Abschnitt 6), nicht mehr der exakte Wert
+    // — die Toleranz muss die Rundung (bis 0,005) plus die eigene kleine
+    // Ungenauigkeit des Differenzenquotienten decken.
+    pruefe(nahBei(ableitungNumerisch(faVon, p.x0a), faWert, 0.01),
       `${kennzeichnung}: f'(${p.x0a}) numerisch (a) = ${ableitungNumerisch(faVon, p.x0a)}, erwartet ${faWert}`);
-    pruefe(nahBei(ableitungNumerisch(fbVon, p.x0b), fbWert, 1e-3),
+    pruefe(nahBei(ableitungNumerisch(fbVon, p.x0b), fbWert, 0.01),
       `${kennzeichnung}: f'(${p.x0b}) numerisch (b) = ${ableitungNumerisch(fbVon, p.x0b)}, erwartet ${fbWert}`);
     return;
   }
@@ -549,6 +553,26 @@ function testeGenerator(generator) {
       summeTeilpunkte === generator.punkte,
       `${generator.id} seed=${seed}: Teilpunkte summieren auf ${summeTeilpunkte}, erwartet ${generator.punkte}`
     );
+
+    // Vorlesungsregel: Klausur-Ergebnisse auf 2 Nachkommastellen, außer bei
+    // Prozentsätzen (Zinssätzen) 4 — siehe CLAUDE.md Abschnitt 6. Eine
+    // Eingabe gilt als Zinssatz-Ergebnis, wenn sie exakt die dafür
+    // vorgesehene Toleranz (KONFIG.toleranz.prozentpunkte) trägt; alle
+    // anderen (nicht-term-)Ergebniswerte dürfen höchstens 2 Nachkomma-
+    // stellen brauchen (iPhone-Rückmeldung: f'(5) zeigte "6,9402").
+    for (const eingabe of aufgabe.eingaben) {
+      if (eingabe.toleranz === KONFIG.toleranz.prozentpunkte) continue;
+      let werte = [];
+      if (eingabe.typ === 'zahl') werte = [eingabe.loesung];
+      else if (eingabe.typ === 'koeffizienten') werte = eingabe.loesung;
+      else if (eingabe.typ === 'matrix') werte = eingabe.loesung.flat();
+      for (const wert of werte) {
+        pruefe(
+          minimaleNachkommastellen(wert) <= 2,
+          `${generator.id} seed=${seed} eingabe=${eingabe.id}: Ergebnis ${wert} braucht mehr als 2 Nachkommastellen (kein Zinssatz-Ergebnis)`
+        );
+      }
+    }
 
     // Jeder Lösungsschritt hat einen gültigen Titel und nicht-leeres LaTeX.
     for (const schritt of aufgabe.loesung.schritte) {
@@ -722,24 +746,19 @@ function testeRundePunkteAbwaerts() {
         `rundePunkteAbwaerts(${richtig}/9 * ${punkte}) = ${ergebnis} ist kein Vielfaches von 0,5`);
     }
   }
-  // Die Abrundung gilt je AUFGABE (Summe über alle ihre Felder), nicht je
-  // einzelnes Feld — sonst könnte eine Aufgabe mit mehreren koeffizienten-/
-  // matrix-Feldern Punkte verschenken, die als Summe schon einen weiteren
-  // halben Punkt ergeben (iPhone-Rückmeldung, verifiziert live in der
-  // Probeklausur-Auswertung an alg.matrixprodukt mit zwei Matrix-Feldern:
-  // a) 1 von 3 Zellen bei 2 Punkten, b) 2 von 9 Zellen bei 2 Punkten — je
-  // Feld gerundet ergäbe 0,5 + 0 = 0,5 P, als Aufgabensumme gerundet ergibt
-  // es korrekt 1 P).
+  // Die Abrundung gilt je EINGABE (Teilaufgabe a), b), …), nicht einmal über
+  // die ganze Aufgabe summiert — die Klausur vergibt Punkte je Teilaufgabe,
+  // jede steht mit ihrer eigenen Punktzahl auf dem Blatt (iPhone-Rückmeldung,
+  // Korrektur einer vorherigen Fassung: alg.matrixprodukt mit a) 1 von 3
+  // Zellen und b) 2 von 9 Zellen bei je 2 Punkten muss 0,5 P + 0 P = 0,5 P
+  // ergeben, NICHT 1 P aus der vorher aufsummierten Rohpunktzahl).
   const rohA = (1 / 3) * 2;
   const rohB = (2 / 9) * 2;
-  const jeFeldGerundetSumme = rundePunkteAbwaerts(rohA) + rundePunkteAbwaerts(rohB);
-  const aufgabenSummeGerundet = rundePunkteAbwaerts(rohA + rohB);
-  pruefe(jeFeldGerundetSumme === 0.5, `Kontrollrechnung je-Feld-Rundung: erwartet 0,5, war ${jeFeldGerundetSumme}`);
-  pruefe(aufgabenSummeGerundet === 1, `Aufgaben-Summen-Rundung (a=1/3 bei 2P, b=2/9 bei 2P): erwartet 1 P, war ${aufgabenSummeGerundet}`);
-  pruefe(aufgabenSummeGerundet !== jeFeldGerundetSumme,
-    'Aufgaben-Summen-Rundung muss sich von Je-Feld-Rundung unterscheiden können (sonst testet dieser Fall nichts)');
+  const jeTeilaufgabeGerundetSumme = rundePunkteAbwaerts(rohA) + rundePunkteAbwaerts(rohB);
+  pruefe(jeTeilaufgabeGerundetSumme === 0.5,
+    `Je-Teilaufgabe-Rundung (a=1/3 bei 2P, b=2/9 bei 2P): erwartet 0,5 P, war ${jeTeilaufgabeGerundetSumme}`);
 
-  console.log('Punkte-Abrundung: 5 Fälle + Rasterprobe + Aufgaben-Summen-Kontrolle geprüft');
+  console.log('Punkte-Abrundung: 5 Fälle + Rasterprobe + Je-Teilaufgabe-Kontrolle geprüft');
 }
 
 // ---------------------------------------------------------------------------

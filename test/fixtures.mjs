@@ -127,7 +127,10 @@ export function testeFixtures() {
     const a = ableitungen.baue({ a: -3, x0a: 2, b: 1, c: 1, x0b: 3 });
     const werte = Object.fromEntries(a.eingaben.map((e) => [e.id, e.loesung]));
     pruefe(nahBei(werte.a_check, -12.25, 1e-9), `MK6a: f'(2)=${werte.a_check}, erwartet -12,25`);
-    pruefe(nahBei(werte.b_check, Math.sqrt(8) + 2 * 3 / Math.sqrt(8), 1e-4), `MK6b: f'(3)=${werte.b_check}, erwartet ≈4,9497`);
+    // 0,01 statt einer engen Toleranz: f'(3) wird wie jedes Klausur-Ergebnis
+    // auf 2 Nachkommastellen gerundet (CLAUDE.md Abschnitt 6), der exakte
+    // Wert 4,9497 ist also nicht mehr das, was baue() liefert (4,95).
+    pruefe(nahBei(werte.b_check, Math.sqrt(8) + 2 * 3 / Math.sqrt(8), 0.01), `MK6b: f'(3)=${werte.b_check}, erwartet ≈4,95`);
     const faStrich = a.loesung.ergebnisse.find((e) => e.label === "a) f'(x)");
     pruefe(faStrich.latex.includes('6x') && faStrich.latex.includes('x^2'), `MK6a: f'(x)-Term "${faStrich.latex}" unerwartet`);
     faelle.push('MK6');
@@ -205,7 +208,10 @@ export function testeFixtures() {
     const w19c = a19c.eingaben[0].loesung;
     // loesung ist auf 4 Nachkommastellen gerundet (siehe baue()), daher eine
     // gröbere Toleranz als bei den anderen (ganzzahligen) Übung-19-Fällen.
-    pruefe(nahBei(w19c, 25 + 1 / 9, 1e-3), `Übung 19c: ${w19c}, erwartet 25 1/9`);
+    // 0,01 statt einer engen Toleranz: das Ergebnis wird wie jedes Klausur-
+    // Ergebnis auf 2 Nachkommastellen gerundet (CLAUDE.md Abschnitt 6, 25
+    // 1/9 = 25,1111… wird zu 25,11), nicht mehr der exakte Bruchwert.
+    pruefe(nahBei(w19c, 25 + 1 / 9, 0.01), `Übung 19c: ${w19c}, erwartet ≈25 1/9 (25,11)`);
 
     const a19d = integralBestimmt.baue({
       termeF: [{ zaehler: 16, nenner: 1, exponent: -4 }, { zaehler: 8, nenner: 1, exponent: -2 }], a: 1, b: 2,

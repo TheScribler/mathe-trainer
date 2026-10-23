@@ -259,7 +259,9 @@ function baueEingabenFelder(aufgabe, { onAenderung } = {}) {
     const zeile = document.createElement('label');
     zeile.className = 'eingabe-zeile';
     const beschriftung = document.createElement('span');
-    beschriftung.textContent = eingabe.label + ': ';
+    // Kein Doppelpunkt nach einem Fragezeichen ("Ist das Produkt
+    // definiert?" statt "...definiert?:", iPhone-Rückmeldung).
+    beschriftung.textContent = eingabe.label + (eingabe.label.trim().endsWith('?') ? ' ' : ': ');
     zeile.appendChild(beschriftung);
 
     if (eingabe.typ === 'koeffizienten') {
@@ -472,13 +474,16 @@ function setzeAntworten(aufgabe, felder, werte) {
 // Probeklausur-Auswertung (Punkte je Teilaufgabe, Summe). Bei koeffizienten/
 // matrix gibt es Teilpunkte proportional zu den richtigen Boxen/Zellen.
 //
-// Die Rundung auf halbe Punkte (rundePunkteAbwaerts) wird NUR EINMAL auf die
-// Summe der ganzen Aufgabe angewendet, nicht je Eingabe — eine Klausur-
-// aufgabe hat EINE Punktzahl, nicht je Teilfeld eine eigene gerundete Zahl.
-// Pro-Feld-Rundung vor der Summe könnte sonst Punkte verschenken, die bei
-// der Aufgabe als Ganzes zusammen schon einen weiteren halben Punkt ergeben
-// (z. B. zwei koeffizienten/matrix-Felder mit je 0,3 Rohpunkten: einzeln
-// gerundet macht das 0+0=0, als Summe zuerst 0,6 gerundet auf 0,5).
+// Die Rundung auf halbe Punkte (rundePunkteAbwaerts) gilt je EINGABE (also
+// je Teilaufgabe a), b), …) — so vergibt die Klausur auch wirklich Punkte:
+// jede Teilaufgabe steht mit ihrer eigenen Punktzahl auf dem Blatt und wird
+// einzeln bewertet, nicht erst am Ende über die ganze Aufgabe hinweg
+// zusammengerechnet und dann gemeinsam gerundet (iPhone-Rückmeldung:
+// matrixprodukt mit a) 1/3 und b) 2/9 richtig muss 0,5 P + 0 P = 0,5 P
+// ergeben, nicht — wie eine vorherige Fassung das tat — 1 P aus der Summe
+// vor dem Runden). Eine Aufgabe ohne mehrere Teilaufgaben-Felder (nur ein
+// koeffizienten-/matrix-Feld) ist davon nicht betroffen: dort IST die
+// Rundung je Feld ohnehin dasselbe wie die Rundung über die ganze Aufgabe.
 function bewerteAlleEingaben(aufgabe, felder) {
   let gesamt = 0;
   let richtig = 0;
@@ -510,7 +515,7 @@ function bewerteAlleEingaben(aufgabe, felder) {
         feldOderFelder[i].classList.add(box.korrekt ? 'gut' : 'schlecht');
         if (box.korrekt) { richtig += 1; teilRichtig += 1; }
       });
-      const punkteEingabe = (teilRichtig / feldOderFelder.length) * eingabe.punkte;
+      const punkteEingabe = rundePunkteAbwaerts((teilRichtig / feldOderFelder.length) * eingabe.punkte);
       erreichtePunkte += punkteEingabe;
       proEingabe.push({ id: eingabe.id, typ: eingabe.typ, punkte: eingabe.punkte, erreichtePunkte: punkteEingabe, leer: false });
     } else if (eingabe.typ === 'matrix') {
@@ -531,7 +536,7 @@ function bewerteAlleEingaben(aufgabe, felder) {
         if (zelle.korrekt) { richtig += 1; teilRichtig += 1; }
       }));
       const beantwortet = anzahl - bewertung.leer;
-      const punkteEingabe = beantwortet > 0 ? (teilRichtig / anzahl) * eingabe.punkte : 0;
+      const punkteEingabe = beantwortet > 0 ? rundePunkteAbwaerts((teilRichtig / anzahl) * eingabe.punkte) : 0;
       erreichtePunkte += punkteEingabe;
       proEingabe.push({ id: eingabe.id, typ: eingabe.typ, punkte: eingabe.punkte, erreichtePunkte: punkteEingabe, leer: beantwortet === 0 });
     } else if (eingabe.typ === 'auswahl') {
@@ -566,7 +571,7 @@ function bewerteAlleEingaben(aufgabe, felder) {
   }
 
   const falsch = gesamt - richtig - leer;
-  return { gesamt, richtig, leer, falsch, erreichtePunkte: rundePunkteAbwaerts(erreichtePunkte), maxPunkteAutomatisch, proEingabe };
+  return { gesamt, richtig, leer, falsch, erreichtePunkte, maxPunkteAutomatisch, proEingabe };
 }
 
 // ---------------------------------------------------------------------------

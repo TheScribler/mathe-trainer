@@ -5,7 +5,7 @@
 
 import { zufallInt, zufallAus } from '../rng.js';
 import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
-import { zahlZuLatex, bruch, bruchGekuerzt, polynomLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette } from '../latex.js';
+import { zahlZuLatex, bruch, bruchGekuerzt, polynomLatex, polynomEingesetztLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // Term mit Vorzeichen, Koeffizient 1/-1 wird nicht ausgeschrieben (gleiche
@@ -111,7 +111,11 @@ function punktPaarLatex(x, y) {
 function bauePolynomAusdruck(paare, formatFn, minus) {
   const nichtNull = paare.filter(([k]) => k !== 0);
   if (nichtNull.length === 0) return formatFn(0, 0);
-  const erster = termMitVorzeichen(nichtNull[0][0], nichtNull[0][1], formatFn, minus).replace(/^\+ /, '');
+  let erster = termMitVorzeichen(nichtNull[0][0], nichtNull[0][1], formatFn, minus).replace(/^\+ /, '');
+  // Ein führendes Minus ist ein unäres Vorzeichen ("−3x²"), kein Operator
+  // zwischen zwei Termen — ohne diese Korrektur blieb hier das Leerzeichen
+  // von termMitVorzeichen stehen ("− 3x²", iPhone-Rückmeldung).
+  if (erster.startsWith(minus + ' ')) erster = minus + erster.slice(minus.length + 1);
   const rest = nichtNull.slice(1).map(([k, einheit]) => termMitVorzeichen(k, einheit, formatFn, minus));
   return [erster, ...rest].join(' ');
 }
@@ -699,7 +703,8 @@ export const ableitungen = {
     const faLatex = `${bauePolynomAusdruck([[a, 'x^2']], zahlZuLatex, '-')} + \\dfrac{1}{x}`;
     const faProse = `${bauePolynomAusdruck([[a, 'x²']], formatDeZahl, '−')} + 1/x`;
     const faStrich = `${bauePolynomAusdruck([[2 * a, 'x']], zahlZuLatex, '-')} - \\dfrac{1}{x^2}`;
-    const faStrichWert = runde(2 * a * x0a - 1 / (x0a * x0a), 4);
+    const faStrichWert = runde(2 * a * x0a - 1 / (x0a * x0a), 2);
+    const faAusgewertet = polynomEingesetztLatex([2 * a, -1], [1, -2], x0a);
 
     // b) f(x) = (x - b)√(x² - c)  =>  f'(x) = √(x²-c) + (x-b)x/√(x²-c)  (MK6b: b=1,c=1)
     const vorzeichenLatex = (k) => (k < 0 ? '+' : '-');
@@ -708,7 +713,16 @@ export const ableitungen = {
     const fbProse = `(x ${vorzeichenProse(b)} ${formatDeZahl(Math.abs(b), 0)})√(x² ${vorzeichenProse(c)} ${formatDeZahl(Math.abs(c), 0)})`;
     const fbStrich = `\\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}} + \\dfrac{(x ${vorzeichenLatex(b)} ${zahlZuLatex(Math.abs(b), 0)})x}{\\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}}`;
     const wurzelB = Math.sqrt(x0b * x0b - c);
-    const fbStrichWert = runde(wurzelB + ((x0b - b) * x0b) / wurzelB, 4);
+    const fbStrichWert = runde(wurzelB + ((x0b - b) * x0b) / wurzelB, 2);
+    // Für die Einsetzen-Zeile x0b klammern, falls negativ — sonst würde x0b²
+    // bei negativem x0b als z. B. "-3^2" erscheinen (mathematisch -9, nicht
+    // (-3)²=9) statt korrekt "(-3)^2" (gleiches Muster wie polynomEingesetztLatex).
+    const x0bKlar = x0b < 0 ? `(${zahlZuLatex(x0b, 0)})` : zahlZuLatex(x0b, 0);
+    const nWert = x0b * x0b - c; // immer positiv, siehe Parameterherleitung oben
+    const mWert = (x0b - b) * x0b; // immer positiv, siehe Parameterherleitung oben
+    const fbEingesetzt = `\\sqrt{${x0bKlar}^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}} + ` +
+      `\\dfrac{(${x0bKlar} ${vorzeichenLatex(b)} ${zahlZuLatex(Math.abs(b), 0)})${x0bKlar}}{\\sqrt{${x0bKlar}^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}}`;
+    const fbVereinfacht = `\\sqrt{${zahlZuLatex(nWert, 0)}} + \\dfrac{${zahlZuLatex(mWert, 0)}}{\\sqrt{${zahlZuLatex(nWert, 0)}}}`;
 
     return {
       frage: {
@@ -728,7 +742,14 @@ export const ableitungen = {
             hinweis: 'Umschreiben: 1/x = x⁻¹, dann Potenzregel (xⁿ)\' = n·xⁿ⁻¹ auf jeden Summanden anwenden.',
           },
           { titel: 'Ergebnis', latex: `f'(x) = ${faStrich}` },
-          { titel: 'Einsetzen', latex: `f'(${zahlZuLatex(x0a, 0)}) = ${zahlZuLatex(faStrichWert, minimaleNachkommastellen(faStrichWert))}` },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeGleichung(`f'(${zahlZuLatex(x0a, 0)})`, [
+              faAusgewertet.eingesetzt,
+              faAusgewertet.werte,
+              zahlZuLatex(faStrichWert, minimaleNachkommastellen(faStrichWert)),
+            ]),
+          },
           {
             titel: 'Formel',
             latex: `f(x) = ${fbLatex}`,
@@ -738,12 +759,19 @@ export const ableitungen = {
             titel: 'Einsetzen',
             latex: mehrzeiligeKette([
               `u = x ${vorzeichenLatex(b)} ${zahlZuLatex(Math.abs(b), 0)}, \\quad u' = 1`,
-              `v = \\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}, \\quad v' = \\dfrac{x}{\\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}}`,
+              `v = \\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}`,
+              `v' = \\dfrac{1}{2\\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}} \\cdot 2x = \\dfrac{x}{\\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}}`,
             ]),
-            hinweis: 'v\' über die Kettenregel: Ableitung der inneren Funktion (x² ± c)\' = 2x, geteilt durch 2·äußere Funktion.',
+            hinweis: 'v\' über die Kettenregel: äußere Ableitung (√u)\' = 1/(2√u) mal innere Ableitung (x² ± c)\' = 2x.',
           },
           { titel: 'Ergebnis', latex: `f'(x) = u'v + uv' = ${fbStrich}` },
-          { titel: 'Einsetzen', latex: `f'(${zahlZuLatex(x0b, 0)}) = ${zahlZuLatex(fbStrichWert, minimaleNachkommastellen(fbStrichWert))}` },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette([
+              `f'(${x0bKlar}) &= ${fbEingesetzt}`,
+              `&= ${fbVereinfacht} \\approx ${zahlZuLatex(fbStrichWert, minimaleNachkommastellen(fbStrichWert))}`,
+            ]),
+          },
         ],
         ergebnisse: [
           { label: 'a) f\'(x)', latex: faStrich },

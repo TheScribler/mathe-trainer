@@ -5,7 +5,7 @@
 // die saubere Lösung, dann die Parameter.
 
 import { zufallInt, zufallAus, zufallBool } from '../rng.js';
-import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
+import { runde, formatDeZahl, minimaleNachkommastellen, nahBei } from '../zahl.js';
 import { zahlZuLatex, bruch, bruchGekuerzt, bruchMitDezimal, polynomLatex, polynomEingesetztLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette, auswertungsklammer, istAbbrechenderDezimalbruch } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
@@ -43,7 +43,11 @@ function termProse(koeff, exponent) {
 function polynomProse(koeffizienten, exponenten) {
   const paare = koeffizienten.map((k, i) => [k, exponenten[i]]).filter(([k]) => k !== 0);
   if (paare.length === 0) return '0';
-  const erster = termProse(paare[0][0], paare[0][1]).replace(/^\+ /, '');
+  let erster = termProse(paare[0][0], paare[0][1]).replace(/^\+ /, '');
+  // Ein führendes Minus ist ein unäres Vorzeichen ("−3x²"), kein Operator
+  // zwischen zwei Termen — ohne diese Korrektur blieb hier das Leerzeichen
+  // von termProse stehen ("− 3x²", iPhone-Rückmeldung).
+  if (erster.startsWith('− ')) erster = '−' + erster.slice(2);
   const rest = paare.slice(1).map(([k, e]) => termProse(k, e));
   return [erster, ...rest].join(' ');
 }
@@ -465,13 +469,17 @@ export const integralBestimmt = {
     const Fa = wertAlsBruch(termeFSortiert, a);
     const Fb = wertAlsBruch(termeFSortiert, b);
     const delta = bruchGekuerzt(Fb.zaehler * Fa.nenner - Fa.zaehler * Fb.nenner, Fb.nenner * Fa.nenner);
-    const deltaDezimal = delta.zaehler / delta.nenner; // exakter Wert — die Toleranz deckt die Rundung beim Vergleich ab
-    // Ein Ergebnis, das als Dezimalzahl abbricht (z. B. 91/4 = 22,75), ist
-    // exakt — keine echte Rundung, also auch keine großzügige Toleranz dafür
-    // (sonst würde z. B. "1,24" bei einem exakten Ergebnis von 1,25 fälschlich
-    // akzeptiert). Nur ein wirklich nicht abbrechender Bruch (z. B. 25 1/9)
-    // braucht die lockerere Rundungstoleranz.
-    const deltaToleranz = istAbbrechenderDezimalbruch(delta.nenner) ? KONFIG.toleranz.exakt : KONFIG.toleranz.bruch;
+    const deltaExaktWert = delta.zaehler / delta.nenner;
+    // Klausur-Ergebnisse werden auf 2 Nachkommastellen angegeben (CLAUDE.md
+    // Abschnitt 6) — auch ein an sich abbrechender Bruch wie 1/8 = 0,125
+    // braucht dafür schon 3 Stellen und muss also gerundet werden (iPhone-
+    // Rückmeldung: das ungerundete deltaDezimal zeigte teils mehr als 2
+    // Nachkommastellen). Exakte Toleranz gilt nur, wenn die Rundung auf 2
+    // Stellen NICHTS verändert (der Wert braucht also höchstens 2 Stellen) —
+    // sonst die lockerere Bruchtoleranz, die auch eine präzisere Eingabe wie
+    // "0,125" gegen das gerundete "0,13" noch akzeptiert.
+    const deltaDezimal = runde(deltaExaktWert, 2);
+    const deltaToleranz = nahBei(deltaExaktWert, deltaDezimal, 1e-9) ? KONFIG.toleranz.exakt : KONFIG.toleranz.bruch;
 
     const FbAusgewertet = bruchPolynomEingesetztLatex(termeFSortiert, b);
     const FaAusgewertet = bruchPolynomEingesetztLatex(termeFSortiert, a);
