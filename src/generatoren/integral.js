@@ -6,7 +6,7 @@
 
 import { zufallInt, zufallAus, zufallBool } from '../rng.js';
 import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
-import { zahlZuLatex, bruch, bruchGekuerzt, bruchMitDezimal, polynomLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette, auswertungsklammer, istAbbrechenderDezimalbruch } from '../latex.js';
+import { zahlZuLatex, bruch, bruchGekuerzt, bruchMitDezimal, polynomLatex, polynomEingesetztLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette, auswertungsklammer, istAbbrechenderDezimalbruch } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // ---------------------------------------------------------------------------
@@ -128,6 +128,42 @@ function bruchOderZahl({ zaehler, nenner }) {
   if (nenner === 1) return zahlZuLatex(zaehler, 0);
   const negativ = zaehler < 0;
   return `${negativ ? '-' : ''}${bruch(Math.abs(zaehler), nenner)}`;
+}
+
+// Klammert bruchOderZahl(wert) nur ein, wenn der Wert negativ ist (sonst
+// entstünde "- -4" bzw. optisch eine unnötige Klammer um eine einzelne
+// positive Zahl wie "(4)" — iPhone-Rückmeldung).
+function bruchOderZahlGeklammert(wert) {
+  const text = bruchOderZahl(wert);
+  return wert.zaehler < 0 ? `(${text})` : text;
+}
+
+// Wertet eine Bruch-Polynom-Termliste an einer ganzzahligen Stelle x aus und
+// zeigt dabei jeden Schritt: erst die Formel mit x eingesetzt ("3 \cdot 2^2 +
+// 2^{-3}"), dann die einzeln berechneten (exakt gekürzten) Werte der
+// Summanden ("12 + \dfrac{1}{8}") — Grundlage für "F(2)" und "F(1)" explizit
+// zu zeigen statt direkt zur Differenz zu springen (iPhone-Rückmeldung).
+function bruchPolynomEingesetztLatex(terme, x) {
+  // Geklammert, falls x negativ ist — sonst würde x² bei x=-1 als "-1^{2}"
+  // erscheinen (mathematisch -1, nicht (-1)²=1) statt korrekt "(-1)^{2}".
+  const xLatex = x < 0 ? `(${zahlZuLatex(x, 0)})` : zahlZuLatex(x, 0);
+  let eingesetzt = '';
+  let werte = '';
+  for (const { zaehler, nenner, exponent } of terme) {
+    if (zaehler === 0) continue;
+    const basis = exponent === 0 ? null : exponent === 1 ? xLatex : `${xLatex}^{${exponent}}`;
+    const koeffAbs = bruchGekuerzt(Math.abs(zaehler), nenner);
+    const koeffText = (koeffAbs.zaehler === 1 && koeffAbs.nenner === 1 && basis) ? '' : bruchOderZahl(koeffAbs);
+    const term = koeffText === '' ? basis : (basis ? `${koeffText} \\cdot ${basis}` : koeffText);
+    eingesetzt = eingesetzt === '' ? (zaehler < 0 ? '-' : '') + term : eingesetzt + (zaehler < 0 ? ' - ' : ' + ') + term;
+
+    const termWert = exponent >= 0
+      ? bruchGekuerzt(zaehler * Math.pow(x, exponent), nenner)
+      : bruchGekuerzt(zaehler, nenner * Math.pow(x, -exponent));
+    const wertText = bruchOderZahl({ zaehler: Math.abs(termWert.zaehler), nenner: termWert.nenner });
+    werte = werte === '' ? (termWert.zaehler < 0 ? '-' : '') + wertText : werte + (termWert.zaehler < 0 ? ' - ' : ' + ') + wertText;
+  }
+  return { eingesetzt: eingesetzt || '0', werte: werte || '0' };
 }
 
 // Eine Division "zaehler/nenner" anzeigen, als gekürzten Bruch, wenn beide
@@ -396,12 +432,12 @@ export const integralBestimmt = {
               titel: 'Einsetzen',
               latex: gleichungsKette([
                 `${lnB} - \\left(${lnA}\\right)`,
-                `\\approx ${zahlZuLatex(deltaDezimal, 2)}`,
+                `\\approx ${zahlZuLatex(deltaDezimal, minimaleNachkommastellen(deltaDezimal))}`,
               ]),
               hinweis: `ln(${b}) und ln(${a}) sind hier keine glatten Zahlen — das Ergebnis ist eine echte Dezimalnäherung, kein Bruch.`,
             },
           ],
-          ergebnisse: [{ label: 'Wert des Integrals', latex: `\\approx ${zahlZuLatex(deltaDezimal, 2)}` }],
+          ergebnisse: [{ label: 'Wert des Integrals', latex: `\\approx ${zahlZuLatex(deltaDezimal, minimaleNachkommastellen(deltaDezimal))}` }],
         },
         params,
       };
@@ -437,6 +473,14 @@ export const integralBestimmt = {
     // braucht die lockerere Rundungstoleranz.
     const deltaToleranz = istAbbrechenderDezimalbruch(delta.nenner) ? KONFIG.toleranz.exakt : KONFIG.toleranz.bruch;
 
+    const FbAusgewertet = bruchPolynomEingesetztLatex(termeFSortiert, b);
+    const FaAusgewertet = bruchPolynomEingesetztLatex(termeFSortiert, a);
+    // Bei nur einem Term ist "einzeln berechneter Wert" bereits die Summe
+    // selbst — eine eigene Zeile dafür wäre eine reine Wiederholung der
+    // nächsten Zeile (gleiche Begründung wie beim "y = -x = -x"-Fund:
+    // dieselbe Zahl darf nicht zweimal als "eigener Schritt" erscheinen).
+    const mehrereTerme = termeFSortiert.filter((t) => t.zaehler !== 0).length > 1;
+
     return {
       frage: { text: `Berechnen Sie das bestimmte Integral von f(x) = ${fProse} in den Grenzen ${a} bis ${b}.` },
       eingaben: [
@@ -452,9 +496,20 @@ export const integralBestimmt = {
           },
           {
             titel: 'Einsetzen',
-            latex: gleichungsKette([
-              `F(${b}) - F(${a})`,
-              `${bruchOderZahl(Fb)} - \\left(${bruchOderZahl(Fa)}\\right)`,
+            latex: mehrzeiligeGleichung(`F(${zahlZuLatex(b, 0)})`, mehrereTerme
+              ? [FbAusgewertet.eingesetzt, FbAusgewertet.werte, bruchOderZahl(Fb)]
+              : [FbAusgewertet.eingesetzt, bruchOderZahl(Fb)]),
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeGleichung(`F(${zahlZuLatex(a, 0)})`, mehrereTerme
+              ? [FaAusgewertet.eingesetzt, FaAusgewertet.werte, bruchOderZahl(Fa)]
+              : [FaAusgewertet.eingesetzt, bruchOderZahl(Fa)]),
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeGleichung(`F(${b}) - F(${a})`, [
+              `${bruchOderZahl(Fb)} - ${bruchOderZahlGeklammert(Fa)}`,
               bruchMitDezimal(delta.zaehler, delta.nenner),
             ]),
           },
@@ -545,8 +600,9 @@ export const integralKonsumentenrente = {
             latex: mehrzeiligeGleichung('KR', [
               `\\int_0^{${zahlZuLatex(x0, 0)}} (${polynomLatex([-b, a], [1, 0])})\\,dx - ${zahlZuLatex(x0, 0)} \\cdot ${zahlZuLatex(p0, minimaleNachkommastellen(p0))}`,
               `${auswertungsklammer(polynomLatex([-halbKR, a], [2, 1]), 0, zahlZuLatex(x0, 0))} - ${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))}`,
+              `F(${zahlZuLatex(x0, 0)}) - F(0) - ${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))}`,
               `${zahlZuLatex(FKRx0, minimaleNachkommastellen(FKRx0))} - ${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))}`,
-              zahlZuLatex(KR, 2),
+              zahlZuLatex(KR, minimaleNachkommastellen(KR)),
             ]),
           },
           {
@@ -554,15 +610,16 @@ export const integralKonsumentenrente = {
             latex: mehrzeiligeGleichung('PR', [
               `${zahlZuLatex(x0, 0)} \\cdot ${zahlZuLatex(p0, minimaleNachkommastellen(p0))} - \\int_0^{${zahlZuLatex(x0, 0)}} ${cdotWennNicht1(c, 'x')}\\,dx`,
               `${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))} - ${auswertungsklammer(polynomLatex([halbPR], [2]), 0, zahlZuLatex(x0, 0))}`,
+              `${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))} - (F(${zahlZuLatex(x0, 0)}) - F(0))`,
               `${zahlZuLatex(x0p0, minimaleNachkommastellen(x0p0))} - ${zahlZuLatex(FPRx0, minimaleNachkommastellen(FPRx0))}`,
-              zahlZuLatex(PR, 2),
+              zahlZuLatex(PR, minimaleNachkommastellen(PR)),
             ]),
           },
         ],
         ergebnisse: [
           { label: 'Gleichgewicht', latex: `x_0=${zahlZuLatex(x0, 0)},\\ p_0=${zahlZuLatex(p0, minimaleNachkommastellen(p0))}` },
-          { label: 'Konsumentenrente KR', latex: zahlZuLatex(KR, 2) },
-          { label: 'Produzentenrente PR', latex: zahlZuLatex(PR, 2) },
+          { label: 'Konsumentenrente KR', latex: zahlZuLatex(KR, minimaleNachkommastellen(KR)) },
+          { label: 'Produzentenrente PR', latex: zahlZuLatex(PR, minimaleNachkommastellen(PR)) },
         ],
       },
       params,
@@ -608,6 +665,7 @@ export const integralKostenAusGrenzkosten = {
     const { m, n, Kf, x0 } = params;
     const mHalb = m / 2;
     const Kx0 = runde(mHalb * x0 * x0 + n * x0 + Kf, 2);
+    const kx0Ausgewertet = polynomEingesetztLatex([mHalb, n, Kf], [2, 1, 0], x0);
 
     return {
       frage: {
@@ -643,12 +701,17 @@ export const integralKostenAusGrenzkosten = {
           },
           {
             titel: 'Einsetzen',
-            latex: `K(${zahlZuLatex(x0, 0)}) = ${polynomLatex([mHalb, n, Kf], [2, 1, 0])}\\Big|_{x=${zahlZuLatex(x0, 0)}} = ${zahlZuLatex(Kx0, 2)}`,
+            latex: mehrzeiligeGleichung(`K(${zahlZuLatex(x0, 0)})`, [
+              polynomLatex([mHalb, n, Kf], [2, 1, 0]),
+              kx0Ausgewertet.eingesetzt,
+              kx0Ausgewertet.werte,
+              zahlZuLatex(Kx0, minimaleNachkommastellen(Kx0)),
+            ]),
           },
         ],
         ergebnisse: [
           { label: 'Kostenfunktion', latex: `K(x) = ${polynomLatex([mHalb, n, Kf], [2, 1, 0])}` },
-          { label: `K(${x0})`, latex: zahlZuLatex(Kx0, 2) },
+          { label: `K(${x0})`, latex: zahlZuLatex(Kx0, minimaleNachkommastellen(Kx0)) },
         ],
       },
       params,

@@ -119,7 +119,15 @@ drei Funktionen auf, statt die Rundung neu zu erfinden. Die Anzahl Nachkommastel
 (aktuell 4) steht zentral in `KONFIG.nachkommastellen.zinssatzDezimal`.
 
 Alle anderen Ergebnisse (Geldbeträge, Jahre, Mengen, Koeffizienten) bleiben bei den
-oben genannten 2 Dezimalen.
+oben genannten 2 Dezimalen — das ist eine Rundungs-**Genauigkeit** (der Wert wird vor
+der Anzeige auf `runde(x, 2)` gebracht), keine erzwungene Anzeige-Nachkommastellenzahl.
+Angezeigt wird danach mit `zahlZuLatex(x, minimaleNachkommastellen(x))`, nicht mit
+`zahlZuLatex(x, 2)`: ein glattes Ergebnis wie 670 oder 8 Jahre erscheint so ohne
+überflüssiges ",00" (iPhone-Rückmeldung 2026-10-23 — K(10) zeigte "670,00" während
+andere Ergebnisse ganzzahlig erschienen; `, 2)` fest zu verdrahten verlor dabei keine
+Genauigkeit, da der Wert ja schon gerundet war, sah aber inkonsistent aus). Einzige
+Ausnahme bleibt die Zinssatz-Regel oben: dort wird fest auf 4 Stellen angezeigt, auch
+wenn weniger reichen würden, weil die Vorlesung genau das vorschreibt.
 
 ## 7 Testpflichten
 

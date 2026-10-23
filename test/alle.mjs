@@ -4,7 +4,7 @@
 
 import { mulberry32 } from '../src/rng.js';
 import { parseDeZahl, nahBei, ggT } from '../src/zahl.js';
-import { pruefeZahl, bewerteKoeffizientenZeile, bewerteMatrix } from '../src/pruefung.js';
+import { pruefeZahl, bewerteKoeffizientenZeile, bewerteMatrix, rundePunkteAbwaerts } from '../src/pruefung.js';
 import { GENERATOREN, GENERATOREN_NACH_TEIL } from '../src/generatoren/index.js';
 import { effektivzins } from '../src/generatoren/finanz.js';
 import { komponiereKlausur } from '../src/komposer.js';
@@ -702,6 +702,30 @@ function testeBewerteMatrix() {
 }
 
 // ---------------------------------------------------------------------------
+// Teilpunkte werden auf das nächste halbe Raster ABgerundet, nie aufgerundet
+// und nie als krummer Dezimalbruch gezeigt (iPhone-Rückmeldung: 1 von 9
+// Matrixeinträgen bei 2 Punkten ergab vorher 0,22 Punkte statt 0; 5 von 9
+// ergab 1,11 statt 1).
+// ---------------------------------------------------------------------------
+function testeRundePunkteAbwaerts() {
+  pruefe(rundePunkteAbwaerts((1 / 9) * 2) === 0, `1 von 9 Boxen bei 2 Punkten: erwartet 0 P, war ${rundePunkteAbwaerts((1 / 9) * 2)}`);
+  pruefe(rundePunkteAbwaerts((5 / 9) * 2) === 1, `5 von 9 Boxen bei 2 Punkten: erwartet 1 P, war ${rundePunkteAbwaerts((5 / 9) * 2)}`);
+  pruefe(rundePunkteAbwaerts((9 / 9) * 2) === 2, `9 von 9 Boxen bei 2 Punkten: erwartet 2 P, war ${rundePunkteAbwaerts((9 / 9) * 2)}`);
+  pruefe(rundePunkteAbwaerts((1 / 2) * 3) === 1.5, `1 von 2 Boxen bei 3 Punkten: erwartet 1,5 P, war ${rundePunkteAbwaerts((1 / 2) * 3)}`);
+  pruefe(rundePunkteAbwaerts((2 / 3) * 3) === 2, `2 von 3 Boxen bei 3 Punkten: erwartet 2 P (2,0 abgerundet), war ${rundePunkteAbwaerts((2 / 3) * 3)}`);
+  // Jedes Ergebnis muss ein Vielfaches von 0,5 sein — sonst könnte eine
+  // Anzeige mehr als eine Nachkommastelle brauchen.
+  for (let richtig = 0; richtig <= 9; richtig++) {
+    for (const punkte of [1, 2, 3, 4, 8]) {
+      const ergebnis = rundePunkteAbwaerts((richtig / 9) * punkte);
+      pruefe(Math.abs(ergebnis * 2 - Math.round(ergebnis * 2)) < 1e-9,
+        `rundePunkteAbwaerts(${richtig}/9 * ${punkte}) = ${ergebnis} ist kein Vielfaches von 0,5`);
+    }
+  }
+  console.log('Punkte-Abrundung: 5 Fälle + Rasterprobe geprüft');
+}
+
+// ---------------------------------------------------------------------------
 // Komposer (Probeklausur, Phase 5): je Preset muss über viele Seeds hinweg
 // eine Generator-Kombination gefunden werden, deren Punkte JE TEIL exakt die
 // Zielsumme aus KONFIG.presets treffen (die Kataloge sind so klein und so
@@ -735,6 +759,7 @@ testeEffektivzinsToleranz();
 testeBruchToleranz();
 testeBewerteKoeffizientenZeile();
 testeBewerteMatrix();
+testeRundePunkteAbwaerts();
 testeKomposer();
 fehler += testeFixtures();
 for (const generator of GENERATOREN) {

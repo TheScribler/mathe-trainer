@@ -3,7 +3,7 @@
 // Lösung, dann die Parameter (siehe PLAN.md, Katalog "1 Finanzmathematik").
 
 import { zufallInt, zufallAus, zufallBool } from '../rng.js';
-import { runde, formatDeZahl } from '../zahl.js';
+import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
 import { zahlZuLatex, bruch } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
@@ -115,9 +115,9 @@ export const renteAusKapital = {
             latex: `r = ${zahlZuLatex(R0, 0)} \\cdot ${bruch(`${iLatex} \\cdot ${qLatex}^{${n}}`, `${qLatex}^{${n}} - 1`)}`,
             hinweis: `Zwischenwert: q${hochgestelltesExponent(n)} = ${formatDeZahl(qn, 6)}`,
           },
-          { titel: 'Ergebnis', latex: `r = ${zahlZuLatex(r, 2)}\\ \\text{€}` },
+          { titel: 'Ergebnis', latex: `r = ${zahlZuLatex(r, minimaleNachkommastellen(r))}\\ \\text{€}` },
         ],
-        ergebnisse: [{ label: 'Jährliche Rente r', latex: `${zahlZuLatex(r, 2)}\\ \\text{€}` }],
+        ergebnisse: [{ label: 'Jährliche Rente r', latex: `${zahlZuLatex(r, minimaleNachkommastellen(r))}\\ \\text{€}` }],
       },
       params,
     };
@@ -184,9 +184,9 @@ export const renteVeraenderlich = {
               'gilt hier nicht, weil die Zahlungen unterschiedlich hoch sind.',
           },
           { titel: 'Einsetzen', latex: `R_0 = ${einsetzenLatex}`, hinweis: `Einzelwerte: ${termeHinweis}` },
-          { titel: 'Ergebnis', latex: `R_0 = ${zahlZuLatex(R0, 2)}` },
+          { titel: 'Ergebnis', latex: `R_0 = ${zahlZuLatex(R0, minimaleNachkommastellen(R0))}` },
         ],
-        ergebnisse: [{ label: 'Rentenbarwert R₀', latex: zahlZuLatex(R0, 2) }],
+        ergebnisse: [{ label: 'Rentenbarwert R₀', latex: zahlZuLatex(R0, minimaleNachkommastellen(R0)) }],
       },
       params,
     };
@@ -246,9 +246,9 @@ export const verdopplungszeit = {
                 'und den Exponenten vor den Logarithmus ziehen.',
             },
             { titel: 'Einsetzen', latex: `n = ${bruch(`\\ln ${faktor}`, `\\ln ${qLatex}`)}` },
-            { titel: 'Ergebnis', latex: `n = ${zahlZuLatex(n, 2)}\\ \\text{Jahre}` },
+            { titel: 'Ergebnis', latex: `n = ${zahlZuLatex(n, minimaleNachkommastellen(n))}\\ \\text{Jahre}` },
           ],
-          ergebnisse: [{ label: 'Laufzeit n', latex: `${zahlZuLatex(n, 2)}\\ \\text{Jahre}` }],
+          ergebnisse: [{ label: 'Laufzeit n', latex: `${zahlZuLatex(n, minimaleNachkommastellen(n))}\\ \\text{Jahre}` }],
         },
         params,
       };
@@ -274,7 +274,7 @@ export const verdopplungszeit = {
             hinweis: 'Durch K₀ teilen, dann beide Seiten logarithmieren und den Exponenten vor ' +
               'den Logarithmus ziehen.',
           },
-          { titel: 'Einsetzen', latex: `n = ${bruch(`\\ln(${zahlZuLatex(Kn, 2)} / ${zahlZuLatex(K0, 0)})`, `\\ln ${qLatex}`)}` },
+          { titel: 'Einsetzen', latex: `n = ${bruch(`\\ln(${zahlZuLatex(Kn, minimaleNachkommastellen(Kn))} / ${zahlZuLatex(K0, 0)})`, `\\ln ${qLatex}`)}` },
           { titel: 'Ergebnis', latex: `n \\approx ${n}\\ \\text{Jahre}` },
         ],
         ergebnisse: [{ label: 'Laufzeit n', latex: `${n}\\ \\text{Jahre}` }],

@@ -82,6 +82,16 @@ export function pruefeAuswahl(eingabe, erwartet) {
   return { korrekt: eingabe === erwartet };
 }
 
+// Teilpunkte (z. B. bei koeffizienten/matrix: Anteil richtiger Boxen/Zellen
+// mal die Punktzahl der Teilaufgabe) werden auf das nächste halbe Raster
+// ABgerundet, nie aufgerundet und nie als krummer Dezimalbruch angezeigt —
+// eine echte Klausurkorrektur vergibt nur ganze oder halbe Punkte. Beispiel
+// (iPhone-Rückmeldung): 1 von 9 Matrixeinträgen bei 2 Punkten ergibt
+// 1/9·2 ≈ 0,22, abgerundet 0 P; 5 von 9 ergibt 5/9·2 ≈ 1,11, abgerundet 1 P.
+export function rundePunkteAbwaerts(punkte) {
+  return Math.floor(punkte * 2) / 2;
+}
+
 // 'term': keine automatische Prüfung — Selbstbewertung nach Lösung aufdecken.
 export function punkteFuerSelbstbewertung(stufe, maxPunkte) {
   if (stufe === 'richtig') return maxPunkte;

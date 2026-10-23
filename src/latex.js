@@ -104,11 +104,43 @@ export function gleichungsKette(teile) {
   return mehrzeiligeKette(zeilen);
 }
 
+// Wertet ein Polynom an der Stelle x aus und zeigt dabei JEDEN Rechenschritt:
+// erst die Formel mit x als Zahl eingesetzt (z. B. "3{,}5 \cdot 10^{2} + 3
+// \cdot 10 + 290"), dann die einzeln berechneten Werte der Summanden
+// ("350 + 30 + 290") — Grundlage für "jeder Rechenschritt wird gezeigt"
+// (iPhone-Rückmeldung: ein Sprung von K(x) direkt auf den Endwert ließ die
+// Zwischenschritte fehlen). Koeffizient 1/-1 wird vor einer x-Potenz wie bei
+// polynomLatex weggelassen (dieselbe Konvention, nicht nur vor einer
+// Variable). Ein negatives x wird geklammert eingesetzt — sonst würde
+// "x^2" bei x=-1 zu "-1^{2}" (mathematisch -1, nicht (-1)²=1) statt zum
+// korrekten "(-1)^{2}".
+export function polynomEingesetztLatex(koeffizienten, exponenten, x) {
+  const xKlar = x < 0 ? `(${zahlZuLatex(x, minimaleNachkommastellen(x))})` : zahlZuLatex(x, minimaleNachkommastellen(x));
+  let eingesetzt = '';
+  let werte = '';
+  let summe = 0;
+  koeffizienten.forEach((k, i) => {
+    if (k === 0) return;
+    const exp = exponenten[i];
+    const wert = k * Math.pow(x, exp);
+    summe += wert;
+    const basis = exp === 0 ? null : exp === 1 ? xKlar : potenz(xKlar, exp);
+    const abs = Math.abs(k);
+    const koeffText = (abs === 1 && basis) ? '' : zahlZuLatex(abs, minimaleNachkommastellen(abs));
+    const term = koeffText === '' ? basis : (basis ? `${koeffText} \\cdot ${basis}` : koeffText);
+    eingesetzt = eingesetzt === '' ? (k < 0 ? '-' : '') + term : eingesetzt + (k < 0 ? ' - ' : ' + ') + term;
+    const wertAbsText = zahlZuLatex(Math.abs(wert), minimaleNachkommastellen(wert));
+    werte = werte === '' ? (wert < 0 ? '-' : '') + wertAbsText : werte + (wert < 0 ? ' - ' : ' + ') + wertAbsText;
+  });
+  return { eingesetzt: eingesetzt || '0', werte: werte || '0', summe };
+}
+
 // Polynom aus Koeffizienten + zugehörigen Exponenten als LaTeX, z. B.
 // polynomLatex([-2.4, 36, -120], [2, 1, 0]) -> "-2{,}4x^{2} + 36x - 120".
 // Nullkoeffizienten werden übersprungen, Koeffizient 1/-1 vor einer Potenz
 // (≠ x^0) wird nicht ausgeschrieben, Vorzeichen korrekt zwischen den Termen
 // gesetzt statt als Minus-vor-Betrag in jedem Summanden.
+
 export function polynomLatex(koeffizienten, exponenten) {
   let ergebnis = '';
   koeffizienten.forEach((k, i) => {

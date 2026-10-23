@@ -99,6 +99,15 @@ function klammerWennNegativ(zahl, nachkommastellen = 0) {
   return zahl < 0 ? `(${text})` : text;
 }
 
+// Punktepaar "(x \mid y)" statt eines rohen "|" als Trenner — ein bloßes "|"
+// lässt KaTeX ein direkt folgendes Minus manchmal mit Operator- statt
+// Vorzeichen-Abstand setzen ("(2|-2)" sah aus wie eine Subtraktion statt ein
+// unäres Vorzeichen, iPhone-Rückmeldung). "\mid" ist die korrekte Relation
+// dafür und sorgt für das richtige Spacing um ein folgendes unäres Minus.
+function punktPaarLatex(x, y) {
+  return `(${zahlZuLatex(x, 0)} \\mid ${zahlZuLatex(y, 0)})`;
+}
+
 function bauePolynomAusdruck(paare, formatFn, minus) {
   const nichtNull = paare.filter(([k]) => k !== 0);
   if (nichtNull.length === 0) return formatFn(0, 0);
@@ -215,7 +224,7 @@ export const gewinnBreakeven = {
               `K'(${x0}) = ${cdotWennNicht1(2 * c, String(x0))} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), minimaleNachkommastellen(Math.abs(d)))}`,
             ]),
           },
-          { titel: 'Ergebnis', latex: `K'(${x0}) = ${zahlZuLatex(grenzkosten, 2)}` },
+          { titel: 'Ergebnis', latex: `K'(${x0}) = ${zahlZuLatex(grenzkosten, minimaleNachkommastellen(grenzkosten))}` },
           {
             titel: 'Umstellen',
             latex: mehrzeiligeKette([
@@ -250,19 +259,19 @@ export const gewinnBreakeven = {
             latex: `G'(x) = ${polynomLatex([2 * gKoeff[0], gKoeff[1]], [1, 0])} = 0 \\;\\Rightarrow\\; x = ${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}`,
             hinweis: `Hinreichende Bedingung: G''(x) = ${formatDeZahl(2 * gKoeff[0], minimaleNachkommastellen(2 * gKoeff[0]))} < 0, also Maximum.`,
           },
-          { titel: 'Einsetzen', latex: `p(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}) = ${polynomLatex([a, -b], [0, 1])}\\big|_{x=${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}} = ${zahlZuLatex(pMax, 2)}` },
-          { titel: 'Einsetzen', latex: `G(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}) = ${polynomLatex(gKoeff, [2, 1, 0])}\\big|_{x=${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}} = ${zahlZuLatex(gMax, 2)}` },
+          { titel: 'Einsetzen', latex: `p(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}) = ${polynomLatex([a, -b], [0, 1])}\\big|_{x=${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}} = ${zahlZuLatex(pMax, minimaleNachkommastellen(pMax))}` },
+          { titel: 'Einsetzen', latex: `G(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}) = ${polynomLatex(gKoeff, [2, 1, 0])}\\big|_{x=${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}} = ${zahlZuLatex(gMax, minimaleNachkommastellen(gMax))}` },
           {
             titel: 'Ergebnis',
-            latex: `x_{max} = ${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}, \\quad p_{max} = ${zahlZuLatex(pMax, 2)}, \\quad G_{max} = ${zahlZuLatex(gMax, 2)}`,
+            latex: `x_{max} = ${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}, \\quad p_{max} = ${zahlZuLatex(pMax, minimaleNachkommastellen(pMax))}, \\quad G_{max} = ${zahlZuLatex(gMax, minimaleNachkommastellen(gMax))}`,
           },
         ],
         ergebnisse: [
           { label: 'Erlösfunktion', latex: `E(x) = ${polynomLatex(eKoeff, [2, 1, 0])}` },
           { label: 'Gewinnfunktion', latex: `G(x) = ${polynomLatex(gKoeff, [2, 1, 0])}` },
-          { label: `Grenzkosten K'(${x0})`, latex: zahlZuLatex(grenzkosten, 2) },
+          { label: `Grenzkosten K'(${x0})`, latex: zahlZuLatex(grenzkosten, minimaleNachkommastellen(grenzkosten)) },
           { label: 'Break-Even / Gewinngrenze', latex: `x_1=${x1},\\ x_2=${x2}` },
-          { label: 'Gewinnmaximum', latex: `x=${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))},\\ p=${zahlZuLatex(pMax, 2)},\\ G=${zahlZuLatex(gMax, 2)}` },
+          { label: 'Gewinnmaximum', latex: `x=${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))},\\ p=${zahlZuLatex(pMax, minimaleNachkommastellen(pMax))},\\ G=${zahlZuLatex(gMax, minimaleNachkommastellen(gMax))}` },
         ],
       },
       params,
@@ -356,7 +365,16 @@ export const extremwerteZweiVariablenKubisch = {
           },
           {
             titel: 'Umstellen',
-            latex: `f_y = 0 \\;\\Rightarrow\\; y = ${minusBruch(a, zweiMalKoeffizient(c), 'x')} = ${yKoeff < 0 ? '-' : ''}${koeffVariable(Math.abs(yKoeff), 'x')}`,
+            // Der zweite Ausdruck ("= yKoeff·x") wird nur angehängt, wenn er
+            // sich vom ersten unterscheidet: minusBruch kürzt bei |c|=1 (dann
+            // ist zweiMalKoeffizient(c) eine reine Zahl, kein symbolisches
+            // "2·(c)") den Bruch a/(2c) bereits numerisch, und a=2mc mit
+            // c=±1 kürzt sich dabei IMMER exakt auf den ganzzahligen
+            // Koeffizienten m — derselbe Wert wie yKoeff. Ohne diese
+            // Bedingung stand hier zweimal dasselbe ("y = -x = -x",
+            // iPhone-Rückmeldung).
+            latex: `f_y = 0 \\;\\Rightarrow\\; y = ${minusBruch(a, zweiMalKoeffizient(c), 'x')}` +
+              (Math.abs(c) === 1 ? '' : ` = ${yKoeff < 0 ? '-' : ''}${koeffVariable(Math.abs(yKoeff), 'x')}`),
             hinweis: 'Nach y umstellen, dann in die Ableitung nach x einsetzen.',
           },
           {
@@ -385,13 +403,13 @@ export const extremwerteZweiVariablenKubisch = {
           { titel: 'Ergebnis', latex: `(0|0)\\text{ ist ein } \\textbf{${typ1}}, \\; f(0,0) = ${zahlZuLatex(wert1, 0)}` },
           {
             titel: 'Einsetzen',
-            latex: `\\text{Punkt }(${zahlZuLatex(x2, 0)}|${zahlZuLatex(y2, 0)})\\text{: } H = \\begin{pmatrix} ${zahlZuLatex(fxx2, 0)} & ${zahlZuLatex(fxy, 0)} \\\\ ${zahlZuLatex(fxy, 0)} & ${zahlZuLatex(fyy, 0)} \\end{pmatrix}, \\; \\det(H) = ${zahlZuLatex(det2, 0)}`,
+            latex: `\\text{Punkt }${punktPaarLatex(x2, y2)}\\text{: } H = \\begin{pmatrix} ${zahlZuLatex(fxx2, 0)} & ${zahlZuLatex(fxy, 0)} \\\\ ${zahlZuLatex(fxy, 0)} & ${zahlZuLatex(fyy, 0)} \\end{pmatrix}, \\; \\det(H) = ${zahlZuLatex(det2, 0)}`,
           },
-          { titel: 'Ergebnis', latex: `(${zahlZuLatex(x2, 0)}|${zahlZuLatex(y2, 0)})\\text{ ist ein } \\textbf{${typ2}}, \\; f(${zahlZuLatex(x2, 0)},${zahlZuLatex(y2, 0)}) = ${zahlZuLatex(wert2, 2)}` },
+          { titel: 'Ergebnis', latex: `${punktPaarLatex(x2, y2)}\\text{ ist ein } \\textbf{${typ2}}, \\; f(${zahlZuLatex(x2, 0)},${zahlZuLatex(y2, 0)}) = ${zahlZuLatex(wert2, minimaleNachkommastellen(wert2))}` },
         ],
         ergebnisse: [
-          { label: 'Punkt 1', latex: `(0|0|${zahlZuLatex(wert1, 0)}),\\ ${typ1}` },
-          { label: 'Punkt 2', latex: `(${zahlZuLatex(x2, 0)}|${zahlZuLatex(y2, 0)}|${zahlZuLatex(wert2, 2)}),\\ ${typ2}` },
+          { label: 'Punkt 1', latex: `(0 \\mid 0 \\mid ${zahlZuLatex(wert1, 0)}),\\ ${typ1}` },
+          { label: 'Punkt 2', latex: `(${zahlZuLatex(x2, 0)} \\mid ${zahlZuLatex(y2, 0)} \\mid ${zahlZuLatex(wert2, minimaleNachkommastellen(wert2))}),\\ ${typ2}` },
         ],
       },
       params,
@@ -518,13 +536,13 @@ export const extremwerteZweiVariablenQuadratisch = {
           },
           {
             titel: 'Ergebnis',
-            latex: `(${zahlZuLatex(xStern, 0)}|${zahlZuLatex(yStern, 0)})\\text{ ist ein } \\textbf{${typ}}, \\; f(${zahlZuLatex(xStern, 0)},${zahlZuLatex(yStern, 0)}) = ${zahlZuLatex(wert, 2)}`,
+            latex: `(${zahlZuLatex(xStern, 0)}|${zahlZuLatex(yStern, 0)})\\text{ ist ein } \\textbf{${typ}}, \\; f(${zahlZuLatex(xStern, 0)},${zahlZuLatex(yStern, 0)}) = ${zahlZuLatex(wert, minimaleNachkommastellen(wert))}`,
           },
         ],
         ergebnisse: [
           { label: 'Stationärer Punkt', latex: `(${zahlZuLatex(xStern, 0)}|${zahlZuLatex(yStern, 0)})` },
           { label: 'Art', latex: `\\text{${typ}}` },
-          { label: 'Funktionswert', latex: zahlZuLatex(wert, 2) },
+          { label: 'Funktionswert', latex: zahlZuLatex(wert, minimaleNachkommastellen(wert)) },
         ],
       },
       params,
@@ -604,7 +622,7 @@ export const nutzenmaximum = {
         schritte: [
           {
             titel: 'Formel',
-            latex: `${uLatex} \\quad \\text{u.d.N.} \\quad ${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} = ${zahlZuLatex(Y, 0)}`,
+            latex: `\\max\\ U(x_1,x_2) = ${uLatex} \\quad \\text{u.d.N.} \\quad ${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} = ${zahlZuLatex(Y, 0)}`,
           },
           {
             titel: 'Umstellen',
@@ -644,7 +662,7 @@ export const nutzenmaximum = {
         ],
         ergebnisse: [
           { label: 'Nutzenmaximales Güterbündel', latex: `(x_1;x_2) = (${zahlZuLatex(x1Stern, 0)};${zahlZuLatex(x2Stern, 0)})` },
-          { label: 'Nutzen im Optimum', latex: `U = ${zahlZuLatex(uOptimum, 2)}` },
+          { label: 'Nutzen im Optimum', latex: `U = ${zahlZuLatex(uOptimum, minimaleNachkommastellen(uOptimum))}` },
           { label: 'Lagrange-Multiplikator', latex: `\\lambda = ${zahlZuLatex(lambda, minimaleNachkommastellen(lambda))}` },
         ],
       },
@@ -710,14 +728,22 @@ export const ableitungen = {
             hinweis: 'Umschreiben: 1/x = x⁻¹, dann Potenzregel (xⁿ)\' = n·xⁿ⁻¹ auf jeden Summanden anwenden.',
           },
           { titel: 'Ergebnis', latex: `f'(x) = ${faStrich}` },
-          { titel: 'Einsetzen', latex: `f'(${zahlZuLatex(x0a, 0)}) = ${zahlZuLatex(faStrichWert, 2)}` },
+          { titel: 'Einsetzen', latex: `f'(${zahlZuLatex(x0a, 0)}) = ${zahlZuLatex(faStrichWert, minimaleNachkommastellen(faStrichWert))}` },
           {
             titel: 'Formel',
             latex: `f(x) = ${fbLatex}`,
             hinweis: `Produktregel (u·v)' = u'v + uv' mit u = x − ${formatDeZahl(b, 0)}, v = √(x² − ${formatDeZahl(c, 0)}); für v' die Kettenregel.`,
           },
-          { titel: 'Ergebnis', latex: `f'(x) = ${fbStrich}` },
-          { titel: 'Einsetzen', latex: `f'(${zahlZuLatex(x0b, 0)}) = ${zahlZuLatex(fbStrichWert, 2)}` },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette([
+              `u = x ${vorzeichenLatex(b)} ${zahlZuLatex(Math.abs(b), 0)}, \\quad u' = 1`,
+              `v = \\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}, \\quad v' = \\dfrac{x}{\\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}}`,
+            ]),
+            hinweis: 'v\' über die Kettenregel: Ableitung der inneren Funktion (x² ± c)\' = 2x, geteilt durch 2·äußere Funktion.',
+          },
+          { titel: 'Ergebnis', latex: `f'(x) = u'v + uv' = ${fbStrich}` },
+          { titel: 'Einsetzen', latex: `f'(${zahlZuLatex(x0b, 0)}) = ${zahlZuLatex(fbStrichWert, minimaleNachkommastellen(fbStrichWert))}` },
         ],
         ergebnisse: [
           { label: 'a) f\'(x)', latex: faStrich },

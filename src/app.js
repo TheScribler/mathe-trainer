@@ -502,7 +502,7 @@ function bewerteAlleEingaben(aufgabe, felder) {
         feldOderFelder[i].classList.add(box.korrekt ? 'gut' : 'schlecht');
         if (box.korrekt) { richtig += 1; teilRichtig += 1; }
       });
-      const punkteEingabe = (teilRichtig / feldOderFelder.length) * eingabe.punkte;
+      const punkteEingabe = rundePunkteAbwaerts((teilRichtig / feldOderFelder.length) * eingabe.punkte);
       erreichtePunkte += punkteEingabe;
       proEingabe.push({ id: eingabe.id, typ: eingabe.typ, punkte: eingabe.punkte, erreichtePunkte: punkteEingabe, leer: false });
     } else if (eingabe.typ === 'matrix') {
@@ -523,7 +523,7 @@ function bewerteAlleEingaben(aufgabe, felder) {
         if (zelle.korrekt) { richtig += 1; teilRichtig += 1; }
       }));
       const beantwortet = anzahl - bewertung.leer;
-      const punkteEingabe = beantwortet > 0 ? (teilRichtig / anzahl) * eingabe.punkte : 0;
+      const punkteEingabe = beantwortet > 0 ? rundePunkteAbwaerts((teilRichtig / anzahl) * eingabe.punkte) : 0;
       erreichtePunkte += punkteEingabe;
       proEingabe.push({ id: eingabe.id, typ: eingabe.typ, punkte: eingabe.punkte, erreichtePunkte: punkteEingabe, leer: beantwortet === 0 });
     } else if (eingabe.typ === 'auswahl') {
@@ -935,8 +935,16 @@ function zeichneAuswertung(wurzel, zustand) {
         const zeile = document.createElement('div');
         zeile.className = 'selbstbewertung-zeile';
         const label = document.createElement('span');
-        label.textContent = `${eingabe.label} (${eingabe.punkte} P): `;
+        label.textContent = `${eingabe.label} (${eingabe.punkte} P):`;
         zeile.appendChild(label);
+
+        // Eigene Zeile für die drei Knöpfe statt in einem Flex-Fluss mit dem
+        // Label — bei langen Labels liefen die Knöpfe sonst mitten in der
+        // Zeile um und landeten uneinheitlich hinter dem Text (iPhone-
+        // Rückmeldung).
+        const knopfReiheSelbst = document.createElement('div');
+        knopfReiheSelbst.className = 'selbstbewertung-knoepfe';
+        zeile.appendChild(knopfReiheSelbst);
 
         const knoepfe = [];
         for (const [stufe, text] of [['richtig', 'Richtig'], ['halb', 'Teilweise'], ['falsch', 'Falsch']]) {
@@ -959,7 +967,7 @@ function zeichneAuswertung(wurzel, zustand) {
             aktualisiereGesamt();
           });
           knoepfe.push(knopf);
-          zeile.appendChild(knopf);
+          knopfReiheSelbst.appendChild(knopf);
         }
         selbstbewertungContainer.appendChild(zeile);
       }
@@ -1037,9 +1045,10 @@ function starteApp() {
     zeigeUebung();
     praxisApi.testErzeugeAufgabe(generatorId, seed, mitLoesung);
   };
-  // Nur für Tests: Zugriff auf findeGenerator, da GENERATOREN sonst im
-  // IIFE-Scope des gebauten Bundles verborgen bleibt.
+  // Nur für Tests: Zugriff auf findeGenerator/mulberry32, da sie sonst im
+  // IIFE-Scope des gebauten Bundles verborgen bleiben.
   window.__testFindeGenerator = findeGenerator;
+  window.__testMulberry32 = mulberry32;
 
   // Eine vorhandene Probeklausur hat Vorrang vor dem Übungsmodus — egal ob
   // noch laufend oder schon abgegeben (dann wird gleich die zuletzt gezeigte
