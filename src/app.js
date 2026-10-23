@@ -471,6 +471,14 @@ function setzeAntworten(aufgabe, felder, werte) {
 // Übungsmodus-Kurzmeldung ("4 von 6 richtig") als auch für die
 // Probeklausur-Auswertung (Punkte je Teilaufgabe, Summe). Bei koeffizienten/
 // matrix gibt es Teilpunkte proportional zu den richtigen Boxen/Zellen.
+//
+// Die Rundung auf halbe Punkte (rundePunkteAbwaerts) wird NUR EINMAL auf die
+// Summe der ganzen Aufgabe angewendet, nicht je Eingabe — eine Klausur-
+// aufgabe hat EINE Punktzahl, nicht je Teilfeld eine eigene gerundete Zahl.
+// Pro-Feld-Rundung vor der Summe könnte sonst Punkte verschenken, die bei
+// der Aufgabe als Ganzes zusammen schon einen weiteren halben Punkt ergeben
+// (z. B. zwei koeffizienten/matrix-Felder mit je 0,3 Rohpunkten: einzeln
+// gerundet macht das 0+0=0, als Summe zuerst 0,6 gerundet auf 0,5).
 function bewerteAlleEingaben(aufgabe, felder) {
   let gesamt = 0;
   let richtig = 0;
@@ -502,7 +510,7 @@ function bewerteAlleEingaben(aufgabe, felder) {
         feldOderFelder[i].classList.add(box.korrekt ? 'gut' : 'schlecht');
         if (box.korrekt) { richtig += 1; teilRichtig += 1; }
       });
-      const punkteEingabe = rundePunkteAbwaerts((teilRichtig / feldOderFelder.length) * eingabe.punkte);
+      const punkteEingabe = (teilRichtig / feldOderFelder.length) * eingabe.punkte;
       erreichtePunkte += punkteEingabe;
       proEingabe.push({ id: eingabe.id, typ: eingabe.typ, punkte: eingabe.punkte, erreichtePunkte: punkteEingabe, leer: false });
     } else if (eingabe.typ === 'matrix') {
@@ -523,7 +531,7 @@ function bewerteAlleEingaben(aufgabe, felder) {
         if (zelle.korrekt) { richtig += 1; teilRichtig += 1; }
       }));
       const beantwortet = anzahl - bewertung.leer;
-      const punkteEingabe = beantwortet > 0 ? rundePunkteAbwaerts((teilRichtig / anzahl) * eingabe.punkte) : 0;
+      const punkteEingabe = beantwortet > 0 ? (teilRichtig / anzahl) * eingabe.punkte : 0;
       erreichtePunkte += punkteEingabe;
       proEingabe.push({ id: eingabe.id, typ: eingabe.typ, punkte: eingabe.punkte, erreichtePunkte: punkteEingabe, leer: beantwortet === 0 });
     } else if (eingabe.typ === 'auswahl') {
@@ -558,7 +566,7 @@ function bewerteAlleEingaben(aufgabe, felder) {
   }
 
   const falsch = gesamt - richtig - leer;
-  return { gesamt, richtig, leer, falsch, erreichtePunkte, maxPunkteAutomatisch, proEingabe };
+  return { gesamt, richtig, leer, falsch, erreichtePunkte: rundePunkteAbwaerts(erreichtePunkte), maxPunkteAutomatisch, proEingabe };
 }
 
 // ---------------------------------------------------------------------------

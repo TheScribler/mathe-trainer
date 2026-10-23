@@ -722,7 +722,24 @@ function testeRundePunkteAbwaerts() {
         `rundePunkteAbwaerts(${richtig}/9 * ${punkte}) = ${ergebnis} ist kein Vielfaches von 0,5`);
     }
   }
-  console.log('Punkte-Abrundung: 5 Fälle + Rasterprobe geprüft');
+  // Die Abrundung gilt je AUFGABE (Summe über alle ihre Felder), nicht je
+  // einzelnes Feld — sonst könnte eine Aufgabe mit mehreren koeffizienten-/
+  // matrix-Feldern Punkte verschenken, die als Summe schon einen weiteren
+  // halben Punkt ergeben (iPhone-Rückmeldung, verifiziert live in der
+  // Probeklausur-Auswertung an alg.matrixprodukt mit zwei Matrix-Feldern:
+  // a) 1 von 3 Zellen bei 2 Punkten, b) 2 von 9 Zellen bei 2 Punkten — je
+  // Feld gerundet ergäbe 0,5 + 0 = 0,5 P, als Aufgabensumme gerundet ergibt
+  // es korrekt 1 P).
+  const rohA = (1 / 3) * 2;
+  const rohB = (2 / 9) * 2;
+  const jeFeldGerundetSumme = rundePunkteAbwaerts(rohA) + rundePunkteAbwaerts(rohB);
+  const aufgabenSummeGerundet = rundePunkteAbwaerts(rohA + rohB);
+  pruefe(jeFeldGerundetSumme === 0.5, `Kontrollrechnung je-Feld-Rundung: erwartet 0,5, war ${jeFeldGerundetSumme}`);
+  pruefe(aufgabenSummeGerundet === 1, `Aufgaben-Summen-Rundung (a=1/3 bei 2P, b=2/9 bei 2P): erwartet 1 P, war ${aufgabenSummeGerundet}`);
+  pruefe(aufgabenSummeGerundet !== jeFeldGerundetSumme,
+    'Aufgaben-Summen-Rundung muss sich von Je-Feld-Rundung unterscheiden können (sonst testet dieser Fall nichts)');
+
+  console.log('Punkte-Abrundung: 5 Fälle + Rasterprobe + Aufgaben-Summen-Kontrolle geprüft');
 }
 
 // ---------------------------------------------------------------------------
