@@ -139,6 +139,58 @@ const LAYOUT_PRUEFSKRIPT = `
     }
   });
 
+  // Lücke zwischen dem letzten Eingabefeld-Block und der Prüfen/Lösung/
+  // Neue-Aufgabe-Zeile (Übungsmodus) darf nicht größer sein als die reale
+  // Höhe des −/⁄-Knopfpaars plus normaler Abstand — zuvor stapelten sich
+  // mehrere Browser-Standardabstände (<p>-Margin u. a.) zu einer Lücke von
+  // über 100px (iPhone-Rückmeldung: "etwa ein Drittel des Bildschirms").
+  // 90 statt der zunächst vorgeschlagenen 80: bei koeffizienten/matrix
+  // kommt zur Knopfpaar-Höhe (40px) noch der kleine, unvermeidbare
+  // Abstand des Gitters zum Label hinzu (das Gitter selbst braucht ihn,
+  // sonst klebt es am Beschriftungstext) — 84–88px ist dort nach dem Fix
+  // der tatsächlich erreichbare Bestwert, nicht mehr die über 180px von
+  // vorher.
+  const MAX_LUECKE_VOR_KNOPFREIHE = 90;
+  const letzteZeile = document.querySelector('#app .eingaben .eingabe-zeile:last-child');
+  const knopfReihe = document.querySelector('#app .knopf-reihe');
+  if (letzteZeile && knopfReihe) {
+    // Bei koeffizienten/matrix steckt die Zeile mehrere Eingabefelder (ein
+    // mehrzeiliges Gitter bei matrix) — querySelector('input') träfe nur das
+    // ERSTE Feld (oben links), nicht das unterste. Das unterste (größtes
+    // bottom) ist der richtige Bezugspunkt für die Lücke danach.
+    const felder = Array.from(letzteZeile.querySelectorAll('input, select'));
+    if (felder.length > 0) {
+      const unterkante = Math.max(...felder.map((f) => f.getBoundingClientRect().bottom));
+      const luecke = knopfReihe.getBoundingClientRect().top - unterkante;
+      if (luecke > MAX_LUECKE_VOR_KNOPFREIHE) {
+        probleme.push('Lücke vor der Knopf-Reihe zu groß (' + luecke.toFixed(1) + 'px > ' + MAX_LUECKE_VOR_KNOPFREIHE + 'px)');
+      }
+    }
+  }
+
+  // Eine koeffizienten-Reihe (z. B. F(x) = __x⁴ + __x³ + __x² + __x + c) muss
+  // auf EINER Zeile bleiben — scrollWidth/clientWidth allein hätten einen
+  // Umbruch nicht erkannt (flex-wrap bricht um, OHNE horizontal zu
+  // überlaufen, siehe iPhone-Rückmeldung zu int.unbestimmt). offsetTop allein
+  // reicht nicht: align-items:center setzt ein niedrigeres "+"-Zeichen schon
+  // auf derselben Zeile tiefer an als die höhere Box daneben (false positive
+  // bei int.kosten-aus-grenzkosten geprüft). Ein echter Umbruch zeigt sich
+  // stattdessen daran, dass die linke Kante NICHT mehr von links nach rechts
+  // wächst — ein neues Element beginnt dann wieder am Zeilenanfang.
+  document.querySelectorAll('#app .koeffizienten-reihe').forEach((reihe) => {
+    const kinder = Array.from(reihe.children);
+    if (kinder.length < 2) return;
+    let vorherigeLinkeKante = -Infinity;
+    let umgebrochen = false;
+    for (const k of kinder) {
+      if (k.getBoundingClientRect().left < vorherigeLinkeKante) { umgebrochen = true; break; }
+      vorherigeLinkeKante = k.getBoundingClientRect().left;
+    }
+    if (umgebrochen) {
+      probleme.push('koeffizienten-reihe: Terme brechen auf mehrere Zeilen um (' + reihe.textContent.replace(/\\s+/g, ' ') + ')');
+    }
+  });
+
   return { seitenbreite, probleme };
 `;
 

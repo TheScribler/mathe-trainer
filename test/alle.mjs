@@ -343,6 +343,14 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
       for (let schritt = 0; schritt < schritte; schritt++) K *= 1 + j;
       pruefe(nahBei(K, Kn, 0.2), `${kennzeichnung}: stetige Verzinsung als Grenzwert ${K.toFixed(2)}, erwartet Kn=${Kn}`);
     }
+    // "Jeder Rechenschritt wird gezeigt" (CLAUDE.md): das Einsetzen darf
+    // nicht direkt von der Formel zum Endwert springen, sondern muss den
+    // Zwischenfaktor (1+i·n bzw. (1+j)^s bzw. e^(i·n)) als eigene Zeile
+    // zeigen — erkennbar an der mehrzeiligen aligned-Kette statt einer
+    // einzelnen Zeile (iPhone-Rückmeldung).
+    const einsetzenVG = aufgabe.loesung.schritte.find((s) => s.titel === 'Einsetzen');
+    pruefe(einsetzenVG.latex.includes('\\begin{aligned}'),
+      `${kennzeichnung}: Einsetzen-Schritt zeigt keinen Zwischenschritt (springt direkt zum Ergebnis): "${einsetzenVG.latex}"`);
     return;
   }
 
@@ -356,6 +364,11 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
       bestand = p.variante === 'vorschuessig' ? (bestand + p.r) * q : bestand * q + p.r;
     }
     pruefe(nahBei(bestand, Rn, 0.01), `${kennzeichnung}: Kontostand schrittweise ${bestand.toFixed(2)}, erwartet Rn=${Rn}`);
+    // "Jeder Rechenschritt wird gezeigt": q^n und der Bruch daraus müssen als
+    // eigene Zeilen erscheinen, nicht nur das Endergebnis (iPhone-Rückmeldung).
+    const einsetzenER = aufgabe.loesung.schritte.find((s) => s.titel === 'Einsetzen');
+    pruefe(einsetzenER.latex.includes('q^n') && einsetzenER.latex.includes('\\begin{aligned}'),
+      `${kennzeichnung}: Einsetzen-Schritt zeigt q^n/Bruch nicht als eigene Zwischenschritte: "${einsetzenER.latex}"`);
     return;
   }
 
@@ -370,6 +383,15 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
       summe += p.r / Math.pow(q, t);
     }
     pruefe(nahBei(summe, R0, 0.5), `${kennzeichnung}: endliche Summe (N=${N}) ${summe.toFixed(2)}, erwartet R0=${R0}`);
+    // "Jeder Rechenschritt wird gezeigt": vorschüssig darf r'/i nicht direkt
+    // in derselben Zeile wie die Addition verschwinden, sondern muss selbst
+    // als Zwischenwert erscheinen (iPhone-Rückmeldung). Nachschüssig ist eine
+    // einzelne Division — dort ist eine Zeile bereits der vollständige Weg.
+    if (p.variante === 'vorschuessig') {
+      const einsetzenEwR = aufgabe.loesung.schritte.find((s) => s.titel === 'Einsetzen');
+      pruefe(einsetzenEwR.latex.includes('\\begin{aligned}'),
+        `${kennzeichnung}: vorschüssige ewige Rente zeigt r'/i nicht als eigenen Zwischenschritt: "${einsetzenEwR.latex}"`);
+    }
     return;
   }
 
@@ -393,6 +415,13 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
       pruefe(nahBei(zeile[2], tilgung, 0.5), `${kennzeichnung}: Jahr ${jahr} Tilgung nachgerechnet ${tilgung.toFixed(2)}, erwartet ${zeile[2]}`);
       pruefe(nahBei(zeile[3], jahresAnnuitaet, 0.5), `${kennzeichnung}: Jahr ${jahr} Annuität nachgerechnet ${jahresAnnuitaet.toFixed(2)}, erwartet ${zeile[3]}`);
     }
+    // "Jeder Rechenschritt wird gezeigt": JEDES Jahr braucht seinen eigenen
+    // Schritt, nicht nur Jahr 1 (iPhone-Rückmeldung) — also mindestens n
+    // "Einsetzen"-Schritte mit eigenem Jahres-Hinweis, plus der einen Schritt
+    // für die Konstante (T bzw. A) davor.
+    const einsetzenSchritteTP = aufgabe.loesung.schritte.filter((s) => s.titel === 'Einsetzen');
+    pruefe(einsetzenSchritteTP.length === p.n + 1,
+      `${kennzeichnung}: ${einsetzenSchritteTP.length} Einsetzen-Schritte, erwartet ${p.n + 1} (1 Konstante + ${p.n} Jahre)`);
     return;
   }
 

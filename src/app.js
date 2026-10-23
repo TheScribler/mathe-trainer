@@ -285,6 +285,16 @@ function baueEingabenFelder(aufgabe, { onAenderung } = {}) {
         reihe.appendChild(teilZeile);
         teilfelder.push(feld);
       });
+      // Bei einer unbestimmten Stammfunktion gehört "+ c" zur Lösung, auch
+      // wenn c selbst nicht abgefragt wird — ohne diesen Hinweis sah die
+      // Box-Reihe aus, als würde sie mitten im Term aufhören (iPhone-
+      // Rückmeldung).
+      if (eingabe.mitKonstante) {
+        const plusC = document.createElement('span');
+        plusC.className = 'koeffizienten-plus';
+        plusC.textContent = '+ c';
+        reihe.appendChild(plusC);
+      }
       zeile.appendChild(reihe);
 
       // Ein einziges Knopfpaar für die ganze Reihe statt je Teilfeld eins
@@ -333,9 +343,37 @@ function baueEingabenFelder(aufgabe, { onAenderung } = {}) {
     } else if (eingabe.typ === 'matrix') {
       const gitter = document.createElement('div');
       gitter.className = 'matrix-gitter';
-      gitter.style.gridTemplateColumns = `repeat(${eingabe.spalten}, auto)`;
+      // Optionale Spalten-/Zeilen-Beschriftungen (z. B. Tilgungsplan: "S, Z,
+      // T, A" über den Spalten, Jahreszahlen links neben den Zeilen) — ohne
+      // sie war nicht erkennbar, welche Spalte welche Größe ist (iPhone-
+      // Rückmeldung). Rein additiv: ohne spaltenLabels/zeilenLabels verhält
+      // sich das Gitter exakt wie zuvor (alg.matrixprodukt u. a.).
+      const spaltenLabels = eingabe.spaltenLabels ?? null;
+      const zeilenLabels = eingabe.zeilenLabels ?? null;
+      gitter.style.gridTemplateColumns = (zeilenLabels ? 'auto ' : '') + `repeat(${eingabe.spalten}, auto)`;
+
+      if (spaltenLabels) {
+        if (zeilenLabels) {
+          const leer = document.createElement('span');
+          leer.className = 'matrix-kopf-leer';
+          gitter.appendChild(leer);
+        }
+        spaltenLabels.forEach((text) => {
+          const kopf = document.createElement('span');
+          kopf.className = 'matrix-spalten-label';
+          kopf.textContent = text;
+          gitter.appendChild(kopf);
+        });
+      }
+
       const zellen = [];
       for (let i = 0; i < eingabe.zeilen; i++) {
+        if (zeilenLabels) {
+          const zeilenLabel = document.createElement('span');
+          zeilenLabel.className = 'matrix-zeilen-label';
+          zeilenLabel.textContent = zeilenLabels[i];
+          gitter.appendChild(zeilenLabel);
+        }
         const zeilenFelder = [];
         for (let j = 0; j < eingabe.spalten; j++) {
           const feld = baueZahlenfeld(gitter, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
@@ -578,16 +616,117 @@ function bewerteAlleEingaben(aufgabe, felder) {
 // Übungsmodus
 // ---------------------------------------------------------------------------
 
+const TEIL_NAMEN = { finanz: 'Finanzmathematik', diff: 'Differentialrechnung', integral: 'Integralrechnung', algebra: 'Lineare Algebra' };
+
+// localStorage mit In-Memory-Ersatz (dieselbe Begründung wie bei der
+// Probeklausur): merkt sich die zuletzt gewählte Themenfilter-Einstellung
+// über einen Neustart der App hinweg.
+const UEBUNG_FILTER_SCHLUESSEL = 'mathe-trainer-uebung-filter-v1';
+let uebungFilterFallback = null;
+
+function speichereUebungFilter(zustand) {
+  const text = JSON.stringify(zustand);
+  try { window.localStorage.setItem(UEBUNG_FILTER_SCHLUESSEL, text); } catch (fehler) { uebungFilterFallback = text; }
+}
+
+function ladeUebungFilter() {
+  try {
+    const text = window.localStorage.getItem(UEBUNG_FILTER_SCHLUESSEL);
+    if (text) return JSON.parse(text);
+  } catch (fehler) { /* weiter zum In-Memory-Fallback */ }
+  if (uebungFilterFallback) { try { return JSON.parse(uebungFilterFallback); } catch (fehler) { return null; } }
+  return null;
+}
+
 function starteUebungsmodus(wurzel) {
+  let filterZustand = ladeUebungFilter();
+  if (!filterZustand || !Array.isArray(filterZustand.ausgeschlossen) ||
+    (filterZustand.teil !== 'alle' && !TEIL_NAMEN[filterZustand.teil])) {
+    filterZustand = { teil: 'alle', ausgeschlossen: [] };
+  }
+
+  const filterContainer = document.createElement('div');
+  filterContainer.className = 'themen-filter';
+  wurzel.appendChild(filterContainer);
+
   const karte = document.createElement('section');
   karte.className = 'aufgabe-karte';
   wurzel.appendChild(karte);
 
   let aktuelleAufgabe = null;
 
+  // Der Pool, aus dem "Neue Aufgabe" zieht: erst nach Teil eingeschränkt
+  // (oder "alle"), dann um einzeln abgewählte Aufgabentypen bereinigt.
+  function aktiverPool() {
+    const basis = filterZustand.teil === 'alle' ? GENERATOREN : (GENERATOREN_NACH_TEIL[filterZustand.teil] || []);
+    return basis.filter((g) => !filterZustand.ausgeschlossen.includes(g.id));
+  }
+
+  function zeichneFilter() {
+    filterContainer.innerHTML = '';
+
+    const teilReihe = document.createElement('div');
+    teilReihe.className = 'themen-filter-teile';
+    ['alle', ...Object.keys(TEIL_NAMEN)].forEach((teil) => {
+      const knopf = document.createElement('button');
+      knopf.type = 'button';
+      knopf.textContent = teil === 'alle' ? 'Alle' : TEIL_NAMEN[teil];
+      knopf.className = 'themen-filter-knopf' + (filterZustand.teil === teil ? ' aktiv' : '');
+      knopf.addEventListener('click', () => {
+        if (filterZustand.teil === teil) return;
+        filterZustand = { teil, ausgeschlossen: filterZustand.ausgeschlossen };
+        speichereUebungFilter(filterZustand);
+        zeichneFilter();
+        neueAufgabe();
+      });
+      teilReihe.appendChild(knopf);
+    });
+    filterContainer.appendChild(teilReihe);
+
+    // Die einzelnen Aufgabentypen nur innerhalb eines gewählten Teils
+    // anzeigen — bei "Alle" wären das auf einmal alle ~20 Generatoren,
+    // unübersichtlich bei 375px und auch nicht nötig (iPhone-Rückmeldung
+    // wollte eine Auswahl "pro Teil").
+    if (filterZustand.teil !== 'alle') {
+      const liste = document.createElement('div');
+      liste.className = 'themen-filter-liste';
+      (GENERATOREN_NACH_TEIL[filterZustand.teil] || []).forEach((g) => {
+        const zeile = document.createElement('label');
+        zeile.className = 'themen-filter-zeile';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = !filterZustand.ausgeschlossen.includes(g.id);
+        checkbox.addEventListener('change', () => {
+          const ausgeschlossen = new Set(filterZustand.ausgeschlossen);
+          if (checkbox.checked) ausgeschlossen.delete(g.id); else ausgeschlossen.add(g.id);
+          filterZustand = { teil: filterZustand.teil, ausgeschlossen: [...ausgeschlossen] };
+          speichereUebungFilter(filterZustand);
+        });
+        zeile.appendChild(checkbox);
+        const text = document.createElement('span');
+        text.textContent = g.name;
+        zeile.appendChild(text);
+        if (g.zusatz) {
+          const abzeichen = document.createElement('span');
+          abzeichen.className = 'themen-filter-abzeichen';
+          abzeichen.textContent = 'Zusatzthema';
+          zeile.appendChild(abzeichen);
+        }
+        liste.appendChild(zeile);
+      });
+      filterContainer.appendChild(liste);
+    }
+  }
+
   function neueAufgabe() {
+    const pool = aktiverPool();
+    if (pool.length === 0) {
+      aktuelleAufgabe = null;
+      karte.innerHTML = '<p class="frage-text">Keine Aufgabentypen ausgewählt — bitte oben mindestens einen Typ aktivieren.</p>';
+      return;
+    }
     const rngAuswahl = mulberry32(erzeugeSeed());
-    const generator = zufallAus(rngAuswahl, GENERATOREN);
+    const generator = zufallAus(rngAuswahl, pool);
     const rngAufgabe = mulberry32(erzeugeSeed());
     const params = generator.waehleParameter(rngAufgabe);
     aktuelleAufgabe = generator.baue(params);
@@ -598,7 +737,11 @@ function starteUebungsmodus(wurzel) {
     karte.innerHTML = '';
 
     const titel = document.createElement('h2');
-    titel.textContent = generator.name + ' (' + generator.punkte + ' P)';
+    // aufgabe.titel (optional): Generatoren mit mehreren zufälligen Varianten
+    // (z. B. Tilgungsplan: Raten- oder Annuitätentilgung) nennen hier nur die
+    // tatsächlich gezogene Variante statt aller möglichen im statischen
+    // generator.name (iPhone-Rückmeldung).
+    titel.textContent = (aktuelleAufgabe.titel ?? generator.name) + ' (' + generator.punkte + ' P)';
     karte.appendChild(titel);
 
     baueFrageDarstellung(karte, aktuelleAufgabe);
@@ -656,6 +799,7 @@ function starteUebungsmodus(wurzel) {
     karte.appendChild(loesungContainer);
   }
 
+  zeichneFilter();
   neueAufgabe();
 
   return {
@@ -839,7 +983,7 @@ function zeichneLaufendeKlausur(wurzel, zustand) {
     const karte = document.createElement('section');
     karte.className = 'aufgabe-karte';
     const titel = document.createElement('h2');
-    titel.textContent = `Aufgabe ${idx + 1}: ${generator.name} (${generator.punkte} P)`;
+    titel.textContent = `Aufgabe ${idx + 1}: ${aufgabe.titel ?? generator.name} (${generator.punkte} P)`;
     karte.appendChild(titel);
 
     baueFrageDarstellung(karte, aufgabe);
@@ -920,7 +1064,7 @@ function zeichneAuswertung(wurzel, zustand) {
     const karte = document.createElement('section');
     karte.className = 'aufgabe-karte';
     const kartenTitel = document.createElement('h2');
-    kartenTitel.textContent = `Aufgabe ${idx + 1}: ${generator.name} (${generator.punkte} P)`;
+    kartenTitel.textContent = `Aufgabe ${idx + 1}: ${aufgabe.titel ?? generator.name} (${generator.punkte} P)`;
     karte.appendChild(kartenTitel);
 
     baueFrageDarstellung(karte, aufgabe);

@@ -312,7 +312,7 @@ export const integralUnbestimmt = {
     const eingaben = [
       {
         id: 'F', label: 'Stammfunktion F(x)', typ: 'koeffizienten', punkte: sonder ? 2 : 3,
-        exponenten: fExponenten, loesung: fDezimalWerte,
+        exponenten: fExponenten, loesung: fDezimalWerte, mitKonstante: true,
         toleranz: hatNichtAbbrechendenBruch ? KONFIG.toleranz.bruch : KONFIG.toleranz.exakt,
       },
     ];

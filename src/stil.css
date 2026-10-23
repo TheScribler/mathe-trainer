@@ -53,8 +53,8 @@ body {
   border: 1px solid var(--rand); padding: 6px 12px; text-align: center;
 }
 .frage-tabelle th { color: var(--gedaempft); font-weight: 600; font-size: .85rem; }
-.eingaben { display: flex; flex-direction: column; gap: 10px; margin-bottom: .75rem; }
-.eingabe-zeile { display: flex; flex-direction: column; gap: .3rem; font-size: .9rem; color: var(--gedaempft); }
+.eingaben { display: flex; flex-direction: column; gap: 10px; margin-bottom: .2rem; }
+.eingabe-zeile { display: flex; flex-direction: column; gap: .2rem; font-size: .9rem; color: var(--gedaempft); }
 .eingabe-zeile input {
   font: inherit; padding: 10px 12px; border-radius: 8px; width: 100%;
   border: 1px solid var(--rand); background: var(--bg); color: var(--fg);
@@ -71,7 +71,16 @@ body {
   height: 1.1em; line-height: 1.1em; overflow: hidden;
 }
 .eingelesen-als-reihe { margin-top: .3rem; }
-.pruef-ergebnis { min-height: 1.2em; font-weight: 600; }
+.pruef-ergebnis {
+  /* margin:0 statt des Browser-Standardabstands eines <p> (1em oben/unten) —
+     der stapelte sich mit .eingabens eigenem margin-bottom zu einer großen,
+     rein zufälligen Lücke vor der Prüfen/Lösung/Neue-Aufgabe-Zeile (iPhone-
+     Rückmeldung). min-height knapper (1em statt 1.2em) aus demselben Grund —
+     reicht für eine Textzeile, muss aber keinen zusätzlichen Puffer reservieren. */
+  margin: 0;
+  min-height: 1em;
+  font-weight: 600;
+}
 .pruef-ergebnis.gut { color: var(--gut); }
 .pruef-ergebnis.schlecht { color: var(--schlecht); }
 .pruef-ergebnis.neutral { color: var(--gedaempft); }
@@ -132,17 +141,28 @@ body {
   text-align: center; font-size: .72rem; color: var(--gedaempft);
   margin: 1.5rem 0 0; padding-top: .5rem; opacity: .7;
 }
-.koeffizienten-reihe { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.koeffizienten-reihe { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem; }
 .koeffizienten-teil { display: inline-flex; align-items: center; gap: .3rem; }
-.koeffizienten-teil input { width: 4.5rem; }
+/* Schmaler als ein normales Zahlenfeld (war 4,5rem) — bei int.unbestimmt
+   müssen bis zu vier Boxen (x⁴…x¹) in einer Zeile nebeneinander passen,
+   sonst bricht die Reihe nach x² um (iPhone-Rückmeldung). */
+.koeffizienten-teil input { width: 2.4rem; }
 .koeffizienten-potenz { font-size: .95rem; }
 .koeffizienten-plus { color: var(--gedaempft); }
 .matrix-gitter {
   display: grid;
   gap: .4rem;
-  margin: .2rem 0;
+  /* Nur oben Abstand zum Label — unten reicht der ohnehin folgende Flex-Gap
+     der .eingabe-zeile, ein zusätzlicher Margin hätte die Lücke vor der
+     Knopf-Reihe nur unnötig vergrößert (iPhone-Rückmeldung). */
+  margin: .2rem 0 0;
 }
 .matrix-zelle { width: 3.6rem; text-align: center; padding-left: 4px; padding-right: 4px; }
+.matrix-spalten-label, .matrix-zeilen-label, .matrix-kopf-leer {
+  display: flex; align-items: center; justify-content: center;
+  font-size: .8rem; color: var(--gedaempft); text-align: center;
+}
+.matrix-zeilen-label { justify-content: flex-start; font-weight: 600; }
 .eingabe-zeile select {
   font: inherit; padding: 10px 12px; border-radius: 8px; width: 100%;
   border: 1px solid var(--rand); background: var(--bg); color: var(--fg);
@@ -181,6 +201,31 @@ body {
   cursor: pointer; -webkit-appearance: none; flex: 1 1 0; min-height: 44px;
 }
 .modus-leiste button.modus-aktiv { color: var(--fg); border-color: var(--akzent); background: var(--karte); }
+
+.themen-filter { margin-bottom: 1rem; }
+.themen-filter-teile { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: .5rem; }
+.themen-filter-knopf {
+  font: inherit; font-size: .85rem; font-weight: 600; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--rand); background: var(--bg); color: var(--gedaempft);
+  cursor: pointer; -webkit-appearance: none; min-height: 36px;
+}
+.themen-filter-knopf.aktiv { color: var(--fg); border-color: var(--akzent); background: var(--karte); }
+.themen-filter-liste {
+  border: 1px solid var(--rand); border-radius: 10px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 8px; background: var(--karte);
+}
+.themen-filter-zeile { display: flex; align-items: flex-start; gap: 8px; font-size: .9rem; }
+.themen-filter-zeile input[type="checkbox"] {
+  margin-top: 3px; flex-shrink: 0; width: 18px; height: 18px; -webkit-appearance: none;
+  border: 1px solid var(--rand); border-radius: 4px; background: var(--bg);
+}
+.themen-filter-zeile input[type="checkbox"]:checked {
+  background: var(--akzent); border-color: var(--akzent);
+}
+.themen-filter-abzeichen {
+  font-size: .7rem; color: var(--akzent); border: 1px solid var(--akzent); border-radius: 999px;
+  padding: 1px 6px; margin-left: 2px; white-space: nowrap; align-self: center;
+}
 
 .klausur-kopf {
   display: flex; align-items: center; justify-content: space-between;
