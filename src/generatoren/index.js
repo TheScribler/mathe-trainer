@@ -1,13 +1,13 @@
 // Registry aller Generatoren. Ab Phase 6 kommen die Zusatzthemen dazu.
 
 import { FINANZ_GENERATOREN, FINANZ_ZUSATZ_GENERATOREN } from './finanz.js';
-import { DIFF_GENERATOREN } from './diff.js';
+import { DIFF_GENERATOREN, DIFF_ZUSATZ_GENERATOREN } from './diff.js';
 import { INTEGRAL_GENERATOREN } from './integral.js';
 import { ALGEBRA_GENERATOREN } from './algebra.js';
 
 export const GENERATOREN = [
   ...FINANZ_GENERATOREN, ...FINANZ_ZUSATZ_GENERATOREN,
-  ...DIFF_GENERATOREN,
+  ...DIFF_GENERATOREN, ...DIFF_ZUSATZ_GENERATOREN,
   ...INTEGRAL_GENERATOREN,
   ...ALGEBRA_GENERATOREN,
 ];

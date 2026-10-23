@@ -20,6 +20,7 @@ import {
   extremwerteZweiVariablenQuadratisch,
   nutzenmaximum,
   ableitungen,
+  elastizitaet,
 } from '../src/generatoren/diff.js';
 import {
   integralUnbestimmt,
@@ -365,6 +366,14 @@ export function testeFixtures() {
     pruefe(plan.length === erwartet.length && plan.every((zeile, i) => zeile.every((w, j) => nahBei(w, erwartet[i][j], 0.01))),
       `Übung 8: Tilgungsplan=${JSON.stringify(plan)}, erwartet ${JSON.stringify(erwartet)}`);
     faelle.push('Übung 8');
+  }
+
+  // Übung 17a: f(x)=10-0,1x -> Punktelastizität ε(50) = -1.
+  {
+    const a = elastizitaet.baue({ a: 10, b: 0.1, x0: 50 });
+    const werte = Object.fromEntries(a.eingaben.map((e) => [e.id, e.loesung]));
+    pruefe(nahBei(werte.eps, -1, 1e-9), `Übung 17a: ε=${werte.eps}, erwartet -1`);
+    faelle.push('Übung 17a');
   }
 
   console.log(`Fixtures: ${faelle.length} geprüft (${faelle.join(', ')})`);

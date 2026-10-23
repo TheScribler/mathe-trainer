@@ -36,6 +36,8 @@ const GENERATOR_IDS = [
   'diff.extremwerte-2var-quadratisch',
   'diff.nutzenmaximum',
   'diff.ableitungen',
+  'diff.elastizitaet',
+  'diff.partielle-ableitungen',
   'int.unbestimmt',
   'int.bestimmt',
   'int.konsumentenrente',

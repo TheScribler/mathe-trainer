@@ -532,16 +532,78 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
   if (generator.id === 'diff.ableitungen') {
     const faWert = wertVon(aufgabe, 'a_check');
     const fbWert = wertVon(aufgabe, 'b_check');
-    const faVon = (x) => p.a * x * x + 1 / x;
-    const fbVon = (x) => (x - p.b) * Math.sqrt(x * x - p.c);
     // 0,01 statt 1e-3: faWert/fbWert sind auf 2 Nachkommastellen gerundete
     // Klausur-Ergebnisse (CLAUDE.md Abschnitt 6), nicht mehr der exakte Wert
     // — die Toleranz muss die Rundung (bis 0,005) plus die eigene kleine
     // Ungenauigkeit des Differenzenquotienten decken.
-    pruefe(nahBei(ableitungNumerisch(faVon, p.x0a), faWert, 0.01),
-      `${kennzeichnung}: f'(${p.x0a}) numerisch (a) = ${ableitungNumerisch(faVon, p.x0a)}, erwartet ${faWert}`);
-    pruefe(nahBei(ableitungNumerisch(fbVon, p.x0b), fbWert, 0.01),
-      `${kennzeichnung}: f'(${p.x0b}) numerisch (b) = ${ableitungNumerisch(fbVon, p.x0b)}, erwartet ${fbWert}`);
+    const variante = p.variante ?? 0;
+    if (variante === 1) {
+      const faVon = (x) => (p.m * x + p.n) / (p.p * x + p.q);
+      const fbVon = (x) => p.k * Math.exp(p.c * x);
+      pruefe(nahBei(ableitungNumerisch(faVon, p.x0a), faWert, 0.01),
+        `${kennzeichnung}: f'(${p.x0a}) numerisch (a, Quotientenregel) = ${ableitungNumerisch(faVon, p.x0a)}, erwartet ${faWert}`);
+      pruefe(nahBei(ableitungNumerisch(fbVon, p.x0b), fbWert, 0.01),
+        `${kennzeichnung}: f'(${p.x0b}) numerisch (b, e-Funktion) = ${ableitungNumerisch(fbVon, p.x0b)}, erwartet ${fbWert}`);
+    } else if (variante === 2) {
+      const faVon = (x) => p.k * Math.log(p.c * x + p.d);
+      const fbVon = (x) => p.kB * (Math.log(x) / Math.log(p.basis));
+      pruefe(nahBei(ableitungNumerisch(faVon, p.x0a), faWert, 0.01),
+        `${kennzeichnung}: f'(${p.x0a}) numerisch (a, ln) = ${ableitungNumerisch(faVon, p.x0a)}, erwartet ${faWert}`);
+      pruefe(nahBei(ableitungNumerisch(fbVon, p.x0b), fbWert, 0.01),
+        `${kennzeichnung}: f'(${p.x0b}) numerisch (b, log_a) = ${ableitungNumerisch(fbVon, p.x0b)}, erwartet ${fbWert}`);
+    } else if (variante === 3) {
+      const faVon = (x) => p.k * Math.pow(p.basis, x);
+      const fbVon = (x) => p.p * x * x * x + p.q * x * x;
+      // Zweite Ableitung: Differenzenquotient zweiter Ordnung, nicht zweimal
+      // der erste (eigener, getrennter Rechenweg statt verschachtelter
+      // numerischer Differentiation mit sich aufschaukelndem Fehler).
+      const h = 1e-3;
+      const fbZweiteNumerisch = (fbVon(p.x0b + h) - 2 * fbVon(p.x0b) + fbVon(p.x0b - h)) / (h * h);
+      pruefe(nahBei(ableitungNumerisch(faVon, p.x0a), faWert, 0.01),
+        `${kennzeichnung}: f'(${p.x0a}) numerisch (a, a^x) = ${ableitungNumerisch(faVon, p.x0a)}, erwartet ${faWert}`);
+      pruefe(nahBei(fbZweiteNumerisch, fbWert, 0.5),
+        `${kennzeichnung}: f''(${p.x0b}) numerisch (b, 2. Ableitung) = ${fbZweiteNumerisch}, erwartet ${fbWert}`);
+    } else {
+      const faVon = (x) => p.a * x * x + 1 / x;
+      const fbVon = (x) => (x - p.b) * Math.sqrt(x * x - p.c);
+      pruefe(nahBei(ableitungNumerisch(faVon, p.x0a), faWert, 0.01),
+        `${kennzeichnung}: f'(${p.x0a}) numerisch (a) = ${ableitungNumerisch(faVon, p.x0a)}, erwartet ${faWert}`);
+      pruefe(nahBei(ableitungNumerisch(fbVon, p.x0b), fbWert, 0.01),
+        `${kennzeichnung}: f'(${p.x0b}) numerisch (b) = ${ableitungNumerisch(fbVon, p.x0b)}, erwartet ${fbWert}`);
+    }
+    return;
+  }
+
+  if (generator.id === 'diff.elastizitaet') {
+    const epsWert = wertVon(aufgabe, 'eps');
+    const fVon = (x) => p.a - p.b * x;
+    const f0 = fVon(p.x0);
+    const fStrichNumerisch = ableitungNumerisch(fVon, p.x0);
+    const epsNumerisch = (fStrichNumerisch * p.x0) / f0;
+    pruefe(nahBei(epsNumerisch, epsWert, 0.05),
+      `${kennzeichnung}: ε(${p.x0}) numerisch = ${epsNumerisch}, erwartet ${epsWert}`);
+    return;
+  }
+
+  if (generator.id === 'diff.partielle-ableitungen') {
+    const fxWert = wertVon(aufgabe, 'fx_check');
+    const fyWert = wertVon(aufgabe, 'fy_check');
+    const familie = p.familie ?? 0;
+    let fVon;
+    if (familie === 1) {
+      fVon = (x, y) => p.C * Math.pow(x, p.m) * Math.pow(y, p.n);
+    } else if (familie === 2) {
+      fVon = (x, y) => Math.exp(p.k * x * x * y);
+    } else {
+      fVon = (x, y) => p.A * Math.pow(x, p.p) + p.B * Math.pow(y, p.q);
+    }
+    const h = 1e-4;
+    const fxNumerisch = (fVon(p.x0 + h, p.y0) - fVon(p.x0 - h, p.y0)) / (2 * h);
+    const fyNumerisch = (fVon(p.x0, p.y0 + h) - fVon(p.x0, p.y0 - h)) / (2 * h);
+    pruefe(nahBei(fxNumerisch, fxWert, 0.05),
+      `${kennzeichnung}: ∂f/∂x(${p.x0},${p.y0}) numerisch = ${fxNumerisch}, erwartet ${fxWert}`);
+    pruefe(nahBei(fyNumerisch, fyWert, 0.05),
+      `${kennzeichnung}: ∂f/∂y(${p.x0},${p.y0}) numerisch = ${fyNumerisch}, erwartet ${fyWert}`);
     return;
   }
 
