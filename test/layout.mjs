@@ -44,6 +44,8 @@ const GENERATOR_IDS = [
   'int.kosten-aus-grenzkosten',
   'alg.matrixprodukt',
   'alg.produktionsprozess',
+  'alg.matrixrechnung',
+  'alg.lgs',
 ];
 
 function warte(ms) {

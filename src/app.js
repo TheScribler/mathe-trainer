@@ -301,11 +301,17 @@ function baueEingabeZeile(eingabe, felder) {
       const reihe = document.createElement('span');
       reihe.className = 'koeffizienten-reihe';
       const teilfelder = [];
-      eingabe.exponenten.forEach((exponent, i) => {
+      // beschriftungen (optional): feste Beschriftungen je Box ("x₁","x₂",
+      // "x₃") statt der aus einem Exponenten abgeleiteten Potenz-Schreibweise
+      // ("x²","x",...) — für Antworten, die kein Polynom sind (z. B. die
+      // Lösung eines LGS). trenner (optional): "," statt "+" zwischen den
+      // Boxen, wenn die Werte keine Summanden sind, sondern ein Tupel.
+      const beschriftungen = eingabe.beschriftungen ?? eingabe.exponenten.map(potenzBeschriftung);
+      beschriftungen.forEach((beschriftungText, i) => {
         if (i > 0) {
           const plus = document.createElement('span');
           plus.className = 'koeffizienten-plus';
-          plus.textContent = '+';
+          plus.textContent = eingabe.trenner ?? '+';
           reihe.appendChild(plus);
         }
         const teilZeile = document.createElement('span');
@@ -313,7 +319,7 @@ function baueEingabeZeile(eingabe, felder) {
         const feld = baueZahlenfeld(teilZeile, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
         const potenzLabel = document.createElement('span');
         potenzLabel.className = 'koeffizienten-potenz';
-        potenzLabel.textContent = potenzBeschriftung(exponent);
+        potenzLabel.textContent = beschriftungText;
         teilZeile.appendChild(potenzLabel);
         reihe.appendChild(teilZeile);
         teilfelder.push(feld);
@@ -858,7 +864,12 @@ function starteUebungsmodus(wurzel) {
     const rngAuswahl = mulberry32(erzeugeSeed());
     const generator = zufallAus(rngAuswahl, pool);
     const rngAufgabe = mulberry32(erzeugeSeed());
-    const params = generator.waehleParameter(rngAufgabe);
+    // erlaubeZusatzvarianten: Übungsmodus zeigt alle Varianten eines
+    // Generators (auch Übung-22/23-ähnliche Zusatzvarianten von
+    // alg.matrixprodukt/alg.produktionsprozess) — nur die Probeklausur hält
+    // sich standardmäßig an die Musterklausur-Form (siehe
+    // generatorenFuerProbeklausur unten).
+    const params = generator.waehleParameter(rngAufgabe, { erlaubeZusatzvarianten: true });
     aktuelleAufgabe = generator.baue(params);
     zeichneAufgabe(generator);
   }
@@ -937,7 +948,7 @@ function starteUebungsmodus(wurzel) {
     testErzeugeAufgabe(generatorId, seed, mitLoesung) {
       const generator = findeGenerator(generatorId);
       if (!generator) throw new Error('Unbekannter Generator: ' + generatorId);
-      const params = generator.waehleParameter(mulberry32(seed));
+      const params = generator.waehleParameter(mulberry32(seed), { erlaubeZusatzvarianten: true });
       aktuelleAufgabe = generator.baue(params);
       zeichneAufgabe(generator);
       if (mitLoesung) {
@@ -1000,7 +1011,14 @@ function baueAufgabenliste(teile) {
   const aufgaben = [];
   for (const teil of teile) {
     for (const generator of teil.generatoren) {
-      const params = generator.waehleParameter(rngAufgaben);
+      // Die Probeklausur hält sich an die Musterklausur-Form, außer
+      // KONFIG.zusatzthemenInKlausur schaltet Zusatzvarianten ausdrücklich
+      // dazu (dieselbe Einstellung, die auch ganze Zusatzthemen-Generatoren
+      // ein-/ausschließt, siehe generatorenFuerProbeklausur unten) — hier
+      // zusätzlich für Varianten INNERHALB von alg.matrixprodukt/
+      // alg.produktionsprozess (Übung 22/23), die keine eigenen Generator-
+      // Einträge sind.
+      const params = generator.waehleParameter(rngAufgaben, { erlaubeZusatzvarianten: KONFIG.zusatzthemenInKlausur });
       aufgaben.push({ teil: teil.teil, generatorId: generator.id, params });
     }
   }

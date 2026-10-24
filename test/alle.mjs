@@ -711,6 +711,27 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
       const nachgerechnet = matrixMalUnabhaengig([v], M)[0];
       pruefe(nachgerechnet.every((w, i) => nahBei(w, wertVon(aufgabe, 'a')[0][i], 1e-6)),
         `${kennzeichnung}: a) nachgerechnet ${nachgerechnet}, erwartet ${wertVon(aufgabe, 'a')[0]}`);
+    } else if (p.teilA.art === 'transponiert') {
+      const { A } = p.teilA;
+      const erwartetA = wertVon(aufgabe, 'a'); // n×m
+      // Unabhängig: direkt per Indextausch nachbauen statt die Generator-
+      // eigene transponiere()-Funktion erneut aufzurufen.
+      for (let i = 0; i < A.length; i++) {
+        for (let j = 0; j < A[0].length; j++) {
+          pruefe(nahBei(A[i][j], erwartetA[j][i], 1e-6),
+            `${kennzeichnung}: a) Aᵗ[${j}][${i}] erwartet A[${i}][${j}]=${A[i][j]}, war ${erwartetA[j][i]}`);
+        }
+      }
+    } else if (p.teilA.art === 'skalar') {
+      const { A, a } = p.teilA;
+      const erwartetA = wertVon(aufgabe, 'a');
+      pruefe(A.every((zeile, i) => zeile.every((w, j) => nahBei(a * w, erwartetA[i][j], 1e-6))),
+        `${kennzeichnung}: a) a·A nachgerechnet ${JSON.stringify(A.map((z) => z.map((w) => a * w)))}, erwartet ${JSON.stringify(erwartetA)}`);
+    } else if (p.teilA.art === 'einheitsmatrix') {
+      const { A } = p.teilA;
+      const erwartetA = wertVon(aufgabe, 'a');
+      pruefe(A.every((zeile, i) => zeile.every((w, j) => nahBei(w, erwartetA[i][j], 1e-6))),
+        `${kennzeichnung}: a) A·E nachgerechnet ${JSON.stringify(A)}, erwartet ${JSON.stringify(erwartetA)}`);
     } else {
       const { C, D } = p.teilA;
       pruefe(C[0].length !== D.length,
@@ -724,13 +745,15 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
   }
 
   if (generator.id === 'alg.produktionsprozess') {
-    const AB = matrixMalUnabhaengig(p.A, p.B);
+    // Übung 23 (einstufig, p.stufen === 1): A ist bereits die Gesamtbedarfs-
+    // matrix, es gibt kein B. Musterklausur 8 (zweistufig): AB = A·B.
+    const AB = p.stufen === 1 ? p.A : matrixMalUnabhaengig(p.A, p.B);
     const R = matrixMalUnabhaengig(AB, p.E);
     const erwartetR = wertVon(aufgabe, 'R');
     pruefe(R.every((zeile, i) => nahBei(zeile[0], erwartetR[i][0], 1e-6)),
       `${kennzeichnung}: R nachgerechnet ${JSON.stringify(R)}, erwartet ${JSON.stringify(erwartetR)}`);
     pruefe(R.every((zeile) => zeile[0] > 0), `${kennzeichnung}: Rohstoffbedarf muss positiv sein, ist ${JSON.stringify(R)}`);
-    pruefe(p.A.every((zeile) => zeile.every((w) => w >= 0)) && p.B.every((zeile) => zeile.every((w) => w >= 0)),
+    pruefe(p.A.every((zeile) => zeile.every((w) => w >= 0)) && (p.stufen === 1 || p.B.every((zeile) => zeile.every((w) => w >= 0))),
       `${kennzeichnung}: A und B müssen nicht-negativ sein`);
     let kosten = 0;
     for (let i = 0; i < p.PR.length; i++) kosten += p.PR[i] * R[i][0];
@@ -742,6 +765,50 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     pruefe(gewinn > 0, `${kennzeichnung}: Gewinn muss positiv sein, ist ${gewinn}`);
     pruefe(gewinn >= 0.1 * erloes - 1e-9,
       `${kennzeichnung}: Gewinn ${gewinn} ist unplausibel klein gegenüber Erlös ${erloes} (< 10 %)`);
+    return;
+  }
+
+  if (generator.id === 'alg.matrixrechnung') {
+    // Unabhängig: jeden Eintrag direkt aus den Rohdaten (p.A/B/C/r/s) neu
+    // ausrechnen, nicht über die Generator-eigenen Zwischenschritte.
+    const a = wertVon(aufgabe, 'a');
+    const b = wertVon(aufgabe, 'b');
+    const c = wertVon(aufgabe, 'c');
+    const d = wertVon(aufgabe, 'd');
+    for (let i = 0; i < 2; i++) {
+      for (let j = 0; j < 2; j++) {
+        pruefe(nahBei(a[i][j], p.r * (p.A[i][j] - p.C[i][j]), 1e-9),
+          `${kennzeichnung}: a)[${i}][${j}] nachgerechnet ${p.r * (p.A[i][j] - p.C[i][j])}, erwartet ${a[i][j]}`);
+        const bWert = p.r * p.A[i][j] + p.s * p.B[i][j] - p.r * p.C[i][j];
+        pruefe(nahBei(b[i][j], bWert, 1e-9),
+          `${kennzeichnung}: b)[${i}][${j}] nachgerechnet ${bWert}, erwartet ${b[i][j]}`);
+        pruefe(nahBei(c[i][j], (p.r + p.s) * p.A[i][j], 1e-9),
+          `${kennzeichnung}: c)[${i}][${j}] nachgerechnet ${(p.r + p.s) * p.A[i][j]}, erwartet ${c[i][j]}`);
+        // d) ist die Transponierte von b) — Eintrag (i,j) von d entspricht (j,i) von b.
+        pruefe(nahBei(d[i][j], b[j][i], 1e-9),
+          `${kennzeichnung}: d)[${i}][${j}] erwartet b)[${j}][${i}]=${b[j][i]}, war ${d[i][j]}`);
+      }
+    }
+    return;
+  }
+
+  if (generator.id === 'alg.lgs') {
+    const x = wertVon(aufgabe, 'x');
+    // Unabhängig: direkt in jede Zeile von A·x=b einsetzen, statt die
+    // Gauß-Elimination/Cramersche Regel des Generators nachzuvollziehen.
+    for (let i = 0; i < 3; i++) {
+      const zeileWert = p.A[i][0] * x[0] + p.A[i][1] * x[1] + p.A[i][2] * x[2];
+      pruefe(nahBei(zeileWert, p.b[i], 1e-6),
+        `${kennzeichnung}: Zeile ${i + 1} eingesetzt ${zeileWert}, erwartet b=${p.b[i]}`);
+    }
+    // Determinante unabhängig per Kofaktor-Entwicklung entlang der ersten
+    // Zeile (ein anderer Rechenweg als die Regel von Sarrus im Generator).
+    const det2 = (m) => m[0][0] * m[1][1] - m[0][1] * m[1][0];
+    const minor = (m, zeileWeg, spalteWeg) =>
+      m.filter((_, i) => i !== zeileWeg).map((zeile) => zeile.filter((_, j) => j !== spalteWeg));
+    const D = p.A[0][0] * det2(minor(p.A, 0, 0)) - p.A[0][1] * det2(minor(p.A, 0, 1)) + p.A[0][2] * det2(minor(p.A, 0, 2));
+    pruefe(Math.abs(D) > 1e-9, `${kennzeichnung}: Determinante D=${D} darf nicht null sein (eindeutige Lösung erfordert det(A)≠0)`);
+    pruefe(x.every((w) => Number.isInteger(w)), `${kennzeichnung}: Lösung ${x} ist nicht ganzzahlig`);
     return;
   }
 

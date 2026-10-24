@@ -27,7 +27,7 @@ import {
   integralBestimmt,
   integralKonsumentenrente,
 } from '../src/generatoren/integral.js';
-import { matrixprodukt, produktionsprozess } from '../src/generatoren/algebra.js';
+import { matrixprodukt, produktionsprozess, matrixrechnung } from '../src/generatoren/algebra.js';
 
 export function testeFixtures() {
   let fehler = 0;
@@ -294,6 +294,54 @@ export function testeFixtures() {
     const wG24b = a24b.eingaben.find((e) => e.id === 'G').loesung;
     pruefe(nahBei(wG24b, 100, 1e-9), `Übung 24b: G=${wG24b}, erwartet 100`);
     faelle.push('Übung 24a/b');
+  }
+
+  // Übung 22a/c/g: A = ((1,2,3,4)(2,3,4,5)(-1,0,1,2)), 3×4.
+  // a) Aᵗ, c) 3·A, g) A·E = A (E die 4×4-Einheitsmatrix) — teilB ist dabei
+  // unabhängig von Übung 22 (wiederverwendet aus MK7b, siehe oben).
+  {
+    const A22 = [[1, 2, 3, 4], [2, 3, 4, 5], [-1, 0, 1, 2]];
+    const teilB22 = {
+      X: [[1, 0, 1], [2, 0, 1], [0, 2, 1]], Y: [[4, 1, 1], [2, 2, 0], [0, 0, 3]],
+      ergebnis: [[4, 1, 4], [8, 2, 5], [4, 4, 3]],
+    };
+
+    const a22a = matrixprodukt.baue({
+      teilA: { art: 'transponiert', A: A22, ergebnis: [[1, 2, -1], [2, 3, 0], [3, 4, 1], [4, 5, 2]] },
+      teilB: teilB22,
+    });
+    const w22a = a22a.eingaben.find((e) => e.id === 'a').loesung;
+    pruefe(JSON.stringify(w22a) === JSON.stringify([[1, 2, -1], [2, 3, 0], [3, 4, 1], [4, 5, 2]]),
+      `Übung 22a: Aᵗ=${JSON.stringify(w22a)}`);
+
+    const a22c = matrixprodukt.baue({
+      teilA: { art: 'skalar', A: A22, a: 3, ergebnis: [[3, 6, 9, 12], [6, 9, 12, 15], [-3, 0, 3, 6]] },
+      teilB: teilB22,
+    });
+    const w22c = a22c.eingaben.find((e) => e.id === 'a').loesung;
+    pruefe(JSON.stringify(w22c) === JSON.stringify([[3, 6, 9, 12], [6, 9, 12, 15], [-3, 0, 3, 6]]),
+      `Übung 22c: 3·A=${JSON.stringify(w22c)}`);
+
+    const a22g = matrixprodukt.baue({
+      teilA: { art: 'einheitsmatrix', A: A22, E: [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], ergebnis: A22 },
+      teilB: teilB22,
+    });
+    const w22g = a22g.eingaben.find((e) => e.id === 'a').loesung;
+    pruefe(JSON.stringify(w22g) === JSON.stringify(A22), `Übung 22g: A·E=${JSON.stringify(w22g)}`);
+    faelle.push('Übung 22a/c/g');
+  }
+
+  // Übung 21: A=(-1,2;-2,3), B=(3,-1;-5,2), C=(2,0;0,1), r=-2, s=2.
+  // a) r(A-C)=(6,-4;4,-4). b) rA+sB-rC=(12,-6;-6,0). c) rA+sA=(r+s)A=0A=0.
+  // d) (rA+sB-rC)ᵗ = (12,-6;-6,0) (hier zufällig symmetrisch).
+  {
+    const a21 = matrixrechnung.baue({ A: [[-1, 2], [-2, 3]], B: [[3, -1], [-5, 2]], C: [[2, 0], [0, 1]], r: -2, s: 2 });
+    const w21 = Object.fromEntries(a21.eingaben.map((e) => [e.id, e.loesung]));
+    pruefe(JSON.stringify(w21.a) === JSON.stringify([[6, -4], [4, -4]]), `Übung 21a: ${JSON.stringify(w21.a)}`);
+    pruefe(JSON.stringify(w21.b) === JSON.stringify([[12, -6], [-6, 0]]), `Übung 21b: ${JSON.stringify(w21.b)}`);
+    pruefe(JSON.stringify(w21.c) === JSON.stringify([[0, 0], [0, 0]]), `Übung 21c: ${JSON.stringify(w21.c)}`);
+    pruefe(JSON.stringify(w21.d) === JSON.stringify([[12, -6], [-6, 0]]), `Übung 21d: ${JSON.stringify(w21.d)}`);
+    faelle.push('Übung 21');
   }
 
   // Übung 4e: K0=20.000, i=6 %, n=5, stetig -> Kn=26.997,18 €.

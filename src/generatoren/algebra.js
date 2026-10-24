@@ -1,6 +1,9 @@
-// Lineare Algebra — 2 Generatoren, 12 Punkte zusammen. Jeder Generator
-// konstruiert rückwärts: erst die saubere Lösung, dann die Parameter (siehe
-// PLAN.md, Katalog "4 Lineare Algebra").
+// Lineare Algebra — Generatoren für MK 7/8 (Matrizenprodukt, Produktions-
+// prozess) sowie die Zusatzthemen alg.lgs (Übung 25) und alg.matrixrechnung
+// (Übung 21), zusammen mit weiteren Übung-22/23-Varianten der beiden
+// Klausur-Generatoren. Jeder Generator konstruiert rückwärts: erst die
+// saubere Lösung, dann die Parameter (siehe PLAN.md, Katalog
+// "4 Lineare Algebra").
 
 import { zufallAus, zufallBool } from '../rng.js';
 import { minimaleNachkommastellen } from '../zahl.js';
@@ -64,6 +67,16 @@ function skalarprodukt(a, b) {
   return a.reduce((summe, w, i) => summe + w * b[i], 0);
 }
 
+// m×n -> n×m, Eintrag (i,j) wird zu (j,i).
+function transponiere(m) {
+  return m[0].map((_, j) => m.map((zeile) => zeile[j]));
+}
+
+// n×n-Einheitsmatrix (Einsen auf der Diagonale, sonst Nullen).
+function einheitsmatrix(n) {
+  return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
+}
+
 // Einen Faktor in einem Skalarprodukt klammern, wenn er negativ ist — sonst
 // entstehen zwei Vorzeichen direkt hintereinander ("+ -2" statt "+ (-2)").
 function faktorLatex(w) {
@@ -123,9 +136,55 @@ export const matrixprodukt = {
   name: 'Matrizenprodukte berechnen',
   punkte: 4,
   vorlage: 'Musterklausur 7 / Übung 22',
-  waehleParameter(rng) {
-    const aUndefiniert = zufallBool(rng, 0.15);
+  waehleParameter(rng, { erlaubeZusatzvarianten = true } = {}) {
+    // Übung-22-Zusatzvarianten (Transponierte, Skalar, Einheitsmatrix) nur
+    // außerhalb der Probeklausur bzw. wenn KONFIG.zusatzthemenInKlausur das
+    // ausdrücklich erlaubt — sonst bleibt Teil a) unverändert bei
+    // definiert/undefiniert (MK7a / Übung 22d).
+    const zusatzVariante = erlaubeZusatzvarianten
+      ? zufallAus(rng, [null, null, null, 'transponiert', 'skalar', 'einheitsmatrix'])
+      : null;
     let teilA;
+    if (zusatzVariante) {
+      for (let versuch = 0; versuch < 100; versuch++) {
+        const m = zufallAus(rng, [2, 3]);
+        const n = zufallAus(rng, [2, 3]);
+        const A = zufallsMatrix(rng, m, n, EINTRAG_POOL);
+        if (nullAnteil([A]) < 1 / 3) continue;
+
+        if (zusatzVariante === 'transponiert') {
+          teilA = { art: 'transponiert', A, ergebnis: transponiere(A) };
+        } else if (zusatzVariante === 'skalar') {
+          const a = zufallAus(rng, [-3, -2, 2, 3]);
+          const ergebnis = A.map((zeile) => zeile.map((w) => a * w));
+          if (ergebnis.some((zeile) => zeile.some((w) => Math.abs(w) > 99))) continue;
+          teilA = { art: 'skalar', A, a, ergebnis };
+        } else {
+          teilA = { art: 'einheitsmatrix', A, E: einheitsmatrix(n), ergebnis: A };
+        }
+        break;
+      }
+      if (!teilA) teilA = { art: 'transponiert', A: [[1, 2], [3, 4]], ergebnis: [[1, 3], [2, 4]] }; // Rückfall
+      let teilB = null;
+      for (let versuch = 0; versuch < 100; versuch++) {
+        const X = zufallsMatrix(rng, 3, 3, EINTRAG_POOL);
+        const Y = zufallsMatrix(rng, 3, 3, EINTRAG_POOL);
+        const ergebnis = matrixMal(X, Y);
+        if (ergebnis.some((zeile) => zeile.some((w) => Math.abs(w) > 99))) continue;
+        if (nullAnteil([X, Y]) < 1 / 3) continue;
+        teilB = { X, Y, ergebnis };
+        break;
+      }
+      if (!teilB) {
+        teilB = {
+          X: [[1, 0, 1], [2, 0, 1], [0, 2, 1]], Y: [[4, 1, 1], [2, 2, 0], [0, 0, 3]],
+          ergebnis: [[4, 1, 4], [8, 2, 5], [4, 4, 3]],
+        };
+      }
+      return { teilA, teilB };
+    }
+
+    const aUndefiniert = zufallBool(rng, 0.15);
     if (aUndefiniert) {
       // p×q mal r×s mit q garantiert ungleich r — kein Reject-Sampling nötig.
       const p = zufallAus(rng, [1, 2, 3]);
@@ -175,6 +234,8 @@ export const matrixprodukt = {
     const eingaben = [];
     const schritteA = [];
     let formelZeilenA;
+    let teilAText;
+    let titel;
 
     if (teilA.art === 'definiert') {
       const { v, M, ergebnis } = teilA;
@@ -201,6 +262,68 @@ export const matrixprodukt = {
         {
           titel: 'Ergebnis',
           latex: mehrzeiligeKette([`${matrixLatexFormatiert([v])}`, `\\cdot ${matrixLatexFormatiert(M)}`, `= ${matrixLatexFormatiert([ergebnis])}`]),
+        },
+      );
+    } else if (teilA.art === 'transponiert') {
+      const { A: Amat, ergebnis } = teilA;
+      const m = Amat.length; const n = Amat[0].length;
+      titel = 'Matrizenprodukt und Transponierte';
+      teilAText = 'Bilden Sie die Transponierte von A.';
+      formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`];
+      eingaben.push({
+        id: 'a', label: `Ergebnis Aᵗ (${n}×${m})`, typ: 'matrix', zeilen: n, spalten: m,
+        punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
+      });
+      schritteA.push(
+        {
+          titel: 'Formel',
+          latex: `A^T`,
+          hinweis: 'Transponieren vertauscht Zeilen und Spalten: Eintrag (i,j) von A wird zum Eintrag (j,i) von Aᵗ.',
+        },
+        { titel: 'Einsetzen', latex: `A = ${matrixLatexFormatiert(Amat)}` },
+        { titel: 'Ergebnis', latex: `A^T = ${matrixLatexFormatiert(ergebnis)}` },
+      );
+    } else if (teilA.art === 'skalar') {
+      const { A: Amat, a, ergebnis } = teilA;
+      const m = Amat.length; const n = Amat[0].length;
+      const aProse = a < 0 ? `−${Math.abs(a)}` : String(a);
+      titel = 'Matrizenprodukt mit Skalar';
+      teilAText = `Multiplizieren Sie A mit ${aProse}.`;
+      formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`];
+      eingaben.push({
+        id: 'a', label: `Ergebnis ${aProse}·A (${m}×${n})`, typ: 'matrix', zeilen: m, spalten: n,
+        punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
+      });
+      schritteA.push(
+        {
+          titel: 'Formel',
+          latex: `${zahlZuLatex(a, 0)} \\cdot A`,
+          hinweis: 'Bei der Multiplikation mit einem Skalar wird jeder Eintrag der Matrix mit dem Skalar multipliziert.',
+        },
+        { titel: 'Einsetzen', latex: `A = ${matrixLatexFormatiert(Amat)}` },
+        { titel: 'Ergebnis', latex: `${zahlZuLatex(a, 0)} \\cdot ${matrixLatexFormatiert(Amat)} = ${matrixLatexFormatiert(ergebnis)}` },
+      );
+    } else if (teilA.art === 'einheitsmatrix') {
+      const { A: Amat, E, ergebnis } = teilA;
+      const m = Amat.length; const n = Amat[0].length;
+      titel = 'Matrizenprodukt mit Einheitsmatrix';
+      teilAText = 'Multiplizieren Sie A mit der Einheitsmatrix E.';
+      formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`];
+      eingaben.push({
+        id: 'a', label: `Ergebnis A·E (${m}×${n})`, typ: 'matrix', zeilen: m, spalten: n,
+        punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
+      });
+      schritteA.push(
+        {
+          titel: 'Formel',
+          latex: `A \\cdot E`,
+          hinweis: 'Die Einheitsmatrix E hat Einsen auf der Diagonale und sonst Nullen — jede Multiplikation mit E lässt eine Matrix unverändert (A·E = A).',
+        },
+        { titel: 'Einsetzen', latex: `A \\cdot E = ${matrixLatexFormatiert(Amat)} \\cdot ${matrixLatexFormatiert(E)}` },
+        {
+          titel: 'Ergebnis',
+          latex: `${matrixLatexFormatiert(Amat)} \\cdot ${matrixLatexFormatiert(E)} = ${matrixLatexFormatiert(ergebnis)}`,
+          hinweis: 'Das Ergebnis ist wieder A, wie von A·E = A erwartet.',
         },
       );
     } else {
@@ -236,10 +359,11 @@ export const matrixprodukt = {
     const formelZeilenB = [`${matrixLatexFormatiert(X)}`, `\\cdot ${matrixLatexFormatiert(Y)}`];
 
     return {
+      titel,
       frage: {
         text: 'Berechnen Sie die folgenden Matrizenprodukte, soweit definiert.',
         teile: [
-          { label: 'a)', formel: mehrzeiligeKette(formelZeilenA) },
+          { label: 'a)', text: teilAText, formel: mehrzeiligeKette(formelZeilenA) },
           { label: 'b)', formel: mehrzeiligeKette(formelZeilenB) },
         ],
       },
@@ -262,9 +386,14 @@ export const matrixprodukt = {
           },
         ],
         ergebnisse: [
-          teilA.art === 'definiert'
-            ? { label: 'Ergebnis a)', latex: matrixLatexFormatiert([teilA.ergebnis]) }
-            : { label: 'Ergebnis a)', latex: '\\text{nicht definiert}' },
+          {
+            label: 'Ergebnis a)',
+            latex: teilA.art === 'undefiniert'
+              ? '\\text{nicht definiert}'
+              : teilA.art === 'definiert'
+                ? matrixLatexFormatiert([teilA.ergebnis])
+                : matrixLatexFormatiert(teilA.ergebnis),
+          },
           { label: 'Ergebnis b)', latex: matrixLatexFormatiert(ergebnisB) },
         ],
       },
@@ -291,7 +420,37 @@ export const produktionsprozess = {
   name: 'Zweistufiger Produktionsprozess',
   punkte: 8,
   vorlage: 'Musterklausur 8 / Übung 24',
-  waehleParameter(rng) {
+  waehleParameter(rng, { erlaubeZusatzvarianten = true } = {}) {
+    // Übung 23 (Zusatzvariante): derselbe Prozess, aber nur EINE Stufe
+    // (Rohstoffe direkt zu Endprodukten, kein Zwischenprodukt-Schritt über
+    // B) — nur außerhalb der Probeklausur bzw. wenn KONFIG.zusatzthemenInKlausur
+    // das ausdrücklich erlaubt; die Probeklausur bleibt sonst unverändert
+    // bei der zweistufigen Musterklausur-8-Form.
+    if (erlaubeZusatzvarianten && zufallBool(rng, 0.3)) {
+      for (let versuch = 0; versuch < 300; versuch++) {
+        const anzahlRohstoffe = zufallAus(rng, [2, 3]);
+        const anzahlEndprodukte = zufallAus(rng, [2, 3]);
+        const A = zufallsMatrix(rng, anzahlRohstoffe, anzahlEndprodukte, NICHTNEGATIV_POOL);
+        const E = Array.from({ length: anzahlEndprodukte }, () => [zufallAus(rng, STUECKZAHL_POOL)]);
+        const R = matrixMal(A, E);
+        if (R.some((zeile) => zeile[0] <= 0)) continue;
+        const PR = zufallsMatrix(rng, 1, anzahlRohstoffe, PREIS_POOL)[0];
+        const kosten = skalarprodukt(PR, R.map((zeile) => zeile[0]));
+
+        let PE = null;
+        for (let preisVersuch = 0; preisVersuch < 50; preisVersuch++) {
+          const kandidat = zufallsMatrix(rng, 1, anzahlEndprodukte, PREIS_POOL)[0];
+          const erloes = skalarprodukt(kandidat, E.map((zeile) => zeile[0]));
+          const gewinn = erloes - kosten;
+          if (gewinn > 0 && gewinn >= 0.1 * erloes && gewinn <= 9999) { PE = kandidat; break; }
+        }
+        if (!PE) continue;
+
+        return { stufen: 1, A, B: null, E, PR, PE };
+      }
+      return { stufen: 1, A: [[1, 2], [2, 1], [0, 3]], B: null, E: [[10], [12]], PR: [2, 3, 2], PE: [80, 90] }; // Rückfall: Übung 23
+    }
+
     for (let versuch = 0; versuch < 300; versuch++) {
       const A = zufallsMatrix(rng, 3, 3, NICHTNEGATIV_POOL);
       const B = zufallsMatrix(rng, 3, 2, NICHTNEGATIV_POOL);
@@ -316,14 +475,15 @@ export const produktionsprozess = {
       }
       if (!PE) continue;
 
-      return { A, B, E, PR, PE };
+      return { stufen: 2, A, B, E, PR, PE };
     }
     // Rückfall: Musterklausur 8 (nur Zahlen, kein Aufgabentext).
-    return { A: [[1, 0, 2], [2, 1, 3], [3, 1, 2]], B: [[1, 2], [2, 1], [0, 3]], E: [[10], [12]], PR: [2, 3, 2], PE: [80, 90] };
+    return { stufen: 2, A: [[1, 0, 2], [2, 1, 3], [3, 1, 2]], B: [[1, 2], [2, 1], [0, 3]], E: [[10], [12]], PR: [2, 3, 2], PE: [80, 90] };
   },
   baue(params) {
     const { A, B, E, PR, PE } = params;
-    const AB = matrixMal(A, B); // Gesamtbedarfsmatrix
+    const einstufig = params.stufen === 1;
+    const AB = einstufig ? A : matrixMal(A, B); // bei Übung 23 ist A selbst schon die Gesamtbedarfsmatrix
     const R = matrixMal(AB, E); // Rohstoffbedarf
     const kosten = skalarprodukt(PR, R.map((zeile) => zeile[0]));
     const erloes = skalarprodukt(PE, E.map((zeile) => zeile[0]));
@@ -332,10 +492,10 @@ export const produktionsprozess = {
     // Dimensionen aus den tatsächlichen Daten lesen statt fest auf 3/2
     // Rohstoffe/Zwischenprodukte anzunehmen — baue() rechnet mit jeder
     // kompatiblen Form korrekt (siehe die Übung-24-Fixtures mit nur zwei
-    // Rohstoffen), nur waehleParameter liefert immer 3×3/3×2/2×1.
+    // Rohstoffen), nur waehleParameter liefert immer 3×3/3×2/2×1ff.
     const anzahlRohstoffe = A.length;
-    const anzahlZwischenprodukte = A[0].length;
-    const anzahlEndprodukte = B[0].length;
+    const anzahlZwischenprodukte = einstufig ? null : A[0].length;
+    const anzahlEndprodukte = einstufig ? A[0].length : B[0].length;
 
     // P_E, P_R sind laut Musterlösung als Spaltenvektoren definiert (die
     // Formel braucht darum "P_E^T", die Transponierte, für das Skalar-
@@ -351,11 +511,26 @@ export const produktionsprozess = {
     const kostenTerme = PR.map((w, i) => `${faktorLatex(w)} \\cdot ${faktorLatex(R[i][0])}`).join(' + ');
     const kostenTeilprodukte = PR.map((w, i) => w * R[i][0]);
 
+    const abSchritte = einstufig
+      ? []
+      : [
+        { titel: 'Einsetzen', latex: mehrzeiligeKette([`A \\cdot B = ${matrixLatexFormatiert(A)} \\cdot ${matrixLatexFormatiert(B)}`, `= ${matrixLatexFormatiert(AB)}`]) },
+        {
+          titel: 'Einsetzen',
+          latex: alleEintraegeLatex(A, B, AB),
+          hinweis: 'Jeder Eintrag von A·B ist eine Zeile von A mal eine Spalte von B.',
+        },
+      ];
+
     return {
+      titel: einstufig ? 'Einstufiger Produktionsprozess' : undefined,
       frage: {
-        text: `In einem zweistufigen Produktionsprozess werden aus ${anzahlRohstoffe} Rohstoffen über die Produktionskoeffizienten in A ` +
-          `${anzahlZwischenprodukte} Zwischenprodukte und aus diesen über B ${anzahlEndprodukte} Endprodukte hergestellt, die in den Mengen E ` +
-          `hergestellt werden sollen.`,
+        text: einstufig
+          ? `In einem einstufigen Produktionsprozess werden aus ${anzahlRohstoffe} Rohstoffen über die Produktionskoeffizienten in A direkt ` +
+            `${anzahlEndprodukte} Endprodukte hergestellt, die in den Mengen E hergestellt werden sollen.`
+          : `In einem zweistufigen Produktionsprozess werden aus ${anzahlRohstoffe} Rohstoffen über die Produktionskoeffizienten in A ` +
+            `${anzahlZwischenprodukte} Zwischenprodukte und aus diesen über B ${anzahlEndprodukte} Endprodukte hergestellt, die in den Mengen E ` +
+            `hergestellt werden sollen.`,
         teile: [
           { label: 'a)', text: `Wie viele Einheiten der ${anzahlRohstoffe} Rohstoffe werden dafür benötigt?` },
           { label: 'b)', text: 'Die Endprodukte werden zu Verkaufspreisen je Einheit PE verkauft, die Rohstoffe kosten je Einheit PR. Wie hoch ist der Gewinn?' },
@@ -366,7 +541,7 @@ export const produktionsprozess = {
         // waren abgeschnitten), eine einzelne Matrix passt dagegen immer.
         formel: mehrzeiligeKette([
           `A = ${matrixLatexFormatiert(A)}`,
-          `B = ${matrixLatexFormatiert(B)}`,
+          ...(einstufig ? [] : [`B = ${matrixLatexFormatiert(B)}`]),
           `E = ${matrixLatexFormatiert(E)}`,
           `P_E = ${matrixLatexFormatiert(peSpalte)}`,
           `P_R = ${matrixLatexFormatiert(prSpalte)}`,
@@ -383,20 +558,17 @@ export const produktionsprozess = {
         schritte: [
           {
             titel: 'Formel',
-            latex: `R = A \\cdot B \\cdot E`,
-            hinweis: 'Erst A·B als Gesamtbedarfsmatrix bilden (wie viele Rohstoffe je Einheit jedes Endprodukts nötig sind), dann mit E multiplizieren.',
+            latex: einstufig ? `R = A \\cdot E` : `R = A \\cdot B \\cdot E`,
+            hinweis: einstufig
+              ? 'Der Rohstoffbedarf R ergibt sich direkt aus A (Rohstoffe je Einheit jedes Endprodukts) mal E (herzustellende Mengen).'
+              : 'Erst A·B als Gesamtbedarfsmatrix bilden (wie viele Rohstoffe je Einheit jedes Endprodukts nötig sind), dann mit E multiplizieren.',
           },
-          { titel: 'Einsetzen', latex: mehrzeiligeKette([`A \\cdot B = ${matrixLatexFormatiert(A)} \\cdot ${matrixLatexFormatiert(B)}`, `= ${matrixLatexFormatiert(AB)}`]) },
-          {
-            titel: 'Einsetzen',
-            latex: alleEintraegeLatex(A, B, AB),
-            hinweis: 'Jeder Eintrag von A·B ist eine Zeile von A mal eine Spalte von B.',
-          },
+          ...abSchritte,
           { titel: 'Einsetzen', latex: mehrzeiligeKette([`R = ${matrixLatexFormatiert(AB)} \\cdot ${matrixLatexFormatiert(E)}`, `= ${matrixLatexFormatiert(R)}`]) },
           {
             titel: 'Einsetzen',
             latex: alleEintraegeLatex(AB, E, R, 'r'),
-            hinweis: 'Jeder Eintrag von R ist eine Zeile von A·B mal die (einzige) Spalte von E.',
+            hinweis: einstufig ? 'Jeder Eintrag von R ist eine Zeile von A mal die (einzige) Spalte von E.' : 'Jeder Eintrag von R ist eine Zeile von A·B mal die (einzige) Spalte von E.',
           },
           { titel: 'Ergebnis', latex: `R = ${matrixLatexFormatiert(R)}` },
           {
@@ -425,4 +597,408 @@ export const produktionsprozess = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// alg.matrixrechnung — Übung 21 (Zusatzthema)
+// Addition/Subtraktion, Vielfache und Linearkombinationen von 2×2-Matrizen,
+// dazu die Transponierten-Regel (rA+sB−rC)ᵗ = rAᵗ+sBᵗ−rCᵗ und den Kurzweg
+// rA+sA = (r+s)A. Rückwärts: A, B, C klein ganzzahlig, r, s klein ganzzahlig
+// (auch r+s=0 zulässig — das macht c) gerade lehrreich, siehe Übung 21c, wo
+// r=−2, s=2 die Nullmatrix ergibt).
+// Zusatzthema (Phase 6) — in der Probeklausur standardmäßig aus.
+// ---------------------------------------------------------------------------
+const RS_POOL = [-3, -2, -1, 1, 2, 3];
+
+export const matrixrechnung = {
+  id: 'alg.matrixrechnung',
+  teil: 'algebra',
+  name: 'Rechnen mit Matrizen: Summen, Vielfache, Transponierte',
+  punkte: 8,
+  vorlage: 'Übung 21',
+  zusatz: true,
+  waehleParameter(rng) {
+    for (let versuch = 0; versuch < 200; versuch++) {
+      const A = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
+      const B = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
+      const C = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
+      const r = zufallAus(rng, RS_POOL);
+      const s = zufallAus(rng, RS_POOL);
+      if (nullAnteil([A, B, C]) < 1 / 4) continue;
+      return { A, B, C, r, s };
+    }
+    return { A: [[-1, 2], [-2, 3]], B: [[3, -1], [-5, 2]], C: [[2, 0], [0, 1]], r: -2, s: 2 }; // Rückfall: Übung 21
+  },
+  baue(params) {
+    const { A, B, C, r, s } = params;
+    const diffAC = A.map((zeile, i) => zeile.map((w, j) => w - C[i][j]));
+    const ergA = diffAC.map((zeile) => zeile.map((w) => r * w));
+    const rA = A.map((zeile) => zeile.map((w) => r * w));
+    const sB = B.map((zeile) => zeile.map((w) => s * w));
+    const rC = C.map((zeile) => zeile.map((w) => r * w));
+    const ergB = A.map((zeile, i) => zeile.map((w, j) => rA[i][j] + sB[i][j] - rC[i][j]));
+    const ergC = A.map((zeile) => zeile.map((w) => (r + s) * w));
+    const ergD = transponiere(ergB);
+
+    const indizes = [[0, 0], [0, 1], [1, 0], [1, 1]];
+    // Klammert eine bereits ausgerechnete Zahl, wenn sie negativ ist — nötig,
+    // sobald sie direkt hinter einem eigenen "+"/"-" eingesetzt wird (sonst
+    // entstehen zwei Vorzeichen direkt hintereinander, "+ -6" statt "+ (-6)").
+    const klammerWennNeg = (w) => (w < 0 ? `(${zahlZuLatex(w, 0)})` : zahlZuLatex(w, 0));
+    // "skalar \cdot Matrix", mit Vorzeichen und ohne den Skalar bei |·|=1
+    // auszuschreiben ("A" statt "1 \cdot A", "-A" statt "-1 \cdot A") — r/s
+    // dürfen laut Pool auch ±1 sein.
+    const skalarMalMatrix = (skalar, matrixAusdruck) => {
+      const abs = Math.abs(skalar);
+      const vz = skalar < 0 ? '-' : '';
+      return abs === 1 ? `${vz}${matrixAusdruck}` : `${vz}${zahlZuLatex(abs, 0)} \\cdot ${matrixAusdruck}`;
+    };
+
+    return {
+      frage: {
+        text: 'Gegeben seien die folgenden Matrizen A, B, C und die Skalare r, s.',
+        // Jede Matrix auf einer eigenen Zeile statt mehrere nebeneinander —
+        // drei 2×2-Matrizen in einer Zeile liefen bei 375px ab dem
+        // Bildschirmrand (iPhone-Rückmeldung, dasselbe Muster wie bei
+        // alg.produktionsprozess).
+        formel: mehrzeiligeKette([
+          `A = ${matrixLatexFormatiert(A)}`,
+          `B = ${matrixLatexFormatiert(B)}`,
+          `C = ${matrixLatexFormatiert(C)}`,
+          `r = ${zahlZuLatex(r, 0)}, \\quad s = ${zahlZuLatex(s, 0)}`,
+        ]),
+        teile: [
+          { label: 'a)', text: 'Bilden Sie r·(A−C).' },
+          { label: 'b)', text: 'Bilden Sie r·A + s·B − r·C.' },
+          { label: 'c)', text: 'Bilden Sie r·A + s·A und vergleichen Sie mit (r+s)·A.' },
+          { label: 'd)', text: 'Bilden Sie die Transponierte von r·A + s·B − r·C.' },
+        ],
+      },
+      eingaben: [
+        { id: 'a', label: 'r·(A−C)', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: ergA, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
+        { id: 'b', label: 'r·A + s·B − r·C', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: ergB, toleranz: KONFIG.toleranz.exakt, teilLabel: 'b)' },
+        { id: 'c', label: 'r·A + s·A', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: ergC, toleranz: KONFIG.toleranz.exakt, teilLabel: 'c)' },
+        { id: 'd', label: '(r·A + s·B − r·C)ᵗ', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: ergD, toleranz: KONFIG.toleranz.exakt, teilLabel: 'd)' },
+      ],
+      loesung: {
+        schritte: [
+          {
+            titel: 'Formel',
+            latex: `r \\cdot (A - C)`,
+            hinweis: 'Erst die Matrizen entrywise subtrahieren, dann jeden Eintrag mit r multiplizieren.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette(indizes.map(([i, j]) =>
+              `a_{${i + 1}${j + 1}} = ${zahlZuLatex(r, 0)} \\cdot (${zahlZuLatex(A[i][j], 0)} - ${faktorLatex(C[i][j])}) = ${zahlZuLatex(r, 0)} \\cdot ${klammerWennNeg(diffAC[i][j])} = ${zahlZuLatex(ergA[i][j], 0)}`)),
+          },
+          { titel: 'Ergebnis', latex: `r(A-C) = ${matrixLatexFormatiert(ergA)}` },
+          {
+            titel: 'Formel',
+            latex: `rA + sB - rC`,
+            hinweis: 'Jede Matrix zuerst mit ihrem Skalar multiplizieren, dann entrywise addieren/subtrahieren.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette([
+              `rA = ${skalarMalMatrix(r, matrixLatexFormatiert(A))} = ${matrixLatexFormatiert(rA)}`,
+              `sB = ${skalarMalMatrix(s, matrixLatexFormatiert(B))} = ${matrixLatexFormatiert(sB)}`,
+              `rC = ${skalarMalMatrix(r, matrixLatexFormatiert(C))} = ${matrixLatexFormatiert(rC)}`,
+            ]),
+            hinweis: 'Jede der drei Matrizen zuerst für sich mit ihrem Skalar multiplizieren.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette(indizes.map(([i, j]) =>
+              `b_{${i + 1}${j + 1}} = ${zahlZuLatex(rA[i][j], 0)} + ${klammerWennNeg(sB[i][j])} - ${klammerWennNeg(rC[i][j])} = ${zahlZuLatex(ergB[i][j], 0)}`)),
+            hinweis: 'Die drei bereits skalierten Matrizen entrywise addieren/subtrahieren.',
+          },
+          { titel: 'Ergebnis', latex: `rA + sB - rC = ${matrixLatexFormatiert(ergB)}` },
+          {
+            titel: 'Formel',
+            latex: `rA + sA = (r+s) \\cdot A`,
+            hinweis: 'Zwei Vielfache derselben Matrix lassen sich zusammenfassen, bevor man überhaupt multipliziert — spart Rechenarbeit, besonders wenn r+s=0 ist.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette([
+              `r + s = ${zahlZuLatex(r, 0)} ${s < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(s), 0)} = ${zahlZuLatex(r + s, 0)}`,
+              ...indizes.map(([i, j]) => `c_{${i + 1}${j + 1}} = ${zahlZuLatex(r + s, 0)} \\cdot ${faktorLatex(A[i][j])} = ${zahlZuLatex(ergC[i][j], 0)}`),
+            ]),
+          },
+          { titel: 'Ergebnis', latex: `rA + sA = (r+s)A = ${matrixLatexFormatiert(ergC)}` },
+          {
+            titel: 'Formel',
+            latex: `(rA+sB-rC)^T = rA^T + sB^T - rC^T`,
+            hinweis: 'Transponieren einer Summe/Differenz ist dieselbe Summe/Differenz der Transponierten, und ein Skalar bleibt beim Transponieren unverändert davor stehen.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: `(rA+sB-rC)^T = \\left(${matrixLatexFormatiert(ergB)}\\right)^T = ${matrixLatexFormatiert(ergD)}`,
+            hinweis: 'Zeilen und Spalten des bereits berechneten Ergebnisses aus b) vertauschen.',
+          },
+          { titel: 'Ergebnis', latex: `(rA+sB-rC)^T = ${matrixLatexFormatiert(ergD)}` },
+        ],
+        ergebnisse: [
+          { label: 'r·(A−C)', latex: matrixLatexFormatiert(ergA) },
+          { label: 'r·A + s·B − r·C', latex: matrixLatexFormatiert(ergB) },
+          { label: 'r·A + s·A = (r+s)·A', latex: matrixLatexFormatiert(ergC) },
+          { label: '(r·A + s·B − r·C)ᵗ', latex: matrixLatexFormatiert(ergD) },
+        ],
+      },
+      params,
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// alg.lgs — Übung 25 (Zusatzthema)
+// 3×3-LGS mit eindeutiger ganzzahliger Lösung, zwei Lösungswege: Gauß-
+// Algorithmus (Zeilenumformungen ohne Pivotsuche) und Cramersche Regel
+// (Determinanten über die Regel von Sarrus, jedes Produkt einzeln gezeigt).
+// Rückwärts konstruiert über A = L·U: U obere Dreiecksmatrix (ganzzahlige,
+// von 0 verschiedene Diagonale — damit ist jeder Pivot automatisch ungleich
+// null, keine Pivotsuche nötig), L unit-untere Dreiecksmatrix (Einsen auf
+// der Diagonale, ganzzahlige Einträge darunter). Für A=L·U liefert die
+// Gauß-Elimination GARANTIERT ganzzahlige Multiplikatoren (Beweis: Zeile 2
+// von A ist l21·Zeile1(U)+Zeile2(U), also m21 = A[1][0]/A[0][0] = l21 exakt;
+// nach dem Abzug bleibt Zeile2(U) übrig, analog für Zeile 3 und den zweiten
+// Eliminationsschritt). b = A·x für eine gewählte ganzzahlige Lösung x.
+// ---------------------------------------------------------------------------
+function matrixMalVektor(A, x) {
+  return A.map((zeile) => skalarprodukt(zeile, x));
+}
+
+// Zwei Dreiecksfaktoren (unit-untere L, obere U) zu A multiplizieren.
+function lgsAusLU(L, U) {
+  return matrixMal(L, U);
+}
+
+// Determinante einer 3×3-Matrix über die Regel von Sarrus: drei Produkte der
+// "Hauptdiagonalen" (und ihrer beiden Parallelen, zyklisch von rechts
+// nachgerückt) minus drei Produkte der "Gegendiagonalen". Liefert die sechs
+// Tripel getrennt nach Vorzeichen, damit die Lösung jedes Produkt einzeln
+// zeigen kann (Katalog-Vorgabe).
+function sarrusTripel(m) {
+  const [[a11, a12, a13], [a21, a22, a23], [a31, a32, a33]] = m;
+  return {
+    positiv: [[a11, a22, a33], [a12, a23, a31], [a13, a21, a32]],
+    negativ: [[a13, a22, a31], [a11, a23, a32], [a12, a21, a33]],
+  };
+}
+function determinante3x3(m) {
+  const { positiv, negativ } = sarrusTripel(m);
+  const summe = (ts) => ts.reduce((s, [x, y, z]) => s + x * y * z, 0);
+  return summe(positiv) - summe(negativ);
+}
+// A, aber Spalte "spalte" (0-indiziert) durch b ersetzt — für D1/D2/D3.
+function cramerMatrix(A, b, spalte) {
+  return A.map((zeile, i) => zeile.map((w, j) => (j === spalte ? b[i] : w)));
+}
+// Zeigt "D = (±a·b·c) (±a·b·c) ... = (±Wert) (±Wert) ... = Ergebnis" als
+// zweizeilige Einsetzen-Kette: erst die eingesetzten Faktoren, dann die
+// einzeln ausgerechneten Produkte — jedes der sechs Produkte einzeln
+// sichtbar, nicht nur die Summe.
+function sarrusSchritt(name, m) {
+  const { positiv, negativ } = sarrusTripel(m);
+  const alle = [...positiv.map((t) => [1, t]), ...negativ.map((t) => [-1, t])];
+  const eingesetzt = alle.map(([vz, [x, y, z]], i) => {
+    const praefix = i === 0 ? (vz < 0 ? '-' : '') : (vz < 0 ? '- ' : '+ ');
+    return `${praefix}${faktorLatex(x)} \\cdot ${faktorLatex(y)} \\cdot ${faktorLatex(z)}`;
+  }).join(' ');
+  const werte = alle.map(([vz, [x, y, z]], i) => {
+    const wert = vz * x * y * z;
+    const praefix = i === 0 ? (wert < 0 ? '-' : '') : (wert < 0 ? '- ' : '+ ');
+    return `${praefix}${zahlZuLatex(Math.abs(wert), 0)}`;
+  }).join(' ');
+  const ergebnis = determinante3x3(m);
+  return mehrzeiligeGleichung(name, [eingesetzt, werte, zahlZuLatex(ergebnis, 0)]);
+}
+
+// Gauß-Elimination ohne Pivotsuche (Pivots sind laut Konstruktion immer
+// ungleich null). Liefert für jeden der drei Schritte die Bezeichnung
+// ("II - 2·I"), die betroffene neue Zeile (inkl. rechter Seite) sowie am
+// Ende die obere Dreiecksform und die Lösung per Rückwärtseinsetzen.
+function zeilenOperationLabel(ziel, quelle, multiplikator) {
+  const abs = Math.abs(multiplikator);
+  const vz = multiplikator < 0 ? '+' : '-';
+  const faktor = abs === 1 ? '' : `${zahlZuLatex(abs, 0)}\\cdot `;
+  return `${ziel} ${vz} ${faktor}${quelle}`;
+}
+function gaussSchritte(A, b) {
+  const M = A.map((zeile) => zeile.slice());
+  const rhs = b.slice();
+  const schritte = [];
+
+  const m21 = M[1][0] / M[0][0];
+  M[1] = M[1].map((w, j) => w - m21 * M[0][j]);
+  rhs[1] = rhs[1] - m21 * rhs[0];
+  schritte.push({ label: zeilenOperationLabel('II', 'I', m21), zeile: M[1].slice(), rhsWert: rhs[1] });
+
+  const m31 = M[2][0] / M[0][0];
+  M[2] = M[2].map((w, j) => w - m31 * M[0][j]);
+  rhs[2] = rhs[2] - m31 * rhs[0];
+  schritte.push({ label: zeilenOperationLabel('III', 'I', m31), zeile: M[2].slice(), rhsWert: rhs[2] });
+
+  const m32 = M[2][1] / M[1][1];
+  M[2] = M[2].map((w, j) => w - m32 * M[1][j]);
+  rhs[2] = rhs[2] - m32 * rhs[1];
+  schritte.push({ label: zeilenOperationLabel('III', 'II', m32), zeile: M[2].slice(), rhsWert: rhs[2] });
+
+  const x3 = rhs[2] / M[2][2];
+  const x2 = (rhs[1] - M[1][2] * x3) / M[1][1];
+  const x1 = (rhs[0] - M[0][1] * x2 - M[0][2] * x3) / M[0][0];
+
+  return { M, rhs, schritte, x: [x1, x2, x3] };
+}
+
+// "(a b c | d)" als Zeile einer augmentierten Matrix in LaTeX.
+function augmentierteZeileLatex(zeile, rhsWert) {
+  return `\\left(${zeile.map((w) => zahlZuLatex(w, 0)).join(' \\quad ')} \\;\\middle|\\; ${zahlZuLatex(rhsWert, 0)}\\right)`;
+}
+function augmentierteMatrixLatex(A, b) {
+  const zeilen = A.map((zeile, i) => `${zeile.map((w) => zahlZuLatex(w, 0)).join(' & ')} & ${zahlZuLatex(b[i], 0)}`).join(' \\\\ ');
+  return `\\left(\\begin{array}{ccc|c} ${zeilen} \\end{array}\\right)`;
+}
+
+const LGS_DIAG_POOL = [-3, -2, -1, 1, 2, 3];
+const LGS_UPPER_POOL = [-3, -2, -1, 0, 0, 1, 2, 3];
+const LGS_L_POOL = [-3, -2, -1, 1, 2, 3];
+const LGS_X_POOL = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
+const LGS_MAX_ZWISCHENWERT = 50;
+
+function lgsZwischenwerteKlein(A, b) {
+  const { schritte, x } = gaussSchritte(A, b);
+  for (const s of schritte) {
+    if (s.zeile.some((w) => Math.abs(w) > LGS_MAX_ZWISCHENWERT)) return false;
+    if (Math.abs(s.rhsWert) > LGS_MAX_ZWISCHENWERT) return false;
+  }
+  if (!x.every((w) => Number.isInteger(w))) return false;
+  for (const M of [A, cramerMatrix(A, b, 0), cramerMatrix(A, b, 1), cramerMatrix(A, b, 2)]) {
+    const { positiv, negativ } = sarrusTripel(M);
+    for (const [a1, a2, a3] of [...positiv, ...negativ]) {
+      if (Math.abs(a1 * a2 * a3) > LGS_MAX_ZWISCHENWERT) return false;
+    }
+  }
+  if (A.flat().some((w) => Math.abs(w) > 30)) return false;
+  if (b.some((w) => Math.abs(w) > 80 || w === 0)) return false;
+  if (A.flat().filter((w) => w === 0).length > 3) return false;
+  return true;
+}
+
+export const lgs = {
+  id: 'alg.lgs',
+  teil: 'algebra',
+  name: 'Lineares Gleichungssystem: Gauß und Cramer',
+  punkte: 6,
+  vorlage: 'Übung 25',
+  zusatz: true,
+  waehleParameter(rng) {
+    for (let versuch = 0; versuch < 3000; versuch++) {
+      const U = [
+        [zufallAus(rng, LGS_DIAG_POOL), zufallAus(rng, LGS_UPPER_POOL), zufallAus(rng, LGS_UPPER_POOL)],
+        [0, zufallAus(rng, LGS_DIAG_POOL), zufallAus(rng, LGS_UPPER_POOL)],
+        [0, 0, zufallAus(rng, LGS_DIAG_POOL)],
+      ];
+      const l21 = zufallAus(rng, LGS_L_POOL);
+      const l31 = zufallAus(rng, LGS_L_POOL);
+      const l32 = zufallAus(rng, LGS_L_POOL);
+      const L = [[1, 0, 0], [l21, 1, 0], [l31, l32, 1]];
+      const x = [zufallAus(rng, LGS_X_POOL), zufallAus(rng, LGS_X_POOL), zufallAus(rng, LGS_X_POOL)];
+      if (x.every((w) => w === 0)) continue;
+
+      const A = lgsAusLU(L, U);
+      const b = matrixMalVektor(A, x);
+      if (!lgsZwischenwerteKlein(A, b)) continue;
+      return { A, b };
+    }
+    // Rückfall: nach derselben L·U-Konstruktion von Hand nachgerechnet (nur
+    // Zahlen), damit garantiert ganzzahlige Gauß-Multiplikatoren entstehen.
+    const Lf = [[1, 0, 0], [2, 1, 0], [1, 2, 1]];
+    const Uf = [[1, 1, 1], [0, -1, -3], [0, 0, 7]];
+    const Af = lgsAusLU(Lf, Uf);
+    const xf = [1, 2, 3];
+    return { A: Af, b: matrixMalVektor(Af, xf) };
+  },
+  baue(params) {
+    const { A, b } = params;
+    const { M, rhs, schritte, x } = gaussSchritte(A, b);
+    const D = determinante3x3(A);
+    const D1 = determinante3x3(cramerMatrix(A, b, 0));
+    const D2 = determinante3x3(cramerMatrix(A, b, 1));
+    const D3 = determinante3x3(cramerMatrix(A, b, 2));
+
+    return {
+      frage: {
+        text: 'Lösen Sie das folgende lineare Gleichungssystem mit drei Unbekannten.',
+        formel: augmentierteMatrixLatex(A, b),
+        teile: [
+          { label: 'a)', text: 'Lösen Sie mit dem Gauß-Algorithmus.' },
+          { label: 'b)', text: 'Lösen Sie mit der Cramerschen Regel.' },
+        ],
+      },
+      eingaben: [
+        {
+          id: 'x', label: 'Lösung', typ: 'koeffizienten', punkte: 6, loesung: x, toleranz: KONFIG.toleranz.exakt,
+          beschriftungen: ['x₁', 'x₂', 'x₃'], trenner: ',',
+        },
+      ],
+      loesung: {
+        schritte: [
+          {
+            titel: 'Formel',
+            latex: augmentierteMatrixLatex(A, b),
+            hinweis: 'Gauß-Algorithmus: Zeilen so umformen (Zielzeile minus Vielfaches einer anderen Zeile), dass unterhalb der Diagonale nur Nullen stehen, dann rückwärts einsetzen.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: `\\text{${schritte[0].label}:} \\quad ${augmentierteMatrixLatex([M[0], schritte[0].zeile, A[2]], [b[0], schritte[0].rhsWert, b[2]])}`,
+            hinweis: 'Ersten Eintrag der zweiten Zeile auf null bringen.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: `\\text{${schritte[1].label}:} \\quad ${augmentierteMatrixLatex([M[0], schritte[0].zeile, schritte[1].zeile], [b[0], schritte[0].rhsWert, schritte[1].rhsWert])}`,
+            hinweis: 'Ersten Eintrag der dritten Zeile auf null bringen.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: `\\text{${schritte[2].label}:} \\quad ${augmentierteMatrixLatex(M, rhs)}`,
+            hinweis: 'Zweiten Eintrag der dritten Zeile auf null bringen — jetzt steht eine obere Dreiecksform da.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette([
+              `x_3 = ${zahlZuLatex(rhs[2], 0)} / ${faktorLatex(M[2][2])} = ${zahlZuLatex(x[2], 0)}`,
+              `x_2 = \\dfrac{${zahlZuLatex(rhs[1], 0)} - ${faktorLatex(M[1][2])} \\cdot ${faktorLatex(x[2])}}{${zahlZuLatex(M[1][1], 0)}} = ${zahlZuLatex(x[1], 0)}`,
+              `x_1 = \\dfrac{${zahlZuLatex(rhs[0], 0)} - ${faktorLatex(M[0][1])} \\cdot ${faktorLatex(x[1])} - ${faktorLatex(M[0][2])} \\cdot ${faktorLatex(x[2])}}{${zahlZuLatex(M[0][0], 0)}} = ${zahlZuLatex(x[0], 0)}`,
+            ]),
+            hinweis: 'Von unten nach oben rückwärts einsetzen (dritte Zeile hat nur noch x₃, zweite nur noch x₂ und x₃, usw.).',
+          },
+          { titel: 'Ergebnis', latex: `x_1 = ${zahlZuLatex(x[0], 0)}, \\quad x_2 = ${zahlZuLatex(x[1], 0)}, \\quad x_3 = ${zahlZuLatex(x[2], 0)}` },
+          {
+            titel: 'Formel',
+            latex: `x_i = \\dfrac{D_i}{D}, \\quad D = \\begin{vmatrix} a_{11} & a_{12} & a_{13} \\\\ a_{21} & a_{22} & a_{23} \\\\ a_{31} & a_{32} & a_{33} \\end{vmatrix}`,
+            hinweis: 'Cramersche Regel zur Kontrolle: D ist die Determinante der Koeffizientenmatrix, Dᵢ dieselbe Determinante, aber mit Spalte i durch die rechte Seite b ersetzt. Jede Determinante über die Regel von Sarrus: Summe der drei "Hauptdiagonalen"-Produkte minus Summe der drei "Gegendiagonalen"-Produkte.',
+          },
+          { titel: 'Einsetzen', latex: sarrusSchritt('D', A) },
+          { titel: 'Einsetzen', latex: sarrusSchritt('D_1', cramerMatrix(A, b, 0)) },
+          { titel: 'Einsetzen', latex: sarrusSchritt('D_2', cramerMatrix(A, b, 1)) },
+          { titel: 'Einsetzen', latex: sarrusSchritt('D_3', cramerMatrix(A, b, 2)) },
+          {
+            titel: 'Ergebnis',
+            latex: mehrzeiligeKette([
+              `x_1 = \\dfrac{D_1}{D} = ${zahlZuLatex(D1, 0)} / ${faktorLatex(D)} = ${zahlZuLatex(x[0], 0)}`,
+              `x_2 = \\dfrac{D_2}{D} = ${zahlZuLatex(D2, 0)} / ${faktorLatex(D)} = ${zahlZuLatex(x[1], 0)}`,
+              `x_3 = \\dfrac{D_3}{D} = ${zahlZuLatex(D3, 0)} / ${faktorLatex(D)} = ${zahlZuLatex(x[2], 0)}`,
+            ]),
+          },
+        ],
+        ergebnisse: [
+          { label: 'Lösung', latex: `x_1 = ${zahlZuLatex(x[0], 0)}, \\quad x_2 = ${zahlZuLatex(x[1], 0)}, \\quad x_3 = ${zahlZuLatex(x[2], 0)}` },
+        ],
+      },
+      params,
+    };
+  },
+};
+
 export const ALGEBRA_GENERATOREN = [matrixprodukt, produktionsprozess];
+export const ALGEBRA_ZUSATZ_GENERATOREN = [matrixrechnung, lgs];
