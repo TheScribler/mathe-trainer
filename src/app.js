@@ -120,18 +120,24 @@ function baueVorzeichenBruchKnopfe(feldOderGetter) {
   return knopfPaar;
 }
 
-// Schiebt das (einzige, wiederverwendete) Knopfpaar per margin-left so, dass
-// seine linke Kante mit der linken Kante von feld übereinstimmt — das Paar
-// bleibt dabei ein normales Fließelement NACH der ganzen Reihe/dem Gitter
-// (nie mittendrin eingefügt, das brachte vorher den Zeilenumbruch der
-// Koeffizientenreihe durcheinander und ließ es bei Matrizen immer links
-// kleben). Erst auf 0 zurücksetzen, dann über getBoundingClientRect neu
-// vermessen — robust gegenüber Flex/Grid-Eigenheiten von offsetLeft.
+// Positioniert das (einzige, wiederverwendete) Knopfpaar als absolutes
+// Overlay direkt unter dem fokussierten Feld, relativ zur umschließenden
+// .eingabe-zeile (siehe position:relative dort in stil.css). Links an der
+// Feldkante ausgerichtet, aber auf die Zeilenbreite geklammert — eine weit
+// rechts stehende Zelle (letzte Matrixspalte, x³-Koeffizient) darf das Paar
+// nie über den rechten Bildschirmrand hinausschieben (iPhone-Rückmeldung:
+// genau das passierte beim vorherigen margin-left-Ansatz).
 function positioniereKnopfPaarUnterFeld(knopfPaar, feld) {
-  knopfPaar.style.marginLeft = '0px';
-  const feldLinks = feld.getBoundingClientRect().left;
-  const paarLinks = knopfPaar.getBoundingClientRect().left;
-  knopfPaar.style.marginLeft = `${Math.max(0, feldLinks - paarLinks)}px`;
+  const zeile = knopfPaar.closest('.eingabe-zeile');
+  if (!zeile) return;
+  const zeileRect = zeile.getBoundingClientRect();
+  const feldRect = feld.getBoundingClientRect();
+  knopfPaar.style.top = `${feldRect.bottom - zeileRect.top + 4}px`;
+  const breite = knopfPaar.offsetWidth;
+  let links = feldRect.left - zeileRect.left;
+  links = Math.min(links, zeileRect.width - breite);
+  links = Math.max(links, 0);
+  knopfPaar.style.left = `${links}px`;
 }
 
 function baueTabelle(tabelle) {
@@ -263,7 +269,7 @@ function baueFrageTeilBlock(teil) {
 // baueAufgabenInhalt), damit
 // baueAufgabenInhalt (unten) sie sowohl gruppiert je Teilaufgabe als auch
 // als flache Liste aufrufen kann.
-function baueEingabeZeile(eingabe, felder) {
+function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
   // Symbolterme (z. B. "a) f'(x)") bekommen keine eigene Zeile: ihr
   // Hinweistext wandert als teilHinweis in die Zeile der zugehörigen
   // Zahlencheck-Eingabe — zwei fast leere, gestapelte Zeilen ("Teilaufgabe
@@ -278,7 +284,13 @@ function baueEingabeZeile(eingabe, felder) {
   const zeile = document.createElement('label');
   zeile.className = 'eingabe-zeile';
 
-  if (eingabe.teilLabel) {
+  // Nur zeigen, wenn die Zeile NICHT schon unter einem per frage.teile
+  // gerenderten Block mit genau dieser Beschriftung steht — sonst stand die
+  // Teil-Beschriftung ("a)", "Marktgleichgewicht") doppelt bzw. bei mehreren
+  // Feldern desselben Teils sogar mehrfach da (iPhone-Rückmeldung). Bleibt
+  // nötig für Generatoren ohne frage.teile (z. B. diff.partielle-
+  // ableitungen), wo teilLabel die einzige Markierung ist.
+  if (zeigeTeilLabel && eingabe.teilLabel) {
     const teilUeberschrift = document.createElement('span');
     teilUeberschrift.className = 'eingabe-teil-ueberschrift';
     teilUeberschrift.textContent = eingabe.teilLabel;
@@ -341,6 +353,7 @@ function baueEingabeZeile(eingabe, felder) {
       // das zuletzt fokussierte Teilfeld.
       let fokussiertesTeilfeld = null;
       const knopfPaarReihe = baueVorzeichenBruchKnopfe(() => fokussiertesTeilfeld);
+      knopfPaarReihe.classList.add('unter-feld');
       zeile.appendChild(knopfPaarReihe);
 
       // Ein gemeinsamer Hinweis unter der ganzen Reihe, nicht je Feld —
@@ -423,13 +436,14 @@ function baueEingabeZeile(eingabe, felder) {
       }
       zeile.appendChild(gitter);
 
-      // Ein einziges Knopfpaar für die ganze Matrix statt je Zelle eins,
-      // als normales Element NACH dem Gitter (nie als zusätzliches Grid-
-      // Element eingefügt — das würde das Spaltenraster verschieben) und
-      // per margin-left unter die fokussierte Zelle verschoben.
+      // Ein einziges Knopfpaar für die ganze Matrix statt je Zelle eins, als
+      // absolutes Overlay unter der fokussierten Zelle (siehe .vorzeichen-
+      // bruch-paar.unter-feld) statt als zusätzliches Grid-Element (das
+      // würde das Spaltenraster verschieben).
       const alleZellen = zellen.flat();
       let fokussierteZelle = null;
       const knopfPaarMatrix = baueVorzeichenBruchKnopfe(() => fokussierteZelle);
+      knopfPaarMatrix.classList.add('unter-feld');
       zeile.appendChild(knopfPaarMatrix);
 
       const eingelesenAls = document.createElement('span');
@@ -541,7 +555,7 @@ function baueAufgabenInhalt(karte, aufgabe, { onAenderung } = {}) {
         form.className = 'eingaben';
         for (const eingabe of passende) {
           zugeordneteIds.add(eingabe.id);
-          const zeile = baueEingabeZeile(eingabe, felder);
+          const zeile = baueEingabeZeile(eingabe, felder, { zeigeTeilLabel: false });
           if (zeile) form.appendChild(zeile);
         }
         karte.appendChild(form);
@@ -1359,6 +1373,29 @@ function starteApp() {
   // IIFE-Scope des gebauten Bundles verborgen bleiben.
   window.__testFindeGenerator = findeGenerator;
   window.__testMulberry32 = mulberry32;
+  // Nur für Tests (test/layout.mjs): rendert dieselbe Aufgabe wie
+  // __testErzeugeAufgabe, aber über die Probeklausur-Renderpfade
+  // (zeichneLaufendeKlausur bzw. — wenn abgegeben=true — zeichneAuswertung
+  // mit Lösung) statt über den Übungsmodus. Eine Probeklausur mit genau
+  // einer Aufgabe reicht dafür aus; der Komposer (mehrere Aufgaben je Teil)
+  // wird bewusst übersprungen. Nötig, weil der Layout-Test bisher nur den
+  // Übungsmodus besuchte und abgeschnittene Zeilen, die nur in der
+  // Probeklausur auftraten, darum unentdeckt blieben (iPhone-Rückmeldung).
+  window.__testZeigeKlausurAufgabe = function (generatorId, seed, abgegeben) {
+    const generator = findeGenerator(generatorId);
+    if (!generator) throw new Error('Unbekannter Generator: ' + generatorId);
+    const params = generator.waehleParameter(mulberry32(seed), { erlaubeZusatzvarianten: true });
+    const zustand = {
+      version: 1, startZeit: Date.now(), dauerSekunden: KONFIG.dauer,
+      teile: [{ teil: generator.teil, ziel: generator.punkte, summe: generator.punkte, exakt: true }],
+      aufgaben: [{ teil: generator.teil, generatorId, params }],
+      antworten: {}, selbstbewertung: {}, abgegeben,
+    };
+    setzeAktivenKnopf(klausurKnopf);
+    inhalt.innerHTML = '';
+    if (abgegeben) zeichneAuswertung(inhalt, zustand);
+    else zeichneLaufendeKlausur(inhalt, zustand);
+  };
 
   // Eine vorhandene Probeklausur hat Vorrang vor dem Übungsmodus — egal ob
   // noch laufend oder schon abgegeben (dann wird gleich die zuletzt gezeigte

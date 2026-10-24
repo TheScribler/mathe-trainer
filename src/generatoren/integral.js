@@ -10,47 +10,11 @@ import { zahlZuLatex, bruch, bruchGekuerzt, bruchMitDezimal, polynomLatex, polyn
 import { KONFIG } from '../konfig.js';
 
 // ---------------------------------------------------------------------------
-// Gemeinsame Hilfsfunktionen (Prosa- und Bruch-Polynomanzeige). Eigene,
-// kleine Kopien statt eines Imports aus diff.js — dieselbe Begründung wie in
-// app.js (siehe dortiger Kommentar): echte Modul-Grenzen unter Node, keine
-// stille Kopplung an private Hilfsfunktionen einer anderen Datei.
+// Gemeinsame Hilfsfunktionen (Bruch-Polynomanzeige). Eigene, kleine Kopien
+// statt eines Imports aus diff.js — dieselbe Begründung wie in app.js (siehe
+// dortiger Kommentar): echte Modul-Grenzen unter Node, keine stille Kopplung
+// an private Hilfsfunktionen einer anderen Datei.
 // ---------------------------------------------------------------------------
-
-const HOCH_ZIFFERN = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
-function hochgestelltesExponent(n) {
-  const text = String(Math.abs(n)).split('').map((z) => HOCH_ZIFFERN[Number(z)]).join('');
-  return (n < 0 ? '⁻' : '') + text;
-}
-function potenzEinheitProse(exponent) {
-  if (exponent === 0) return '';
-  if (exponent === 1) return 'x';
-  return `x${hochgestelltesExponent(exponent)}`;
-}
-
-// Term mit Vorzeichen für reinen Fließtext. Koeffizient 1/-1 wird nur vor
-// einer Variable weggelassen ("x³" statt "1x³") — bei einem reinen Zahlenterm
-// (exponent===0) wäre das Weglassen keine Vereinfachung, sondern ein
-// verschwundener Term (nur das nackte Vorzeichen bliebe übrig). Das war ein
-// echter Bug in diff.js (termMitVorzeichen) und ist hier von Anfang an
-// richtig gemacht.
-function termProse(koeff, exponent) {
-  const abs = Math.abs(koeff);
-  const einheit = potenzEinheitProse(exponent);
-  const zahl = (abs === 1 && einheit !== '') ? '' : formatDeZahl(abs, minimaleNachkommastellen(abs));
-  return `${koeff < 0 ? '−' : '+'} ${zahl}${einheit}`;
-}
-
-function polynomProse(koeffizienten, exponenten) {
-  const paare = koeffizienten.map((k, i) => [k, exponenten[i]]).filter(([k]) => k !== 0);
-  if (paare.length === 0) return '0';
-  let erster = termProse(paare[0][0], paare[0][1]).replace(/^\+ /, '');
-  // Ein führendes Minus ist ein unäres Vorzeichen ("−3x²"), kein Operator
-  // zwischen zwei Termen — ohne diese Korrektur blieb hier das Leerzeichen
-  // von termProse stehen ("− 3x²", iPhone-Rückmeldung).
-  if (erster.startsWith('− ')) erster = '−' + erster.slice(2);
-  const rest = paare.slice(1).map(([k, e]) => termProse(k, e));
-  return [erster, ...rest].join(' ');
-}
 
 // "koeffizient \cdot ausdruck", ohne den Faktor zu zeigen, wenn |koeffizient|=1.
 function cdotWennNicht1(koeffizient, ausdruck) {
@@ -100,10 +64,6 @@ function bruchPolynomAusdruck(terme) {
 // Vorzeichen/Koeffizient-1/Null-Terme bereits korrekt behandelt).
 function bruchPolynomDezimalLatex(terme) {
   return polynomLatex(terme.map((t) => t.zaehler / t.nenner), terme.map((t) => t.exponent));
-}
-
-function bruchPolynomProse(terme) {
-  return polynomProse(terme.map((t) => t.zaehler / t.nenner), terme.map((t) => t.exponent));
 }
 
 // Eine Bruch-Polynom-Termliste an einer ganzzahligen Stelle x exakt (als
@@ -190,12 +150,10 @@ function sonderTermTexte(sonderterm) {
   if (!sonderterm) return null;
   const { typ, koeffizient } = sonderterm;
   const vz = koeffizient < 0 ? '-' : '+';
-  const vzProse = koeffizient < 0 ? '−' : '+';
   const abs = Math.abs(koeffizient);
   if (typ === 'ln') {
     return {
       fLatex: `${vz} ${bruch(zahlZuLatex(abs, 0), 'x')}`,
-      fProse: `${vzProse} ${formatDeZahl(abs, 0)}/x`,
       summenregelLatex: `${vz} ${cdotWennNicht1(koeffizient, '\\int \\dfrac{1}{x}\\,dx')}`,
       FLatex: `${vz} ${cdotWennNicht1(koeffizient, '\\ln|x|')}`,
       regel: 'Sonderregel ln|x| statt Potenzregel, da n = −1 (Potenzregel wäre hier eine Division durch 0).',
@@ -203,7 +161,6 @@ function sonderTermTexte(sonderterm) {
   }
   return {
     fLatex: `${vz} ${cdotWennNicht1(koeffizient, 'e^x')}`,
-    fProse: `${vzProse} ${abs === 1 ? '' : formatDeZahl(abs, 0) + '·'}eˣ`,
     summenregelLatex: `${vz} ${cdotWennNicht1(koeffizient, '\\int e^x\\,dx')}`,
     FLatex: `${vz} ${cdotWennNicht1(koeffizient, 'e^x')}`,
     regel: 'eˣ ist seine eigene Stammfunktion.',
@@ -255,9 +212,7 @@ export const integralUnbestimmt = {
     const { exponenten, koeffizienten, sonderterm } = params;
     const sonder = sonderTermTexte(sonderterm);
     const fLatexPotenz = polynomLatex(koeffizienten, exponenten);
-    const fProsePotenz = polynomProse(koeffizienten, exponenten);
     const fLatex = sonder ? `${fLatexPotenz} ${sonder.fLatex}` : fLatexPotenz;
-    const fProse = sonder ? `${fProsePotenz} ${sonder.fProse}` : fProsePotenz;
 
     const terme = koeffizienten
       .map((a, i) => {
@@ -325,7 +280,7 @@ export const integralUnbestimmt = {
     }
 
     return {
-      frage: { text: `Bestimmen Sie die Stammfunktion von f(x) = ${fProse}.` },
+      frage: { text: 'Bestimmen Sie die Stammfunktion der folgenden Funktion.', formel: `f(x) = ${fLatex}` },
       eingaben,
       loesung: {
         schritte,
@@ -408,7 +363,6 @@ export const integralBestimmt = {
       const { koeffizient, a, b } = params;
       const abs = Math.abs(koeffizient);
       const fLatex = `${koeffizient < 0 ? '-' : ''}${bruch(zahlZuLatex(abs, 0), 'x')}`;
-      const fProse = `${koeffizient < 0 ? '−' : ''}${formatDeZahl(abs, 0)}/x`;
       const deltaExakt = koeffizient * (Math.log(b) - Math.log(a));
       const deltaDezimal = runde(deltaExakt, 2);
       const vzLatex = koeffizient < 0 ? '-' : '';
@@ -417,7 +371,10 @@ export const integralBestimmt = {
       const lnB = `${vzLatex}${cdotWennNicht1(koeffizient, `\\ln ${b}`)}`;
 
       return {
-        frage: { text: `Berechnen Sie das bestimmte Integral von f(x) = ${fProse} in den Grenzen ${a} bis ${b}.` },
+        frage: {
+          text: `Berechnen Sie das bestimmte Integral der folgenden Funktion in den Grenzen ${a} bis ${b}.`,
+          formel: `f(x) = ${fLatex}`,
+        },
         eingaben: [
           { id: 'wert', label: 'Wert des Integrals', typ: 'zahl', punkte: 4, loesung: deltaDezimal, toleranz: KONFIG.toleranz.bruch },
         ],
@@ -462,7 +419,6 @@ export const integralBestimmt = {
       return { zaehler: z, nenner: n, exponent: exponent - 1 };
     });
     const fExakt = bruchPolynomAusdruck(termeF_abgeleitet);
-    const fProse = bruchPolynomProse(termeF_abgeleitet);
 
     const FExakt = bruchPolynomAusdruck(termeFSortiert);
 
@@ -490,7 +446,10 @@ export const integralBestimmt = {
     const mehrereTerme = termeFSortiert.filter((t) => t.zaehler !== 0).length > 1;
 
     return {
-      frage: { text: `Berechnen Sie das bestimmte Integral von f(x) = ${fProse} in den Grenzen ${a} bis ${b}.` },
+      frage: {
+        text: `Berechnen Sie das bestimmte Integral der folgenden Funktion in den Grenzen ${a} bis ${b}.`,
+        formel: `f(x) = ${fExakt}`,
+      },
       eingaben: [
         { id: 'wert', label: 'Wert des Integrals', typ: 'zahl', punkte: 4, loesung: deltaDezimal, toleranz: deltaToleranz },
       ],
@@ -571,8 +530,11 @@ export const integralKonsumentenrente = {
 
     return {
       frage: {
-        text: `Für eine Marktsituation gelten die Nachfragefunktion pₙ(x) = ${polynomProse([a, -b], [0, 1])} und ` +
-          `die Angebotsfunktion pₐ(x) = ${polynomProse([c], [1])}.`,
+        text: 'Für eine Marktsituation gelten die folgende Nachfragefunktion und Angebotsfunktion.',
+        formel: mehrzeiligeKette([
+          `p_N(x) = ${polynomLatex([a, -b], [0, 1])}`,
+          `p_A(x) = ${polynomLatex([c], [1])}`,
+        ]),
         teile: [
           { label: 'Marktgleichgewicht', text: 'Bestimmen Sie Gleichgewichtspreis und -menge.' },
           { label: 'Konsumenten- und Produzentenrente', text: 'Bestimmen Sie die Konsumenten- und die Produzentenrente.' },
@@ -680,8 +642,8 @@ export const integralKostenAusGrenzkosten = {
 
     return {
       frage: {
-        text: `Die Grenzkostenfunktion eines Betriebs lautet K'(x) = ${polynomProse([m, n], [1, 0])}. ` +
-          `Die Fixkosten betragen ${formatDeZahl(Kf, 0)}.`,
+        text: `Die Grenzkostenfunktion eines Betriebs lautet wie folgt. Die Fixkosten betragen ${formatDeZahl(Kf, 0)}.`,
+        formel: `K'(x) = ${polynomLatex([m, n], [1, 0])}`,
         teile: [
           { label: 'a)', text: 'Bestimmen Sie die Kostenfunktion K(x).' },
           { label: 'b)', text: `Berechnen Sie K(${x0}).` },

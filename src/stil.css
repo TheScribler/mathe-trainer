@@ -65,7 +65,11 @@ body {
 }
 .frage-tabelle th { color: var(--gedaempft); font-weight: 600; font-size: .85rem; }
 .eingaben { display: flex; flex-direction: column; gap: 10px; margin-bottom: .2rem; }
-.eingabe-zeile { display: flex; flex-direction: column; gap: .2rem; font-size: .9rem; color: var(--gedaempft); }
+/* position:relative macht die Zeile zum Bezugsrahmen für das absolut
+   positionierte Knopfpaar-Overlay von Koeffizientenreihen/Matrizen (siehe
+   .vorzeichen-bruch-paar.unter-feld unten) — ändert sonst nichts am
+   Flex-Spaltenlayout. */
+.eingabe-zeile { display: flex; flex-direction: column; gap: .2rem; font-size: .9rem; color: var(--gedaempft); position: relative; }
 .eingabe-teil-ueberschrift { font-weight: 700; color: var(--fg); font-size: 1rem; }
 .eingabe-teil-hinweis { font-size: .85rem; }
 .eingabe-zeile input {
@@ -193,27 +197,33 @@ body {
 .eingabe-zeile select.schlecht { border-color: var(--schlecht); }
 
 .vorzeichen-bruch-paar {
-  /* Immer im normalen Fluss (display:flex bleibt konstant) — nur
-     visibility wechselt, nicht display. Das reserviert die Höhe des Paares
-     PERMANENT (auch wenn es gerade unsichtbar ist), damit nichts auf der
-     Seite springt, sobald ein Feld fokussiert wird. Erscheint per JS
-     (margin-left, siehe positioniereKnopfPaarUnterFeld in app.js) unter dem
-     gerade fokussierten Feld statt als feste Leiste am Seitenende, die bei
-     langen Aufgaben (z. B. Koeffizientenreihen) hinter der iOS-Tastatur
-     verschwindet. Bleibt dabei immer ein Element NACH der ganzen Reihe/dem
-     Gitter — nie mittendrin eingefügt, das brachte vorher den Zeilenumbruch
-     der Koeffizientenreihe durcheinander und störte bei Matrizen das
-     CSS-Grid-Spaltenraster. Kein eigenes margin-top: der umgebende Flex-
-     Container (.eingabe-zeile gap) liefert den Abstand zum vorherigen
-     Element schon — ein zusätzliches margin-top zählte die reservierte
-     Höhe doppelt (Lücke + Margin) und machte die permanente Reservierung
-     spürbar größer als die tatsächliche Höhe des Knopfpaares. */
   display: flex;
   visibility: hidden;
   gap: 8px;
   width: fit-content;
 }
 .vorzeichen-bruch-paar.aktiv { visibility: visible; }
+/* Für Koeffizientenreihen/Matrizen (nicht für das dauerhaft sichtbare Paar
+   eines einzelnen Zahlenfelds, siehe .zahlenfeld-reihe oben): als absolut
+   positioniertes Overlay direkt unter der fokussierten Zelle statt als
+   normales Fließelement NACH der Reihe/dem Gitter. Nimmt dadurch nie Platz
+   im Fluss ein — kein dauerhaft reservierter Leerraum mehr, wenn das Paar
+   unsichtbar ist — und wird von app.js (positioniereKnopfPaarUnterFeld) nie
+   über den rechten Bildschirmrand hinaus platziert; vorher schob ein
+   margin-left-basierter Ansatz das Paar bei einer weit rechts stehenden
+   Zelle (letzte Matrixspalte, x³-Koeffizient) über den Rand hinaus — der
+   "/"-Knopf war abgeschnitten, die Seite scrollte seitwärts (iPhone-
+   Rückmeldung). Eigener Hintergrund + z-index, damit das Overlay über dem
+   nachfolgenden Inhalt liegt, statt ihn zu verschieben. */
+.vorzeichen-bruch-paar.unter-feld {
+  position: absolute;
+  z-index: 5;
+  background: var(--karte);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .15);
+}
 
 .modus-leiste { display: flex; gap: 8px; margin-bottom: 1rem; }
 .modus-leiste button {

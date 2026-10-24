@@ -21,6 +21,11 @@ const SEEDS_PRO_GENERATOR = 50;
 // Kleinere Zahl als oben: pro Instanz wird JEDES Eingabefeld einzeln fokussiert
 // (O(Felderzahl²) Rect-Vergleiche), das summiert sich schneller auf.
 const FOKUS_SEEDS_PRO_GENERATOR = 10;
+// Kleinere Zahl als SEEDS_PRO_GENERATOR: deckt denselben Renderpfad-
+// Unterschied (Probeklausur statt Übungsmodus) ab, nicht zusätzliche
+// Zufallswerte — die eigentliche Seed-Streuung prüft der Übungsmodus-
+// Durchlauf oben bereits ausreichend.
+const KLAUSUR_SEEDS_PRO_GENERATOR = 15;
 
 const GENERATOR_IDS = [
   'fin.rente-aus-kapital',
@@ -300,20 +305,49 @@ const FOKUS_PRUEFSKRIPT = `
     });
     // Bei einem einzelnen Zahlenfeld (.zahlenfeld-reihe) sitzt das Knopfpaar
     // absichtlich RECHTS neben dem Feld, nicht darunter — die Links-
-    // Ausrichtung gilt nur für Koeffizientenreihen/Matrizen, wo das gemein-
-    // same Paar per margin-left unter die fokussierte Zelle wandert (siehe
-    // positioniereKnopfPaarUnterFeld in app.js). Für .zahlenfeld-reihe prüft
+    // Ausrichtung gilt nur für Koeffizientenreihen/Matrizen, wo das
+    // gemeinsame Paar als absolutes Overlay unter die fokussierte Zelle
+    // wandert (siehe .vorzeichen-bruch-paar.unter-feld, positioniere-
+    // KnopfPaarUnterFeld in app.js). Für .zahlenfeld-reihe prüft
     // LAYOUT_PRUEFSKRIPT bereits, dass Feld und Paar in derselben Zeile stehen.
+    // Das Overlay klammert seine linke Kante auf die Zeilenbreite (nie über
+    // den rechten Rand hinaus) — bei einer weit rechts stehenden Zelle sitzt
+    // es darum NICHT exakt linksbündig zum Feld, sondern flächig am rechten
+    // Rand der Zeile; genau das ist beabsichtigt, die Prüfung lässt diesen
+    // Fall darum ausdrücklich zu, verlangt aber in jedem Fall, dass das Paar
+    // nie weiter rechts als das Feld beginnt und nie über die Zeile hinausragt.
     if (!feld.closest('.zahlenfeld-reihe')) {
       const zeile = feld.closest('.eingabe-zeile');
       const paar = zeile ? zeile.querySelector('.vorzeichen-bruch-paar') : null;
       if (paar) {
         const paarRect = paar.getBoundingClientRect();
         const feldRect = feld.getBoundingClientRect();
-        if (Math.abs(paarRect.left - feldRect.left) > 2) {
+        const zeileRect = zeile.getBoundingClientRect();
+        const geklammert = Math.abs(paarRect.right - zeileRect.right) <= 2;
+        if (paarRect.left > feldRect.left + 2 || (!geklammert && Math.abs(paarRect.left - feldRect.left) > 2)) {
           probleme.push('Knopfpaar für Feld ' + i + ' nicht ausgerichtet: paar.left=' + paarRect.left.toFixed(1) + ', feld.left=' + feldRect.left.toFixed(1));
         }
       }
+    }
+    // Das gemeinsame Knopfpaar einer Koeffizientenreihe/Matrix wird als
+    // absolutes Overlay unter die fokussierte Zelle gelegt (positioniere-
+    // KnopfPaarUnterFeld in app.js, auf die Zeilenbreite geklammert) — zur
+    // Sicherheit trotzdem direkt die rechte Kante des sichtbaren Knopfpaars
+    // gegen die Fensterbreite prüfen (document.documentElement.scrollWidth
+    // allein ist dafür nicht zuverlässig, body hat overflow-x:hidden, siehe
+    // stil.css). Die übrigen Layout-Prüfungen fokussieren nie ein Feld und
+    // übersahen das vor der Umstellung auf das Overlay darum (iPhone-
+    // Rückmeldung: "/"-Knopf abgeschnitten, Seite scrollte seitwärts).
+    const seitenbreite = document.documentElement.clientWidth;
+    const paarAktiv = document.querySelector('#app .vorzeichen-bruch-paar.aktiv');
+    if (paarAktiv) {
+      const paarRect = paarAktiv.getBoundingClientRect();
+      if (paarRect.right > seitenbreite + 1) {
+        probleme.push('Knopfpaar ragt bei Feld ' + i + ' über den rechten Bildschirmrand hinaus (right=' + paarRect.right.toFixed(1) + ' > ' + seitenbreite + ')');
+      }
+    }
+    if (document.documentElement.scrollWidth > seitenbreite + 1) {
+      probleme.push('Seite scrollt horizontal, nachdem Feld ' + i + ' fokussiert wurde: scrollWidth=' + document.documentElement.scrollWidth + ' > ' + seitenbreite);
     }
     feld.blur();
   });
@@ -377,6 +411,34 @@ async function main() {
         }
       }
       console.log(`${generatorId}: ${SEEDS_PRO_GENERATOR} Instanzen bei ${tatsaechlicheBreite}px geprüft, ${problemeFuerGenerator} Layout-Probleme`);
+    }
+
+    // Dieselben Aufgabe+Lösung-Renderpfade zusätzlich über die Probeklausur
+    // prüfen (zeichneLaufendeKlausur ohne Lösung, zeichneAuswertung MIT
+    // Lösung) — der Übungsmodus-Durchlauf oben besucht diese Renderpfade
+    // NIE, abgeschnittene Zeilen, die nur dort auftraten, blieben darum
+    // unentdeckt (iPhone-Rückmeldung).
+    console.log('\nPrüfe Probeklausur-Renderpfade (laufende Klausur + Auswertung) …');
+    for (const generatorId of GENERATOR_IDS) {
+      let problemeFuerGenerator = 0;
+      for (let seed = 0; seed < KLAUSUR_SEEDS_PRO_GENERATOR; seed++) {
+        for (const abgegeben of [false, true]) {
+          await wd(`/session/${id}/execute/sync`, 'POST', {
+            script: 'window.__testZeigeKlausurAufgabe(arguments[0], arguments[1], arguments[2]);',
+            args: [generatorId, seed, abgegeben],
+          });
+          const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
+            script: LAYOUT_PRUEFSKRIPT, args: [],
+          });
+          geprueft += 1;
+          for (const problem of ergebnis.probleme) {
+            fehler += 1;
+            problemeFuerGenerator += 1;
+            console.error(`FEHLER (Probeklausur, ${abgegeben ? 'Auswertung' : 'laufend'}): ${generatorId} seed=${seed}: ${problem}`);
+          }
+        }
+      }
+      console.log(`${generatorId}: ${KLAUSUR_SEEDS_PRO_GENERATOR} Instanzen × 2 Ansichten in der Probeklausur geprüft, ${problemeFuerGenerator} Layout-Probleme`);
     }
 
     // Fokus-Stabilität: für jeden Generator ein paar Seeds durchgehen und

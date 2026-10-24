@@ -189,6 +189,15 @@ const LATEX_RESTE = /\{,\}|_|\^|\\(?:[a-zA-Z]|;)/;
 // in diff.ableitungen aufgetreten (Zahlencheck-Labels, iPhone-Rückmeldung).
 const ASCII_MINUS_IN_KLAMMER = /\(-\d/;
 
+// "x²", "x⁻³" usw. — ein Exponent direkt nach der Polynom-Variable x/y in
+// reinem Fließtext kann mitten im Exponenten umbrechen ("x" am Zeilenende,
+// "²" allein auf der nächsten Zeile, iPhone-Rückmeldung). Solche Funktions-
+// terme gehören als echtes KaTeX in frage.formel, nicht in frage.text/-teile/
+// Labels. Andere Unicode-Hochzahlen in reiner Prosa bleiben erlaubt (z. B.
+// "q²⁵" für den Aufzinsungsfaktor in der Finanzmathematik, siehe LATEX_RESTE-
+// Kommentar oben) — hier geht es ausschließlich um x/y als Funktionsvariable.
+const PLAINTEXT_VARIABLEN_EXPONENT = /[xy][⁰¹²³⁴⁵⁶⁷⁸⁹⁻]/;
+
 // Koeffizient 1 bzw. -1 muss weggelassen werden ("x" statt "1x", "x0" statt
 // "1 \cdot x0") — tatsächlich mehrfach in diff.js aufgetreten (P1=1, 2c=1,
 // E=±1 je nach Zufallszug). "1x"/"1\cdot" zählt nur, wenn die "1" davor nicht
@@ -224,6 +233,13 @@ const DOPPELVORZEICHEN = /[+\-−]\s*[-−]/;
 // "(-1 + 3)²"). Tatsächlich in diff.ableitungen und diff.partielle-
 // ableitungen aufgetreten (Audit gegen Übung 9-11, iPhone-Rückmeldung).
 const DOPPELKLAMMER = /\(\(/;
+
+// "f(x)|_{x=7} = 11" (Auswertungsstrich-Kurzschreibweise) zeigt nicht, WIE
+// eingesetzt und ausgerechnet wurde — jeder Zwischenschritt mit Zahlen muss
+// ausgeschrieben sein ("p(7) = 25 − 2·7 = 25 − 14 = 11" statt "p(7) = 25 −
+// 2x|_{x=7} = 11", iPhone-Rückmeldung: diff.gewinn-breakeven nutzte das für
+// p(x*)/G(x*)).
+const AUSWERTUNGSSTRICH_KURZSCHREIBWEISE = /\|_\{?x\s*=/;
 
 // Jeder "\dfrac{zaehler}{nenner}" mit rein numerischem Zähler/Nenner (keine
 // Variable, kein Dezimalkomma — das wäre kein echter Bruch, sondern eine
@@ -492,6 +508,13 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     const kVonX = (x) => wertePolynom(kKoeff, exp, x);
     pruefe(nahBei(ableitungNumerisch(kVonX, p.x0), wertVon(aufgabe, 'Kstrich'), 1e-3),
       `${kennzeichnung}: K'(${p.x0}) numerisch ${ableitungNumerisch(kVonX, p.x0)}, erwartet ${wertVon(aufgabe, 'Kstrich')}`);
+    // Grenzkosten müssen auf dem gesamten ökonomisch relevanten Bereich
+    // [0, x2] positiv sein — negative Grenzkosten wären ökonomisch sinnlos
+    // (iPhone-Rückmeldung: "x² − 17x + 120" lieferte K'(6) = −5).
+    for (const x of [0, p.x2 / 4, p.x2 / 2, (3 * p.x2) / 4, p.x2]) {
+      const kStrich = ableitungNumerisch(kVonX, x);
+      pruefe(kStrich > 0, `${kennzeichnung}: K'(${x}) = ${kStrich} ist nicht positiv (Grenzkosten müssen auf [0, x2] positiv sein)`);
+    }
     // xmax: G'(xmax)=0 numerisch; pmax, gmax direkt an der Stelle xmax.
     const gVonX = (x) => wertePolynom(gKoeff, exp, x);
     const xmax = wertVon(aufgabe, 'xmax');
@@ -920,6 +943,18 @@ function testeGenerator(generator) {
         !ASCII_MINUS_IN_KLAMMER.test(text),
         `${generator.id} seed=${seed}: ${feld} zeigt ein negatives Vorzeichen mit ASCII "-" statt echtem Minus "−": "${text}"`
       );
+      // Nur die eigentliche Aufgabenstellung (frage.*, Kartentitel, Eingabe-
+      // Labels) — nicht loesung.schritte[].hinweis/loesung.ergebnisse[].label:
+      // dort stehen feste, seedunabhängige Regel-Erklärungen ("(xⁿ)' = n·xⁿ⁻¹"),
+      // die kurze, etablierte Unicode-Notation ist dort so gewollt (siehe
+      // LATEX_RESTE-Kommentar), anders als eine lange, seedabhängige
+      // Funktionsformel mitten im Fragetext.
+      if (!feld.startsWith('loesung.')) {
+        pruefe(
+          !PLAINTEXT_VARIABLEN_EXPONENT.test(text),
+          `${generator.id} seed=${seed}: ${feld} zeigt eine Funktionsvariable mit Exponent als reinen Fließtext statt als KaTeX (frage.formel): "${text}"`
+        );
+      }
     }
 
     // Koeffizient 1/-1 muss überall weggelassen werden, auch in Formelfeldern
@@ -937,6 +972,10 @@ function testeGenerator(generator) {
       pruefe(
         !DOPPELKLAMMER.test(text),
         `${generator.id} seed=${seed}: ${feld} zeigt eine doppelte öffnende Klammer "((": "${text}"`
+      );
+      pruefe(
+        !AUSWERTUNGSSTRICH_KURZSCHREIBWEISE.test(text),
+        `${generator.id} seed=${seed}: ${feld} nutzt die "|_{x=...}"-Kurzschreibweise statt eingesetzter Zahlen: "${text}"`
       );
       pruefeGekuerzteBrueche(text, feld, `${generator.id} seed=${seed}`);
       pruefeGeldFormat(text, feld, `${generator.id} seed=${seed}`);

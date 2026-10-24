@@ -140,6 +140,19 @@ function bauePolynomAusdruck(paare, formatFn, minus) {
   return [erster, ...rest].join(' ');
 }
 
+// Bricht einen von bauePolynomAusdruck gebauten Ausdruck mit vielen Termen
+// (z. B. 6 bei Übung 15: Ax²+Bx+Cy²+Dy+Exy+F) vor dem mittleren Term auf
+// zwei Zeilen um — eine einzelne KaTeX-Zeile mit sechs zweistelligen
+// Koeffizienten lief sonst bei 375px über den Bildschirmrand (iPhone-
+// Rückmeldung). Gibt bei höchstens 3 Termen den Ausdruck unverändert als
+// einzeiliges Array zurück (reicht erfahrungsgemäß immer auf eine Zeile).
+function teileLangenPolynomAusdruck(ausdruck) {
+  const terme = ausdruck.split(/ (?=[+-] )/);
+  if (terme.length <= 3) return [ausdruck];
+  const mitte = Math.ceil(terme.length / 2);
+  return [terme.slice(0, mitte).join(' '), terme.slice(mitte).join(' ')];
+}
+
 // ---------------------------------------------------------------------------
 // diff.gewinn-breakeven — MK 3 / Übung 13
 // p(x) = a - bx, K(x) = cx² + dx + e
@@ -167,7 +180,15 @@ export const gewinnBreakeven = {
     const x2 = x1 + gap;
     const b = zufallAus(rng, [1, 2, 3]);
     const c = zufallAus(rng, [0.2, 0.4, 0.5, 1, 1.5, 2]);
-    const a = b * x2 + zufallInt(rng, 5, 30);
+    // Rückwärts konstruiert: K'(x) = 2c·x + d ist wegen c > 0 auf [0, x2]
+    // streng steigend, ihr Minimum liegt also bei x=0 — K'(x) ist auf ganz
+    // [0, x2] genau dann positiv (ökonomisch sinnvolle, nie negative
+    // Grenzkosten), wenn d > 0 ist. d deshalb direkt positiv wählen, dann a
+    // daraus ableiten (nicht umgekehrt) — vorher konnte a unabhängig von d
+    // zu klein geraten, d wurde dadurch negativ (z. B. K'(6) = −5 bei
+    // "x² − 17x + 120", iPhone-Rückmeldung).
+    const d = zufallInt(rng, 5, 30);
+    const a = runde((b + c) * (x1 + x2) + d, 4);
     const x0 = zufallInt(rng, x1, 3 * x2);
     const vorlageIndex = zufallInt(rng, 0, VORLAGEN_GEWINN_TEXT.length - 1);
     return { x1, x2, b, c, a, x0, vorlageIndex };
@@ -187,6 +208,10 @@ export const gewinnBreakeven = {
     const eKoeff = [-b, a, 0];
     // G(x) = -A x² + A(x1+x2) x - e
     const gKoeff = [-A, A * (x1 + x2), -e];
+    // Für die mit Zahlen vorgerechneten p(xMax)/G(xMax)-Schritte unten (statt
+    // der "|_{x=...}"-Kurzschreibweise, iPhone-Rückmeldung).
+    const pBeiXMax = polynomEingesetztLatex([a, -b], [0, 1], xMax);
+    const gBeiXMax = polynomEingesetztLatex(gKoeff, [2, 1, 0], xMax);
 
     return {
       frage: {
@@ -282,8 +307,21 @@ export const gewinnBreakeven = {
             latex: `G'(x) = ${polynomLatex([2 * gKoeff[0], gKoeff[1]], [1, 0])} = 0 \\;\\Rightarrow\\; x = ${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}`,
             hinweis: `Hinreichende Bedingung: G''(x) = ${formatDeZahl(2 * gKoeff[0], minimaleNachkommastellen(2 * gKoeff[0]))} < 0, also Maximum.`,
           },
-          { titel: 'Einsetzen', latex: `p(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}) = ${polynomLatex([a, -b], [0, 1])}\\big|_{x=${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}} = ${zahlZuLatex(pMax, minimaleNachkommastellen(pMax))}` },
-          { titel: 'Einsetzen', latex: `G(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}) = ${polynomLatex(gKoeff, [2, 1, 0])}\\big|_{x=${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}} = ${zahlZuLatex(gMax, minimaleNachkommastellen(gMax))}` },
+          {
+            // Mit eingesetzten Zahlen vorgerechnet statt der "|_{x=...}"-
+            // Kurzschreibweise ("p(7) = 25 − 2·7 = 25 − 14 = 11" statt
+            // "p(7) = 25 − 2x|_{x=7} = 11", iPhone-Rückmeldung).
+            titel: 'Einsetzen',
+            latex: mehrzeiligeGleichung(`p(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))})`, [
+              pBeiXMax.eingesetzt, pBeiXMax.werte, zahlZuLatex(pMax, minimaleNachkommastellen(pMax)),
+            ]),
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeGleichung(`G(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))})`, [
+              gBeiXMax.eingesetzt, gBeiXMax.werte, zahlZuLatex(gMax, minimaleNachkommastellen(gMax)),
+            ]),
+          },
           {
             titel: 'Ergebnis',
             latex: `x_{max} = ${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}, \\quad p_{max} = ${zahlZuLatex(pMax, minimaleNachkommastellen(pMax))}, \\quad G_{max} = ${zahlZuLatex(gMax, minimaleNachkommastellen(gMax))}`,
@@ -363,12 +401,16 @@ export const extremwerteZweiVariablenKubisch = {
     const typ2 = klassifiziereKritischenPunkt(det2, fxx2);
     const wert2 = runde(x2 * x2 * x2 + a * x2 * y2 + b * x2 * x2 + c * y2 * y2, 4);
 
-    const text = `f(x,y) = x³ ${termMitVorzeichen(a, 'xy', formatDeZahl)} ${termMitVorzeichen(b, 'x²', formatDeZahl)} ${termMitVorzeichen(c, 'y²', formatDeZahl)}`;
+    // Als echtes KaTeX statt reinem Fließtext (siehe frage.formel unten) —
+    // "x²"/"y²" in Fließtext kann mitten im Exponenten umbrechen ("x" am
+    // Zeilenende, "²" allein auf der nächsten, iPhone-Rückmeldung).
+    const fLatex = `f(x,y) = x^3 ${termMitVorzeichen(a, 'xy', zahlZuLatex, '-')} ${termMitVorzeichen(b, 'x^2', zahlZuLatex, '-')} ${termMitVorzeichen(c, 'y^2', zahlZuLatex, '-')}`;
     const yKoeff = -a / (2 * c); // aus f_y=0 umgestellt: y = -(a/2c)x
 
     return {
       frage: {
-        text: `Bestimmen Sie alle Extremwerte und Sattelpunkte der Funktion ${text}.`,
+        text: 'Bestimmen Sie alle Extremwerte und Sattelpunkte der folgenden Funktion.',
+        formel: fLatex,
         teile: [{ label: 'Punkt 1' }, { label: 'Punkt 2' }],
       },
       eingaben: [
@@ -493,7 +535,16 @@ export const extremwerteZweiVariablenQuadratisch = {
     const typ = klassifiziereKritischenPunkt(det, fxx);
     const wert = runde(A * xStern * xStern + B * xStern + C * yStern * yStern + D * yStern + E * xStern * yStern + F, 4);
 
-    const fText = `f(x,y) = ${bauePolynomAusdruck([[A, 'x²'], [B, 'x'], [C, 'y²'], [D, 'y'], [E, 'xy'], [F, '']], formatDeZahl, '−')}`;
+    // Als echtes KaTeX statt reinem Fließtext (siehe frage.formel unten) —
+    // "x²"/"y²" in Fließtext kann mitten im Exponenten umbrechen (iPhone-
+    // Rückmeldung). Bis zu sechs Terme mit zweistelligen Koeffizienten
+    // liefen in einer einzigen Zeile bei 375px über den Bildschirmrand —
+    // teileLangenPolynomAusdruck bricht ab vier Termen auf zwei Zeilen um.
+    const fAusdruck = bauePolynomAusdruck([[A, 'x^2'], [B, 'x'], [C, 'y^2'], [D, 'y'], [E, 'xy'], [F, '']], zahlZuLatex, '-');
+    const fZeilen = teileLangenPolynomAusdruck(fAusdruck);
+    const fLatexFormel = fZeilen.length > 1
+      ? mehrzeiligeKette([`f(x,y) = ${fZeilen[0]}`, fZeilen[1]])
+      : `f(x,y) = ${fZeilen[0]}`;
 
     // Einsetzungsmethode mit echten Zahlen (keine Platzhalterbuchstaben):
     // x = k1 + k2·y aus f_x=0, dann in f_y=0 eingesetzt und nach y aufgelöst.
@@ -505,7 +556,7 @@ export const extremwerteZweiVariablenQuadratisch = {
     const m1Term = `${m1 < 0 ? '-' : ''}${koeffVariable(Math.abs(m1), 'y')}`;
 
     return {
-      frage: { text: `Bestimmen Sie alle Extremwerte der Funktion ${fText}.` },
+      frage: { text: 'Bestimmen Sie alle Extremwerte der folgenden Funktion.', formel: fLatexFormel },
       eingaben: [
         { id: 'x', label: 'Stationärer Punkt: x', typ: 'zahl', punkte: 3, loesung: xStern, toleranz: KONFIG.toleranz.exakt },
         { id: 'y', label: 'Stationärer Punkt: y', typ: 'zahl', punkte: 3, loesung: yStern, toleranz: KONFIG.toleranz.exakt },
@@ -879,21 +930,6 @@ export const ableitungen = {
     };
   },
 };
-
-// Hochgestellte Ziffern für reinen Fließtext (kein LaTeX-Markup außerhalb
-// von Formelfeldern, siehe LATEX_RESTE in test/alle.mjs — ein rohes "^" oder
-// "_" in frage.text wäre ein Testfehler). Eigene, kleine Kopie statt eines
-// Imports, dieselbe Begründung wie überall sonst in dieser Datei (echte
-// Modul-Grenzen unter Node, keine stille Kopplung).
-const ABL_HOCH = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
-// Reine Hochzahl ohne Basis in Fließtext, z. B. n=2 -> "²", n=-1 -> "⁻¹",
-// n=1 -> "" (x¹ wird als "x" geschrieben, kein sichtbarer Exponent).
-function hochzahlProse(n) {
-  if (n === 1) return '';
-  const abs = Math.abs(n);
-  const ziffern = String(abs).split('').map((z) => ABL_HOCH[Number(z)]).join('');
-  return (n < 0 ? '⁻' : '') + ziffern;
-}
 
 // Ganze Zahl für ein Eingabefeld-Label mit echtem Unicode-Minus "−" statt
 // des ASCII-Bindestrichs, den eine einfache Template-Interpolation oder
@@ -1272,10 +1308,13 @@ export const elastizitaet = {
 // Exponentialfunktion e^(k·x²y) — Letztere exakt der in Übung 14d belegte
 // Fall. Zusatzthema (Phase 6) — in der Probeklausur standardmäßig aus.
 // ---------------------------------------------------------------------------
-function baueFx(fxLatex, fxWert, fyLatex, fyWert, frageProse, x0, y0, titel, einsetzenSchritte, params) {
+function baueFx(fxLatex, fxWert, fyLatex, fyWert, fFormelLatex, x0, y0, titel, einsetzenSchritte, params) {
   return {
     titel,
-    frage: { text: `Bilden Sie die partiellen Ableitungen von f(x,y) = ${frageProse} nach x und nach y.` },
+    frage: {
+      text: 'Bilden Sie die partiellen Ableitungen der folgenden Funktion nach x und nach y.',
+      formel: `f(x,y) = ${fFormelLatex}`,
+    },
     eingaben: [
       { id: 'fx_term', label: 'a) ∂f/∂x', typ: 'term', punkte: 1 },
       {
@@ -1351,7 +1390,6 @@ export const partielleAbleitungen = {
       // Betrag, siehe Kommentar an der Funktion).
       const { C, m, n } = params;
       const basisLatex = cdotWennNicht1(C, `${hochLatex('x', m)}${hochLatex('y', n)}`);
-      const basisProse = `${C === 1 ? '' : formatDeZahl(C, 0) + '·'}x${hochzahlProse(m)}y${hochzahlProse(n)}`;
       const fxFaktor = C * m;
       const fxVZ = fxFaktor < 0 ? '-' : '';
       const fxLatex = `${fxVZ}${cdotWennNicht1(fxFaktor, `${hochLatex('x', m - 1)}${hochLatex('y', n)}`)}`;
@@ -1360,7 +1398,7 @@ export const partielleAbleitungen = {
       const fxWert = runde(fxFaktor * Math.pow(x0, m - 1) * Math.pow(y0, n), 2);
       const fyWert = runde(fyFaktor * Math.pow(x0, m) * Math.pow(y0, n - 1), 2);
 
-      return baueFx(fxLatex, fxWert, fyLatex, fyWert, basisProse, x0, y0, 'Produkt zweier Potenzen', [
+      return baueFx(fxLatex, fxWert, fyLatex, fyWert, basisLatex, x0, y0, 'Produkt zweier Potenzen', [
         {
           titel: 'Formel',
           latex: `f(x,y) = ${basisLatex}`,
@@ -1385,9 +1423,7 @@ export const partielleAbleitungen = {
       // gebraucht.
       const { k } = params;
       const vz = k < 0 ? '-' : '';
-      const vzProse = k < 0 ? '⁻' : '';
       const innenLatex = `${vz}x^{2}y`;
-      const fProse = `e${vzProse}ˣ²ʸ`;
       const fLatex = `e^{${innenLatex}}`;
       const fxLatex = `${2 * k < 0 ? '-' : ''}2xy \\cdot e^{${innenLatex}}`;
       const fyLatex = `${vz}x^{2} \\cdot e^{${innenLatex}}`;
@@ -1396,11 +1432,11 @@ export const partielleAbleitungen = {
       const fyWert = runde(k * x0 * x0 * Math.exp(innenWert), 2);
       const innenBeiPunkt = `${vz}${hochLatex(x0Klar, 2)} \\cdot ${y0Klar}`;
 
-      return baueFx(fxLatex, fxWert, fyLatex, fyWert, fProse, x0, y0, 'Exponentialfunktion e hoch x²y', [
+      return baueFx(fxLatex, fxWert, fyLatex, fyWert, fLatex, x0, y0, 'Exponentialfunktion mit quadratischer innerer Funktion', [
         {
           titel: 'Formel',
           latex: `f(x,y) = ${fLatex}`,
-          hinweis: 'Kettenregel: äußere Funktion e hoch (etwas), innere Funktion x²y — nach x bzw. y partiell ableiten.',
+          hinweis: 'Kettenregel: äußere Funktion eᵘ, innere Funktion u(x,y) — nach x bzw. y partiell ableiten.',
         },
         {
           titel: 'Einsetzen',
@@ -1408,7 +1444,7 @@ export const partielleAbleitungen = {
             `\\text{innere Ableitung nach } x: \\quad ${2 * k < 0 ? '-' : ''}2xy`,
             `\\text{innere Ableitung nach } y: \\quad ${vz}x^{2}`,
           ]),
-          hinweis: 'x²y partiell nach x abgeleitet (y konstant): 2·x·y-Faktor. Partiell nach y abgeleitet (x konstant): x²-Faktor.',
+          hinweis: 'Die innere Funktion partiell nach x abgeleitet (y konstant) ergibt den Faktor 2xy; partiell nach y abgeleitet (x konstant) ergibt den Faktor x hoch 2.',
         },
         { titel: 'Ergebnis', latex: `f_x = ${fxLatex}` },
         { titel: 'Ergebnis', latex: `f_y = ${fyLatex}` },
@@ -1427,7 +1463,6 @@ export const partielleAbleitungen = {
     // das Vorzeichen von A bzw. B.
     const { A, B, p, q } = params;
     const fLatex = bauePolynomAusdruck([[A, `x^{${p}}`], [B, `y^{${q}}`]], zahlZuLatex, '-');
-    const fProse = bauePolynomAusdruck([[A, `x${hochzahlProse(p)}`], [B, `y${hochzahlProse(q)}`]], formatDeZahl, '−');
     const fxFaktor = A * p;
     const fyFaktor = B * q;
     const fxVZ = fxFaktor < 0 ? '-' : '';
@@ -1437,7 +1472,7 @@ export const partielleAbleitungen = {
     const fxWert = runde(fxFaktor * Math.pow(x0, p - 1), 2);
     const fyWert = runde(fyFaktor * Math.pow(y0, q - 1), 2);
 
-    return baueFx(fxLatex, fxWert, fyLatex, fyWert, fProse, x0, y0, 'Potenzsumme', [
+    return baueFx(fxLatex, fxWert, fyLatex, fyWert, fLatex, x0, y0, 'Potenzsumme', [
       {
         titel: 'Formel',
         latex: `f(x,y) = ${fLatex}`,
