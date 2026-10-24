@@ -732,6 +732,45 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
       const erwartetA = wertVon(aufgabe, 'a');
       pruefe(A.every((zeile, i) => zeile.every((w, j) => nahBei(w, erwartetA[i][j], 1e-6))),
         `${kennzeichnung}: a) A·E nachgerechnet ${JSON.stringify(A)}, erwartet ${JSON.stringify(erwartetA)}`);
+    } else if (p.teilA.art === 'aussenprodukt') {
+      // Übung 22 h): Außenprodukt D·Fᵗ — direkt per Doppelschleife
+      // nachgerechnet, nicht über die flatMap/map-Kette des Generators.
+      const { D, F } = p.teilA;
+      const erwartetA = wertVon(aufgabe, 'a');
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          pruefe(nahBei(D[i] * F[j], erwartetA[i][j], 1e-6),
+            `${kennzeichnung}: a) Außenprodukt[${i}][${j}] nachgerechnet ${D[i] * F[j]}, erwartet ${erwartetA[i][j]}`);
+        }
+      }
+    } else if (p.teilA.art === 'skalarprodukt1x1') {
+      // Übung 22 i): Dᵗ·F als 1×1-Matrix — eigene Summierschleife statt der
+      // Generator-eigenen skalarprodukt()-Funktion.
+      const { D, F } = p.teilA;
+      const erwartetA = wertVon(aufgabe, 'a');
+      let summe = 0;
+      for (let i = 0; i < 3; i++) summe += D[i] * F[i];
+      pruefe(nahBei(summe, erwartetA[0][0], 1e-6),
+        `${kennzeichnung}: a) Dᵗ·F nachgerechnet ${summe}, erwartet ${erwartetA[0][0]}`);
+    } else if (p.teilA.art === 'transponierte-regel') {
+      // Übung 22 k): AᵗC − (CᵗA)ᵗ = 0 — über die separate Dreifachschleife
+      // matrixMalUnabhaengig und einen eigenen Index-Tausch für "transponiert"
+      // nachgerechnet, nicht über die generator-eigene transponiere()/
+      // matrixMal()-Kombination.
+      const { A, C } = p.teilA;
+      const erwartetA = wertVon(aufgabe, 'a');
+      const At = A[0].map((_, j) => A.map((zeile) => zeile[j]));
+      const Ct = C[0].map((_, j) => C.map((zeile) => zeile[j]));
+      const AtC = matrixMalUnabhaengig(At, C);
+      const CtA = matrixMalUnabhaengig(Ct, A);
+      for (let i = 0; i < 2; i++) {
+        for (let j = 0; j < 2; j++) {
+          pruefe(nahBei(AtC[i][j] - CtA[j][i], erwartetA[i][j], 1e-9),
+            `${kennzeichnung}: a) AᵗC-(CᵗA)ᵗ[${i}][${j}] nachgerechnet ${AtC[i][j] - CtA[j][i]}, erwartet ${erwartetA[i][j]}`);
+          pruefe(Math.abs(erwartetA[i][j]) < 1e-9,
+            `${kennzeichnung}: a) AᵗC-(CᵗA)ᵗ muss die Nullmatrix sein, war ${erwartetA[i][j]}`);
+        }
+      }
     } else {
       const { C, D } = p.teilA;
       pruefe(C[0].length !== D.length,

@@ -7,7 +7,7 @@
 
 import { zufallAus, zufallBool } from '../rng.js';
 import { minimaleNachkommastellen } from '../zahl.js';
-import { zahlZuLatex, matrixLatex, mehrzeiligeGleichung, mehrzeiligeKette } from '../latex.js';
+import { zahlZuLatex, matrixLatex, mehrzeiligeGleichung, mehrzeiligeKette, bruchGekuerzt } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // ---------------------------------------------------------------------------
@@ -142,10 +142,47 @@ export const matrixprodukt = {
     // ausdrücklich erlaubt — sonst bleibt Teil a) unverändert bei
     // definiert/undefiniert (MK7a / Übung 22d).
     const zusatzVariante = erlaubeZusatzvarianten
-      ? zufallAus(rng, [null, null, null, 'transponiert', 'skalar', 'einheitsmatrix'])
+      ? zufallAus(rng, [
+        null, null, null, 'transponiert', 'skalar', 'einheitsmatrix',
+        'aussenprodukt', 'skalarprodukt1x1', 'transponierte-regel',
+      ])
       : null;
     let teilA;
-    if (zusatzVariante) {
+    if (zusatzVariante === 'aussenprodukt' || zusatzVariante === 'skalarprodukt1x1') {
+      // Übung 22 h)/i): D, F je 3×1-Spaltenvektoren. h) D·Fᵗ ist das
+      // Außenprodukt (3×1)·(1×3) = 3×3, i) Dᵗ·F ist das Skalarprodukt als
+      // 1×1-"Matrix" (1×3)·(3×1) — derselbe Aufbau wie in Übung 22, aber als
+      // zwei getrennte Varianten (wie transponiert/skalar/einheitsmatrix
+      // auch je für sich gezogen werden).
+      for (let versuch = 0; versuch < 100; versuch++) {
+        const D = zufallsMatrix(rng, 3, 1, EINTRAG_POOL).map((z) => z[0]);
+        const F = zufallsMatrix(rng, 3, 1, EINTRAG_POOL).map((z) => z[0]);
+        if (nullAnteil([D.map((w) => [w]), F.map((w) => [w])]) < 1 / 3) continue;
+        if (zusatzVariante === 'aussenprodukt') {
+          const ergebnis = D.map((d) => F.map((f) => d * f));
+          if (ergebnis.some((zeile) => zeile.some((w) => Math.abs(w) > 99))) continue;
+          teilA = { art: 'aussenprodukt', D, F, ergebnis };
+        } else {
+          const wert = skalarprodukt(D, F);
+          if (Math.abs(wert) > 99) continue;
+          teilA = { art: 'skalarprodukt1x1', D, F, ergebnis: [[wert]] };
+        }
+        break;
+      }
+      if (!teilA) teilA = { art: 'aussenprodukt', D: [1, 2, 3], F: [1, 0, -1], ergebnis: [[1, 0, -1], [2, 0, -2], [3, 0, -3]] }; // Rückfall
+    } else if (zusatzVariante === 'transponierte-regel') {
+      // Übung 22 k): AᵗC − (CᵗA)ᵗ = 0, weil (CᵗA)ᵗ = Aᵗ(Cᵗ)ᵗ = AᵗC gilt
+      // ((A·B)ᵗ = Bᵗ·Aᵗ, hier mit B=C). A, C gleich groß (2×2), damit sowohl
+      // AᵗC als auch CᵗA definiert sind.
+      for (let versuch = 0; versuch < 100; versuch++) {
+        const A = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
+        const C = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
+        if (nullAnteil([A, C]) < 1 / 4) continue;
+        teilA = { art: 'transponierte-regel', A, C, ergebnis: [[0, 0], [0, 0]] };
+        break;
+      }
+      if (!teilA) teilA = { art: 'transponierte-regel', A: [[1, 2], [3, 4]], C: [[0, 1], [1, 0]], ergebnis: [[0, 0], [0, 0]] }; // Rückfall
+    } else if (zusatzVariante) {
       for (let versuch = 0; versuch < 100; versuch++) {
         const m = zufallAus(rng, [2, 3]);
         const n = zufallAus(rng, [2, 3]);
@@ -165,6 +202,8 @@ export const matrixprodukt = {
         break;
       }
       if (!teilA) teilA = { art: 'transponiert', A: [[1, 2], [3, 4]], ergebnis: [[1, 3], [2, 4]] }; // Rückfall
+    }
+    if (zusatzVariante) {
       let teilB = null;
       for (let versuch = 0; versuch < 100; versuch++) {
         const X = zufallsMatrix(rng, 3, 3, EINTRAG_POOL);
@@ -324,6 +363,86 @@ export const matrixprodukt = {
           titel: 'Ergebnis',
           latex: `${matrixLatexFormatiert(Amat)} \\cdot ${matrixLatexFormatiert(E)} = ${matrixLatexFormatiert(ergebnis)}`,
           hinweis: 'Das Ergebnis ist wieder A, wie von A·E = A erwartet.',
+        },
+      );
+    } else if (teilA.art === 'aussenprodukt') {
+      const { D, F, ergebnis } = teilA;
+      titel = 'Außenprodukt zweier Vektoren';
+      teilAText = 'Bilden Sie das Außenprodukt D·Fᵗ.';
+      formelZeilenA = [`D = ${matrixLatexFormatiert(D.map((w) => [w]))}`, `F^T = ${matrixLatexFormatiert([F])}`];
+      eingaben.push({
+        id: 'a', label: 'Ergebnis D·Fᵗ (3×3)', typ: 'matrix', zeilen: 3, spalten: 3,
+        punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
+      });
+      schritteA.push(
+        {
+          titel: 'Formel',
+          latex: `D \\cdot F^T`,
+          hinweis: 'Das Außenprodukt eines Spaltenvektors D (3×1) mit der Transponierten eines Spaltenvektors F (1×3) ist eine 3×3-Matrix: jeder Eintrag ist ein einzelnes Produkt aus einem Eintrag von D und einem Eintrag von F — anders als beim gewöhnlichen Skalarprodukt wird hier nichts aufsummiert.',
+        },
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeKette(
+            D.flatMap((d, i) => F.map((f, j) => `c_{${i + 1}${j + 1}} = ${faktorLatex(d)} \\cdot ${faktorLatex(f)} = ${zahlZuLatex(d * f, 0)}`))
+          ),
+        },
+        { titel: 'Ergebnis', latex: `D \\cdot F^T = ${matrixLatexFormatiert(ergebnis)}` },
+      );
+    } else if (teilA.art === 'skalarprodukt1x1') {
+      const { D, F, ergebnis } = teilA;
+      const wert = ergebnis[0][0];
+      titel = 'Skalarprodukt als 1×1-Matrix';
+      teilAText = 'Bilden Sie das Produkt Dᵗ·F.';
+      formelZeilenA = [`D^T = ${matrixLatexFormatiert([D])}`, `F = ${matrixLatexFormatiert(F.map((w) => [w]))}`];
+      eingaben.push({
+        id: 'a', label: 'Ergebnis Dᵗ·F (1×1)', typ: 'matrix', zeilen: 1, spalten: 1,
+        punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
+      });
+      schritteA.push(
+        {
+          titel: 'Formel',
+          latex: `D^T \\cdot F`,
+          hinweis: 'Dᵗ ist ein Zeilenvektor (1×3), F ein Spaltenvektor (3×1) — das Produkt (1×3)·(3×1) ist eine 1×1-"Matrix", also ein einzelner Wert: das gewöhnliche Skalarprodukt von D und F.',
+        },
+        { titel: 'Einsetzen', latex: `D^T \\cdot F = ${skalarproduktLatex(D, F)} = ${zahlZuLatex(wert, 0)}` },
+        { titel: 'Ergebnis', latex: `D^T \\cdot F = ${matrixLatexFormatiert(ergebnis)}` },
+      );
+    } else if (teilA.art === 'transponierte-regel') {
+      const { A: Amat, C } = teilA;
+      const AtC = matrixMal(transponiere(Amat), C);
+      const CtA = matrixMal(transponiere(C), Amat);
+      const CtAt = transponiere(CtA);
+      titel = 'Transponierten-Regel beim Matrizenprodukt';
+      teilAText = 'Zeigen Sie AᵗC − (CᵗA)ᵗ = 0.';
+      formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`, `C = ${matrixLatexFormatiert(C)}`];
+      eingaben.push({
+        id: 'a', label: 'Ergebnis AᵗC − (CᵗA)ᵗ (2×2)', typ: 'matrix', zeilen: 2, spalten: 2,
+        punkte: 2, loesung: [[0, 0], [0, 0]], toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
+      });
+      schritteA.push(
+        {
+          titel: 'Formel',
+          latex: `A^TC - (C^TA)^T`,
+          hinweis: 'Aus (A·B)ᵗ = Bᵗ·Aᵗ folgt mit B=C: (CᵗA)ᵗ = Aᵗ(Cᵗ)ᵗ = AᵗC — die Differenz ist deshalb immer die Nullmatrix, unabhängig von den konkreten Werten in A und C.',
+        },
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeKette([
+            `A^TC = ${matrixLatexFormatiert(AtC)}`,
+            `C^TA = ${matrixLatexFormatiert(CtA)}`,
+            `(C^TA)^T = ${matrixLatexFormatiert(CtAt)}`,
+          ]),
+        },
+        {
+          // Drei 2×2-Matrizen nebeneinander liefen bei 375px ab dem
+          // Bildschirmrand (dasselbe Muster wie bei alg.matrixrechnung) —
+          // jede auf eine eigene Zeile.
+          titel: 'Ergebnis',
+          latex: mehrzeiligeKette([
+            `A^TC - (C^TA)^T`,
+            `= ${matrixLatexFormatiert(AtC)} - ${matrixLatexFormatiert(CtAt)}`,
+            `= ${matrixLatexFormatiert([[0, 0], [0, 0]])}`,
+          ]),
         },
       );
     } else {
@@ -813,49 +932,94 @@ function sarrusSchritt(name, m) {
   return mehrzeiligeGleichung(name, [eingesetzt, werte, zahlZuLatex(ergebnis, 0)]);
 }
 
+// Exakte Bruch-Arithmetik [Zähler, Nenner] (Nenner immer positiv, über
+// bruchGekuerzt sofort gekürzt) — nötig, weil bei rund 40 % der alg.lgs-
+// Instanzen die Gauß-Multiplikatoren bewusst echte (nicht ganzzahlige)
+// Brüche sind (Vorlesungsbeispiel Übung 25a: "II − ¼·I" liefert −½, ¼, 7/2)
+// und dabei exakt, nicht als gerundete Dezimalzahl, gerechnet werden müssen
+// — sonst würde die Lösung x am Ende nicht mehr exakt ganzzahlig herauskommen.
+function bruchAus(zaehler, nenner = 1) {
+  const { zaehler: z, nenner: n } = bruchGekuerzt(zaehler, nenner);
+  return [z, n];
+}
+function bSub([a, b], [c, d]) { return bruchAus(a * d - c * b, b * d); }
+function bMul([a, b], [c, d]) { return bruchAus(a * c, b * d); }
+function bDiv([a, b], [c, d]) { return bruchAus(a * d, b * c); }
+function bruchZuZahl([n, d]) { return n / d; }
+function bruchIstGanz([, d]) { return d === 1; }
+// Ganzzahl (Nenner 1) oder echter, bereits gekürzter Bruch "\dfrac{Z}{N}"
+// mit dem Vorzeichen im Zähler.
+function bruchLatex([n, d]) {
+  if (d === 1) return zahlZuLatex(n, 0);
+  return `${n < 0 ? '-' : ''}\\dfrac{${Math.abs(n)}}{${d}}`;
+}
+// Wie bruchLatex, aber geklammert, wenn negativ — für Brüche, die direkt
+// hinter einem eigenen "+"/"-" eingesetzt werden.
+function bruchFaktorLatex(w) {
+  return w[0] < 0 ? `(${bruchLatex(w)})` : bruchLatex(w);
+}
+
 // Gauß-Elimination ohne Pivotsuche (Pivots sind laut Konstruktion immer
-// ungleich null). Liefert für jeden der drei Schritte die Bezeichnung
-// ("II - 2·I"), die betroffene neue Zeile (inkl. rechter Seite) sowie am
-// Ende die obere Dreiecksform und die Lösung per Rückwärtseinsetzen.
+// ungleich null). Rechnet durchgehend mit exakten Brüchen (siehe oben), auch
+// wenn bei rund 60 % der Instanzen (A=L·U-Konstruktion) alle Zwischenwerte
+// ganzzahlig bleiben — bruchLatex zeigt einen Bruch mit Nenner 1 ohnehin als
+// gewöhnliche ganze Zahl. Liefert für jeden der drei Schritte die
+// Bezeichnung ("II - ¼·I"), die betroffene neue Zeile (inkl. rechter Seite)
+// sowie am Ende die obere Dreiecksform und die Lösung per Rückwärtseinsetzen.
 function zeilenOperationLabel(ziel, quelle, multiplikator) {
-  const abs = Math.abs(multiplikator);
-  const vz = multiplikator < 0 ? '+' : '-';
-  const faktor = abs === 1 ? '' : `${zahlZuLatex(abs, 0)}\\cdot `;
-  return `${ziel} ${vz} ${faktor}${quelle}`;
+  const [n, d] = multiplikator;
+  const vz = n < 0 ? '+' : '-';
+  const abs = Math.abs(n);
+  if (d === 1) {
+    const faktor = abs === 1 ? '' : `${zahlZuLatex(abs, 0)}\\cdot `;
+    return `\\text{${ziel} ${vz} ${faktor}${quelle}:}`;
+  }
+  // Echter Bruch als Multiplikator: "\dfrac" ist in KaTeX im Textmodus
+  // ("\text{...}") nicht erlaubt — der Bruch selbst bleibt deshalb im
+  // Mathe-Modus, die umgebenden Wörter stehen in eigenen \text{}-Stücken.
+  return `\\text{${ziel} ${vz} }\\dfrac{${abs}}{${d}}\\text{\\,\\cdot ${quelle}:}`;
 }
 function gaussSchritte(A, b) {
-  const M = A.map((zeile) => zeile.slice());
-  const rhs = b.slice();
+  const M = A.map((zeile) => zeile.map((w) => bruchAus(w)));
+  const rhs = b.map((w) => bruchAus(w));
   const schritte = [];
 
-  const m21 = M[1][0] / M[0][0];
-  M[1] = M[1].map((w, j) => w - m21 * M[0][j]);
-  rhs[1] = rhs[1] - m21 * rhs[0];
-  schritte.push({ label: zeilenOperationLabel('II', 'I', m21), zeile: M[1].slice(), rhsWert: rhs[1] });
+  const m21 = bDiv(M[1][0], M[0][0]);
+  M[1] = M[1].map((w, j) => bSub(w, bMul(m21, M[0][j])));
+  rhs[1] = bSub(rhs[1], bMul(m21, rhs[0]));
+  schritte.push({ label: zeilenOperationLabel('II', 'I', m21), zeile: M[1].slice(), rhsWert: rhs[1], multiplikator: m21 });
 
-  const m31 = M[2][0] / M[0][0];
-  M[2] = M[2].map((w, j) => w - m31 * M[0][j]);
-  rhs[2] = rhs[2] - m31 * rhs[0];
-  schritte.push({ label: zeilenOperationLabel('III', 'I', m31), zeile: M[2].slice(), rhsWert: rhs[2] });
+  const m31 = bDiv(M[2][0], M[0][0]);
+  M[2] = M[2].map((w, j) => bSub(w, bMul(m31, M[0][j])));
+  rhs[2] = bSub(rhs[2], bMul(m31, rhs[0]));
+  schritte.push({ label: zeilenOperationLabel('III', 'I', m31), zeile: M[2].slice(), rhsWert: rhs[2], multiplikator: m31 });
 
-  const m32 = M[2][1] / M[1][1];
-  M[2] = M[2].map((w, j) => w - m32 * M[1][j]);
-  rhs[2] = rhs[2] - m32 * rhs[1];
-  schritte.push({ label: zeilenOperationLabel('III', 'II', m32), zeile: M[2].slice(), rhsWert: rhs[2] });
+  const m32 = bDiv(M[2][1], M[1][1]);
+  M[2] = M[2].map((w, j) => bSub(w, bMul(m32, M[1][j])));
+  rhs[2] = bSub(rhs[2], bMul(m32, rhs[1]));
+  schritte.push({ label: zeilenOperationLabel('III', 'II', m32), zeile: M[2].slice(), rhsWert: rhs[2], multiplikator: m32 });
 
-  const x3 = rhs[2] / M[2][2];
-  const x2 = (rhs[1] - M[1][2] * x3) / M[1][1];
-  const x1 = (rhs[0] - M[0][1] * x2 - M[0][2] * x3) / M[0][0];
+  const x3b = bDiv(rhs[2], M[2][2]);
+  const zaehler2 = bSub(rhs[1], bMul(M[1][2], x3b));
+  const x2b = bDiv(zaehler2, M[1][1]);
+  const zaehler1 = bSub(bSub(rhs[0], bMul(M[0][1], x2b)), bMul(M[0][2], x3b));
+  const x1b = bDiv(zaehler1, M[0][0]);
 
-  return { M, rhs, schritte, x: [x1, x2, x3] };
+  return {
+    M, rhs, schritte,
+    x: [x1b, x2b, x3b].map(bruchZuZahl),
+    rueckeinsetzen: { zaehler2, zaehler1 },
+  };
 }
 
-// "(a b c | d)" als Zeile einer augmentierten Matrix in LaTeX.
-function augmentierteZeileLatex(zeile, rhsWert) {
-  return `\\left(${zeile.map((w) => zahlZuLatex(w, 0)).join(' \\quad ')} \\;\\middle|\\; ${zahlZuLatex(rhsWert, 0)}\\right)`;
-}
+// "(a b c | d)" als Zeile einer augmentierten Matrix in LaTeX — A/b dürfen
+// entweder plain-ganzzahlig sein (pristine Ausgangsmatrix) oder bereits als
+// Bruch-Paare [n, d] vorliegen (Zwischenschritte der Elimination); bruchAus
+// ist für ganze Zahlen die Identität (Nenner 1), darum reicht ein Mapping.
 function augmentierteMatrixLatex(A, b) {
-  const zeilen = A.map((zeile, i) => `${zeile.map((w) => zahlZuLatex(w, 0)).join(' & ')} & ${zahlZuLatex(b[i], 0)}`).join(' \\\\ ');
+  const Ab = A.map((zeile) => zeile.map((w) => (Array.isArray(w) ? w : bruchAus(w))));
+  const bb = b.map((w) => (Array.isArray(w) ? w : bruchAus(w)));
+  const zeilen = Ab.map((zeile, i) => `${zeile.map(bruchLatex).join(' & ')} & ${bruchLatex(bb[i])}`).join(' \\\\ ');
   return `\\left(\\begin{array}{ccc|c} ${zeilen} \\end{array}\\right)`;
 }
 
@@ -864,13 +1028,26 @@ const LGS_UPPER_POOL = [-3, -2, -1, 0, 0, 1, 2, 3];
 const LGS_L_POOL = [-3, -2, -1, 1, 2, 3];
 const LGS_X_POOL = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
 const LGS_MAX_ZWISCHENWERT = 50;
+// Nenner, die beim Gauß-Schritt auftreten dürfen, bevor eine Instanz als "zu
+// unschön" verworfen wird — ¼, ½, ⅓ usw. sind laut Vorlesungsbeispiel
+// (Übung 25a) gewollt, ein Nenner wie 1/97 wäre es nicht.
+const LGS_MAX_NENNER = 8;
 
-function lgsZwischenwerteKlein(A, b) {
+// erfordereBruch=true (die ~40 %-"gebrochen"-Variante): mindestens einer der
+// drei Gauß-Multiplikatoren muss ein echter (nicht ganzzahliger) Bruch sein.
+// erfordereBruch=false (die L·U-Konstruktion, ~60 %): bleibt wie bewiesen
+// garantiert ganzzahlig — die Prüfung hier ist nur ein zusätzliches Netz.
+function lgsZwischenwerteKlein(A, b, { erfordereBruch = false } = {}) {
   const { schritte, x } = gaussSchritte(A, b);
+  let hatBruch = false;
   for (const s of schritte) {
-    if (s.zeile.some((w) => Math.abs(w) > LGS_MAX_ZWISCHENWERT)) return false;
-    if (Math.abs(s.rhsWert) > LGS_MAX_ZWISCHENWERT) return false;
+    if (s.multiplikator[1] > LGS_MAX_NENNER) return false;
+    if (Math.abs(bruchZuZahl(s.rhsWert)) > LGS_MAX_ZWISCHENWERT) return false;
+    if (s.zeile.some((w) => Math.abs(bruchZuZahl(w)) > LGS_MAX_ZWISCHENWERT)) return false;
+    if (s.zeile.some((w) => w[1] > LGS_MAX_NENNER) || s.rhsWert[1] > LGS_MAX_NENNER) return false;
+    if (s.multiplikator[1] > 1) hatBruch = true;
   }
+  if (erfordereBruch !== hatBruch) return false;
   if (!x.every((w) => Number.isInteger(w))) return false;
   for (const M of [A, cramerMatrix(A, b, 0), cramerMatrix(A, b, 1), cramerMatrix(A, b, 2)]) {
     const { positiv, negativ } = sarrusTripel(M);
@@ -883,6 +1060,17 @@ function lgsZwischenwerteKlein(A, b) {
   if (A.flat().filter((w) => w === 0).length > 3) return false;
   return true;
 }
+// Zeigt "x_i = Zähler(-Ausdruck) / Nenner = Ergebnis": ganzzahlige Division
+// (beide Seiten Nenner 1) als schlichten Schrägstrich (wie bisher — das
+// Ergebnis ist ohnehin ganzzahlig, ein "\dfrac" wäre ein ungekürzter
+// Bruch-Anschein), eine echte Bruch-Division als "\dfrac".
+function bruchTeilungLatex(zaehlerAusdruck, zaehlerWert, nennerWert, ergebnis) {
+  if (bruchIstGanz(zaehlerWert) && bruchIstGanz(nennerWert)) {
+    const nennerText = nennerWert[0] < 0 ? `(${bruchLatex(nennerWert)})` : bruchLatex(nennerWert);
+    return `${zaehlerAusdruck} / ${nennerText} = ${zahlZuLatex(ergebnis, 0)}`;
+  }
+  return `\\dfrac{${zaehlerAusdruck}}{${bruchLatex(nennerWert)}} = ${zahlZuLatex(ergebnis, 0)}`;
+}
 
 export const lgs = {
   id: 'alg.lgs',
@@ -892,6 +1080,28 @@ export const lgs = {
   vorlage: 'Übung 25',
   zusatz: true,
   waehleParameter(rng) {
+    // Rund 40 % der Instanzen sollen beim Gauß-Algorithmus einen echten
+    // (nicht ganzzahligen) Multiplikator durchlaufen ("II − ¼·I" wie in
+    // Übung 25a) — dafür reicht die A=L·U-Konstruktion unten nicht (die
+    // liefert beweisbar IMMER ganzzahlige Multiplikatoren), also wird A für
+    // diesen Fall direkt (nicht über L·U) aus EINTRAG_POOL gezogen.
+    if (zufallBool(rng, 0.4)) {
+      for (let versuch = 0; versuch < 3000; versuch++) {
+        const A = zufallsMatrix(rng, 3, 3, EINTRAG_POOL);
+        if (A[0][0] === 0) continue; // erster Pivot muss ungleich null sein (keine Pivotsuche)
+        const x = [zufallAus(rng, LGS_X_POOL), zufallAus(rng, LGS_X_POOL), zufallAus(rng, LGS_X_POOL)];
+        if (x.every((w) => w === 0)) continue;
+
+        const b = matrixMalVektor(A, x);
+        if (!lgsZwischenwerteKlein(A, b, { erfordereBruch: true })) continue;
+        return { A, b };
+      }
+      // Rückfall: Übung 25a (Zahlen aus der gerenderten Musterlösung, nur
+      // Zahlen — siehe CLAUDE.md Abschnitt 2). det A = 2, D₁=24, D₂=−22,
+      // D₃=−16, x=(12,−11,−8); der erste Gauß-Schritt ist dort "II−¼·I".
+      return { A: [[4, 2, 3], [1, 0, 1], [2, 2, 0]], b: [2, 4, 2] };
+    }
+
     for (let versuch = 0; versuch < 3000; versuch++) {
       const U = [
         [zufallAus(rng, LGS_DIAG_POOL), zufallAus(rng, LGS_UPPER_POOL), zufallAus(rng, LGS_UPPER_POOL)],
@@ -920,7 +1130,8 @@ export const lgs = {
   },
   baue(params) {
     const { A, b } = params;
-    const { M, rhs, schritte, x } = gaussSchritte(A, b);
+    const { M, rhs, schritte, x, rueckeinsetzen } = gaussSchritte(A, b);
+    const { zaehler2, zaehler1 } = rueckeinsetzen;
     const D = determinante3x3(A);
     const D1 = determinante3x3(cramerMatrix(A, b, 0));
     const D2 = determinante3x3(cramerMatrix(A, b, 1));
@@ -950,25 +1161,25 @@ export const lgs = {
           },
           {
             titel: 'Einsetzen',
-            latex: `\\text{${schritte[0].label}:} \\quad ${augmentierteMatrixLatex([M[0], schritte[0].zeile, A[2]], [b[0], schritte[0].rhsWert, b[2]])}`,
+            latex: `${schritte[0].label} \\quad ${augmentierteMatrixLatex([M[0], schritte[0].zeile, A[2]], [b[0], schritte[0].rhsWert, b[2]])}`,
             hinweis: 'Ersten Eintrag der zweiten Zeile auf null bringen.',
           },
           {
             titel: 'Einsetzen',
-            latex: `\\text{${schritte[1].label}:} \\quad ${augmentierteMatrixLatex([M[0], schritte[0].zeile, schritte[1].zeile], [b[0], schritte[0].rhsWert, schritte[1].rhsWert])}`,
+            latex: `${schritte[1].label} \\quad ${augmentierteMatrixLatex([M[0], schritte[0].zeile, schritte[1].zeile], [b[0], schritte[0].rhsWert, schritte[1].rhsWert])}`,
             hinweis: 'Ersten Eintrag der dritten Zeile auf null bringen.',
           },
           {
             titel: 'Einsetzen',
-            latex: `\\text{${schritte[2].label}:} \\quad ${augmentierteMatrixLatex(M, rhs)}`,
+            latex: `${schritte[2].label} \\quad ${augmentierteMatrixLatex(M, rhs)}`,
             hinweis: 'Zweiten Eintrag der dritten Zeile auf null bringen — jetzt steht eine obere Dreiecksform da.',
           },
           {
             titel: 'Einsetzen',
             latex: mehrzeiligeKette([
-              `x_3 = ${zahlZuLatex(rhs[2], 0)} / ${faktorLatex(M[2][2])} = ${zahlZuLatex(x[2], 0)}`,
-              `x_2 = \\dfrac{${zahlZuLatex(rhs[1], 0)} - ${faktorLatex(M[1][2])} \\cdot ${faktorLatex(x[2])}}{${zahlZuLatex(M[1][1], 0)}} = ${zahlZuLatex(x[1], 0)}`,
-              `x_1 = \\dfrac{${zahlZuLatex(rhs[0], 0)} - ${faktorLatex(M[0][1])} \\cdot ${faktorLatex(x[1])} - ${faktorLatex(M[0][2])} \\cdot ${faktorLatex(x[2])}}{${zahlZuLatex(M[0][0], 0)}} = ${zahlZuLatex(x[0], 0)}`,
+              `x_3 = ${bruchTeilungLatex(bruchLatex(rhs[2]), rhs[2], M[2][2], x[2])}`,
+              `x_2 = ${bruchTeilungLatex(`${bruchLatex(rhs[1])} - ${bruchFaktorLatex(M[1][2])} \\cdot ${faktorLatex(x[2])}`, zaehler2, M[1][1], x[1])}`,
+              `x_1 = ${bruchTeilungLatex(`${bruchLatex(rhs[0])} - ${bruchFaktorLatex(M[0][1])} \\cdot ${faktorLatex(x[1])} - ${bruchFaktorLatex(M[0][2])} \\cdot ${faktorLatex(x[2])}`, zaehler1, M[0][0], x[0])}`,
             ]),
             hinweis: 'Von unten nach oben rückwärts einsetzen (dritte Zeile hat nur noch x₃, zweite nur noch x₂ und x₃, usw.).',
           },

@@ -27,7 +27,7 @@ import {
   integralBestimmt,
   integralKonsumentenrente,
 } from '../src/generatoren/integral.js';
-import { matrixprodukt, produktionsprozess, matrixrechnung } from '../src/generatoren/algebra.js';
+import { matrixprodukt, produktionsprozess, matrixrechnung, lgs } from '../src/generatoren/algebra.js';
 
 export function testeFixtures() {
   let fehler = 0;
@@ -342,6 +342,40 @@ export function testeFixtures() {
     pruefe(JSON.stringify(w21.c) === JSON.stringify([[0, 0], [0, 0]]), `Übung 21c: ${JSON.stringify(w21.c)}`);
     pruefe(JSON.stringify(w21.d) === JSON.stringify([[12, -6], [-6, 0]]), `Übung 21d: ${JSON.stringify(w21.d)}`);
     faelle.push('Übung 21');
+  }
+
+  // Übung 23 (einstufig): A=((1,2,2)(2,1,0)(1,0,2)), E=(5;6;7) ->
+  // A·E=(31;16;19); P_R=(5,4,3), P_E=(10,15,20) -> Erlös 280, Kosten 276,
+  // G=4.
+  {
+    const a23 = produktionsprozess.baue({
+      stufen: 1, A: [[1, 2, 2], [2, 1, 0], [1, 0, 2]], B: null,
+      E: [[5], [6], [7]], PR: [5, 4, 3], PE: [10, 15, 20],
+    });
+    const wR23 = a23.eingaben.find((e) => e.id === 'R').loesung;
+    const wG23 = a23.eingaben.find((e) => e.id === 'G').loesung;
+    pruefe(JSON.stringify(wR23) === JSON.stringify([[31], [16], [19]]), `Übung 23: R=${JSON.stringify(wR23)}, erwartet [[31],[16],[19]]`);
+    pruefe(nahBei(wG23, 4, 1e-9), `Übung 23: G=${wG23}, erwartet 4`);
+    faelle.push('Übung 23');
+  }
+
+  // Übung 25a: A=((4,2,3)(1,0,1)(2,2,0)), b=(2;4;2) -> det A=2, D1=24,
+  // D2=-22, D3=-16, x=(12,-11,-8). Der erste Gauß-Schritt ("II-¼·I") ist
+  // hier ein echter (nicht ganzzahliger) Multiplikator.
+  {
+    const a25a = lgs.baue({ A: [[4, 2, 3], [1, 0, 1], [2, 2, 0]], b: [2, 4, 2] });
+    const w25a = a25a.eingaben.find((e) => e.id === 'x').loesung;
+    pruefe(JSON.stringify(w25a) === JSON.stringify([12, -11, -8]), `Übung 25a: x=${JSON.stringify(w25a)}, erwartet [12,-11,-8]`);
+    faelle.push('Übung 25a');
+  }
+
+  // Übung 25b: A=((2,2,1)(2,1,1)(1,-1,1)), b=(1;2;3) -> det A=-1,
+  // x=(1,-1,1).
+  {
+    const a25b = lgs.baue({ A: [[2, 2, 1], [2, 1, 1], [1, -1, 1]], b: [1, 2, 3] });
+    const w25b = a25b.eingaben.find((e) => e.id === 'x').loesung;
+    pruefe(JSON.stringify(w25b) === JSON.stringify([1, -1, 1]), `Übung 25b: x=${JSON.stringify(w25b)}, erwartet [1,-1,1]`);
+    faelle.push('Übung 25b');
   }
 
   // Übung 4e: K0=20.000, i=6 %, n=5, stetig -> Kn=26.997,18 €.
