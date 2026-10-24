@@ -182,10 +182,10 @@ export const matrixprodukt = {
       // Faktoren auf getrennte Zeilen statt nebeneinander — zwei 3×3-
       // Matrizen (oder sogar nur eine, falls Einträge zweistellig sind)
       // liefen bei 375px sonst gelegentlich ab (iPhone-Rückmeldung).
-      formelZeilenA = [`\\text{a)}\\quad ${matrixLatexFormatiert([v])}`, `\\cdot ${matrixLatexFormatiert(M)}`];
+      formelZeilenA = [`${matrixLatexFormatiert([v])}`, `\\cdot ${matrixLatexFormatiert(M)}`];
       eingaben.push({
-        id: 'a', label: `a) Ergebnis (1×${n})`, typ: 'matrix', zeilen: 1, spalten: n,
-        punkte: 2, loesung: [ergebnis], toleranz: KONFIG.toleranz.exakt,
+        id: 'a', label: `Ergebnis (1×${n})`, typ: 'matrix', zeilen: 1, spalten: n,
+        punkte: 2, loesung: [ergebnis], toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
       });
       schritteA.push(
         {
@@ -206,10 +206,10 @@ export const matrixprodukt = {
     } else {
       const { C, D } = teilA;
       const p = C.length; const q = C[0].length; const r = D.length; const s = D[0].length;
-      formelZeilenA = [`\\text{a)}\\quad ${matrixLatexFormatiert(C)}`, `\\cdot ${matrixLatexFormatiert(D)}`];
+      formelZeilenA = [`${matrixLatexFormatiert(C)}`, `\\cdot ${matrixLatexFormatiert(D)}`];
       eingaben.push({
-        id: 'a', label: 'a) Ist das Produkt definiert?', typ: 'auswahl',
-        optionen: ['Definiert', 'Nicht definiert'], punkte: 2, loesung: 'Nicht definiert',
+        id: 'a', label: 'Ist das Produkt definiert?', typ: 'auswahl',
+        optionen: ['Definiert', 'Nicht definiert'], punkte: 2, loesung: 'Nicht definiert', teilLabel: 'a)',
       });
       schritteA.push(
         {
@@ -230,15 +230,18 @@ export const matrixprodukt = {
 
     const { X, Y, ergebnis: ergebnisB } = teilB;
     eingaben.push({
-      id: 'b', label: 'b) Ergebnis (3×3)', typ: 'matrix', zeilen: 3, spalten: 3,
-      punkte: 2, loesung: ergebnisB, toleranz: KONFIG.toleranz.exakt,
+      id: 'b', label: 'Ergebnis (3×3)', typ: 'matrix', zeilen: 3, spalten: 3,
+      punkte: 2, loesung: ergebnisB, toleranz: KONFIG.toleranz.exakt, teilLabel: 'b)',
     });
-    const formelZeilenB = [`\\text{b)}\\quad ${matrixLatexFormatiert(X)}`, `\\cdot ${matrixLatexFormatiert(Y)}`];
+    const formelZeilenB = [`${matrixLatexFormatiert(X)}`, `\\cdot ${matrixLatexFormatiert(Y)}`];
 
     return {
       frage: {
         text: 'Berechnen Sie die folgenden Matrizenprodukte, soweit definiert.',
-        formel: mehrzeiligeKette([...formelZeilenA, ...formelZeilenB]),
+        teile: [
+          { label: 'a)', formel: mehrzeiligeKette(formelZeilenA) },
+          { label: 'b)', formel: mehrzeiligeKette(formelZeilenB) },
+        ],
       },
       eingaben,
       loesung: {
@@ -371,10 +374,10 @@ export const produktionsprozess = {
       },
       eingaben: [
         {
-          id: 'R', label: `a) Rohstoffbedarf R (${anzahlRohstoffe}×1)`, typ: 'matrix', zeilen: anzahlRohstoffe, spalten: 1,
-          punkte: 4, loesung: R, toleranz: KONFIG.toleranz.exakt,
+          id: 'R', label: `Rohstoffbedarf R (${anzahlRohstoffe}×1)`, typ: 'matrix', zeilen: anzahlRohstoffe, spalten: 1,
+          punkte: 4, loesung: R, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
         },
-        { id: 'G', label: 'b) Gewinn G', typ: 'zahl', punkte: 4, loesung: gewinn, toleranz: KONFIG.toleranz.geld },
+        { id: 'G', label: 'Gewinn G', typ: 'zahl', punkte: 4, loesung: gewinn, toleranz: KONFIG.toleranz.geld, teilLabel: 'b)' },
       ],
       loesung: {
         schritte: [

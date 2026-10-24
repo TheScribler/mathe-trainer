@@ -146,20 +146,13 @@ function bauePolynomAusdruck(paare, formatFn, minus) {
 // E(x) = p(x)x = ax - bx²
 // G(x) = E(x) - K(x) = -(b+c)x² + (a-d)x - e =: -A x² + A(x1+x2) x - A x1 x2
 // ---------------------------------------------------------------------------
-// Koeffizient vor einer Variable in reinem Fließtext, Koeffizient 1 wird
-// weggelassen ("x" statt "1x"); b, c sind hier immer positiv (b∈{1,2,3},
-// c>0), kein Vorzeichen-Handling nötig.
-function proseKoeffVariable(koeff, variable) {
-  return koeff === 1 ? variable : `${formatDeZahl(koeff, minimaleNachkommastellen(koeff))}${variable}`;
-}
-
-const VORLAGEN_GEWINN = [
-  (a, b, c, d, e) => `Gegeben sei die Preisabsatzfunktion p(x) = ${formatDeZahl(a, 0)} − ${proseKoeffVariable(b, 'x')} ` +
-    `sowie die Kostenfunktion K(x) = ${proseKoeffVariable(c, 'x²')} ${d < 0 ? '−' : '+'} ${proseKoeffVariable(Math.abs(d), 'x')} ` +
-    `${e < 0 ? '−' : '+'} ${formatDeZahl(Math.abs(e), 0)}.`,
-  (a, b, c, d, e) => `Eine Preisabsatzfunktion lautet p(x) = ${formatDeZahl(a, 0)} − ${proseKoeffVariable(b, 'x')}, ` +
-    `die zugehörige Kostenfunktion K(x) = ${proseKoeffVariable(c, 'x²')} ${d < 0 ? '−' : '+'} ${proseKoeffVariable(Math.abs(d), 'x')} ` +
-    `${e < 0 ? '−' : '+'} ${formatDeZahl(Math.abs(e), 0)}.`,
+// Zwei gleich wahrscheinliche Formulierungen für den Einleitungssatz — die
+// Funktionen selbst stehen NICHT mehr hier (reiner Fließtext hätte z. B.
+// "0,2x²" zeigen müssen, das mitten im Ausdruck umbrechen kann), sondern als
+// echtes KaTeX in frage.formel (siehe baue() unten).
+const VORLAGEN_GEWINN_TEXT = [
+  'Gegeben seien die folgende Preisabsatzfunktion p(x) und die zugehörige Kostenfunktion K(x).',
+  'Eine Preisabsatzfunktion p(x) und die zugehörige Kostenfunktion K(x) lauten wie folgt.',
 ];
 
 export const gewinnBreakeven = {
@@ -176,7 +169,7 @@ export const gewinnBreakeven = {
     const c = zufallAus(rng, [0.2, 0.4, 0.5, 1, 1.5, 2]);
     const a = b * x2 + zufallInt(rng, 5, 30);
     const x0 = zufallInt(rng, x1, 3 * x2);
-    const vorlageIndex = zufallInt(rng, 0, VORLAGEN_GEWINN.length - 1);
+    const vorlageIndex = zufallInt(rng, 0, VORLAGEN_GEWINN_TEXT.length - 1);
     return { x1, x2, b, c, a, x0, vorlageIndex };
   },
   baue(params) {
@@ -197,7 +190,11 @@ export const gewinnBreakeven = {
 
     return {
       frage: {
-        text: VORLAGEN_GEWINN[vorlageIndex](a, b, c, d, e),
+        text: VORLAGEN_GEWINN_TEXT[vorlageIndex],
+        formel: mehrzeiligeKette([
+          `p(x) = ${polynomLatex([a, -b], [0, 1])}`,
+          `K(x) = ${polynomLatex([c, d, e], [2, 1, 0])}`,
+        ]),
         teile: [
           { label: 'a)', text: 'Bestimmen Sie die Erlös- und Gewinnfunktion (soweit wie möglich vereinfacht).' },
           { label: 'b)', text: `Wie lauten die Grenzkosten für x = ${x0}?` },
@@ -206,14 +203,14 @@ export const gewinnBreakeven = {
         ],
       },
       eingaben: [
-        { id: 'E', label: 'Erlösfunktion E(x)', typ: 'koeffizienten', punkte: 1, exponenten: [2, 1, 0], loesung: eKoeff, toleranz: KONFIG.toleranz.exakt },
-        { id: 'G', label: 'Gewinnfunktion G(x)', typ: 'koeffizienten', punkte: 1, exponenten: [2, 1, 0], loesung: gKoeff, toleranz: KONFIG.toleranz.exakt },
-        { id: 'Kstrich', label: `Grenzkosten K'(${x0})`, typ: 'zahl', punkte: 2, loesung: grenzkosten, toleranz: KONFIG.toleranz.geld },
-        { id: 'x1', label: 'Gewinnschwelle (Break-Even) x₁', typ: 'zahl', punkte: 2, loesung: x1, toleranz: KONFIG.toleranz.exakt },
-        { id: 'x2', label: 'Gewinngrenze x₂', typ: 'zahl', punkte: 2, loesung: x2, toleranz: KONFIG.toleranz.exakt },
-        { id: 'xmax', label: 'Gewinnmaximale Menge x', typ: 'zahl', punkte: 2, loesung: xMax, toleranz: KONFIG.toleranz.jahre },
-        { id: 'pmax', label: 'Gewinnmaximaler Preis p(x)', typ: 'zahl', punkte: 1, loesung: pMax, toleranz: KONFIG.toleranz.geld },
-        { id: 'gmax', label: 'Maximaler Gewinn G(x)', typ: 'zahl', punkte: 1, loesung: gMax, toleranz: KONFIG.toleranz.geld },
+        { id: 'E', label: 'Erlösfunktion E(x)', typ: 'koeffizienten', punkte: 1, exponenten: [2, 1, 0], loesung: eKoeff, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
+        { id: 'G', label: 'Gewinnfunktion G(x)', typ: 'koeffizienten', punkte: 1, exponenten: [2, 1, 0], loesung: gKoeff, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
+        { id: 'Kstrich', label: `Grenzkosten K'(${x0})`, typ: 'zahl', punkte: 2, loesung: grenzkosten, toleranz: KONFIG.toleranz.geld, teilLabel: 'b)' },
+        { id: 'x1', label: 'Gewinnschwelle (Break-Even) x₁', typ: 'zahl', punkte: 2, loesung: x1, toleranz: KONFIG.toleranz.exakt, teilLabel: 'c)' },
+        { id: 'x2', label: 'Gewinngrenze x₂', typ: 'zahl', punkte: 2, loesung: x2, toleranz: KONFIG.toleranz.exakt, teilLabel: 'c)' },
+        { id: 'xmax', label: 'Gewinnmaximale Menge x*', typ: 'zahl', punkte: 2, loesung: xMax, toleranz: KONFIG.toleranz.jahre, teilLabel: 'd)' },
+        { id: 'pmax', label: 'Gewinnmaximaler Preis p(x*)', typ: 'zahl', punkte: 1, loesung: pMax, toleranz: KONFIG.toleranz.geld, teilLabel: 'd)' },
+        { id: 'gmax', label: 'Maximaler Gewinn G(x*)', typ: 'zahl', punkte: 1, loesung: gMax, toleranz: KONFIG.toleranz.geld, teilLabel: 'd)' },
       ],
       loesung: {
         schritte: [
@@ -370,16 +367,19 @@ export const extremwerteZweiVariablenKubisch = {
     const yKoeff = -a / (2 * c); // aus f_y=0 umgestellt: y = -(a/2c)x
 
     return {
-      frage: { text: `Bestimmen Sie alle Extremwerte und Sattelpunkte der Funktion ${text}.` },
+      frage: {
+        text: `Bestimmen Sie alle Extremwerte und Sattelpunkte der Funktion ${text}.`,
+        teile: [{ label: 'Punkt 1' }, { label: 'Punkt 2' }],
+      },
       eingaben: [
-        { id: 'p1x', label: 'Stationärer Punkt 1: x', typ: 'zahl', punkte: 1, loesung: 0, toleranz: KONFIG.toleranz.exakt },
-        { id: 'p1y', label: 'Stationärer Punkt 1: y', typ: 'zahl', punkte: 1, loesung: 0, toleranz: KONFIG.toleranz.exakt },
-        { id: 'p1typ', label: 'Punkt 1: Art', typ: 'auswahl', punkte: 2, optionen: ['Maximum', 'Minimum', 'Sattelpunkt'], loesung: typ1 },
-        { id: 'p1wert', label: 'Punkt 1: Funktionswert f(x,y)', typ: 'zahl', punkte: 2, loesung: wert1, toleranz: KONFIG.toleranz.exakt },
-        { id: 'p2x', label: 'Stationärer Punkt 2: x', typ: 'zahl', punkte: 1, loesung: x2, toleranz: KONFIG.toleranz.exakt },
-        { id: 'p2y', label: 'Stationärer Punkt 2: y', typ: 'zahl', punkte: 1, loesung: y2, toleranz: KONFIG.toleranz.exakt },
-        { id: 'p2typ', label: 'Punkt 2: Art', typ: 'auswahl', punkte: 2, optionen: ['Maximum', 'Minimum', 'Sattelpunkt'], loesung: typ2 },
-        { id: 'p2wert', label: 'Punkt 2: Funktionswert f(x,y)', typ: 'zahl', punkte: 2, loesung: wert2, toleranz: KONFIG.toleranz.geld },
+        { id: 'p1x', label: 'x', typ: 'zahl', punkte: 1, loesung: 0, toleranz: KONFIG.toleranz.exakt, teilLabel: 'Punkt 1' },
+        { id: 'p1y', label: 'y', typ: 'zahl', punkte: 1, loesung: 0, toleranz: KONFIG.toleranz.exakt, teilLabel: 'Punkt 1' },
+        { id: 'p1typ', label: 'Art', typ: 'auswahl', punkte: 2, optionen: ['Maximum', 'Minimum', 'Sattelpunkt'], loesung: typ1, teilLabel: 'Punkt 1' },
+        { id: 'p1wert', label: 'Funktionswert f(x,y)', typ: 'zahl', punkte: 2, loesung: wert1, toleranz: KONFIG.toleranz.exakt, teilLabel: 'Punkt 1' },
+        { id: 'p2x', label: 'x', typ: 'zahl', punkte: 1, loesung: x2, toleranz: KONFIG.toleranz.exakt, teilLabel: 'Punkt 2' },
+        { id: 'p2y', label: 'y', typ: 'zahl', punkte: 1, loesung: y2, toleranz: KONFIG.toleranz.exakt, teilLabel: 'Punkt 2' },
+        { id: 'p2typ', label: 'Art', typ: 'auswahl', punkte: 2, optionen: ['Maximum', 'Minimum', 'Sattelpunkt'], loesung: typ2, teilLabel: 'Punkt 2' },
+        { id: 'p2wert', label: 'Funktionswert f(x,y)', typ: 'zahl', punkte: 2, loesung: wert2, toleranz: KONFIG.toleranz.geld, teilLabel: 'Punkt 2' },
       ],
       loesung: {
         schritte: [

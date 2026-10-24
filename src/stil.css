@@ -48,7 +48,14 @@ body {
 .frage-text { margin: 0 0 1rem; }
 .frage-tabelle-wrapper { overflow-x: auto; max-width: 100%; margin: 0 0 1rem; }
 .frage-formel { overflow-x: auto; max-width: 100%; margin: 0 0 1rem; }
-.frage-teile { display: flex; flex-direction: column; gap: .75rem; margin: 0 0 1rem; }
+/* Jeder Teil wird jetzt direkt gefolgt von den zu ihm gehörenden Eingabe-
+   feldern gerendert (baueAufgabenInhalt, app.js) statt alle Teile gesammelt
+   vor allen Eingaben zu zeigen — margin-bottom hier hält Beschriftung/
+   Fragetext/-formel eines Teils nah an seinen eigenen Eingabefeldern,
+   während .eingaben (eigener margin-bottom) den Abstand zur NÄCHSTEN
+   Teilaufgabe liefert (iPhone-Rückmeldung: beim Scrollen war nicht mehr
+   erkennbar, welches Feld zu welcher Teilaufgabe gehört). */
+.frage-teil { margin: 0 0 .4rem; }
 .frage-teil-label { font-weight: 700; display: block; }
 .frage-teil-text { display: block; }
 .frage-teil-formel { overflow-x: auto; max-width: 100%; margin-top: .2rem; }
@@ -68,6 +75,14 @@ body {
 }
 .eingabe-zeile input.gut { border-color: var(--gut); }
 .eingabe-zeile input.schlecht { border-color: var(--schlecht); }
+/* Einzelnes Zahlenfeld: −/⁄-Knopfpaar rechts daneben in derselben Zeile statt
+   darunter, dauerhaft sichtbar (siehe .vorzeichen-bruch-paar.aktiv weiter
+   unten, hier per JS fest gesetzt) — kein reservierter Leerraum unter dem
+   Feld mehr nötig (iPhone-Rückmeldung). Nur für das einzelne Zahlenfeld,
+   nicht für Koeffizientenreihen/Matrizen (die bauen ihr Knopfpaar selbst,
+   als eigenes Element NACH der ganzen Reihe/dem Gitter). */
+.zahlenfeld-reihe { display: flex; align-items: center; gap: 8px; }
+.zahlenfeld-reihe input { width: auto; flex: 1 1 auto; min-width: 0; }
 .eingelesen-als {
   display: block; font-size: .8rem; color: var(--gedaempft);
   /* Feste Höhe von Anfang an reserviert (nicht nur min-height — bei einem

@@ -572,14 +572,17 @@ export const integralKonsumentenrente = {
     return {
       frage: {
         text: `Für eine Marktsituation gelten die Nachfragefunktion pₙ(x) = ${polynomProse([a, -b], [0, 1])} und ` +
-          `die Angebotsfunktion pₐ(x) = ${polynomProse([c], [1])}. ` +
-          `Bestimmen Sie Gleichgewichtspreis und -menge sowie Konsumenten- und Produzentenrente.`,
+          `die Angebotsfunktion pₐ(x) = ${polynomProse([c], [1])}.`,
+        teile: [
+          { label: 'Marktgleichgewicht', text: 'Bestimmen Sie Gleichgewichtspreis und -menge.' },
+          { label: 'Konsumenten- und Produzentenrente', text: 'Bestimmen Sie die Konsumenten- und die Produzentenrente.' },
+        ],
       },
       eingaben: [
-        { id: 'x0', label: 'Gleichgewichtsmenge x₀', typ: 'zahl', punkte: 1, loesung: x0, toleranz: KONFIG.toleranz.exakt },
-        { id: 'p0', label: 'Gleichgewichtspreis p₀', typ: 'zahl', punkte: 1, loesung: p0, toleranz: KONFIG.toleranz.geld },
-        { id: 'KR', label: 'Konsumentenrente KR', typ: 'zahl', punkte: 2, loesung: KR, toleranz: KONFIG.toleranz.geld },
-        { id: 'PR', label: 'Produzentenrente PR', typ: 'zahl', punkte: 1, loesung: PR, toleranz: KONFIG.toleranz.geld },
+        { id: 'x0', label: 'Gleichgewichtsmenge x₀', typ: 'zahl', punkte: 1, loesung: x0, toleranz: KONFIG.toleranz.exakt, teilLabel: 'Marktgleichgewicht' },
+        { id: 'p0', label: 'Gleichgewichtspreis p₀', typ: 'zahl', punkte: 1, loesung: p0, toleranz: KONFIG.toleranz.geld, teilLabel: 'Marktgleichgewicht' },
+        { id: 'KR', label: 'Konsumentenrente KR', typ: 'zahl', punkte: 2, loesung: KR, toleranz: KONFIG.toleranz.geld, teilLabel: 'Konsumenten- und Produzentenrente' },
+        { id: 'PR', label: 'Produzentenrente PR', typ: 'zahl', punkte: 1, loesung: PR, toleranz: KONFIG.toleranz.geld, teilLabel: 'Konsumenten- und Produzentenrente' },
       ],
       loesung: {
         schritte: [
@@ -687,9 +690,9 @@ export const integralKostenAusGrenzkosten = {
       eingaben: [
         {
           id: 'K', label: 'Kostenfunktion K(x)', typ: 'koeffizienten', punkte: 2,
-          exponenten: [2, 1, 0], loesung: [mHalb, n, Kf], toleranz: KONFIG.toleranz.exakt,
+          exponenten: [2, 1, 0], loesung: [mHalb, n, Kf], toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
         },
-        { id: 'Kx0', label: `K(${x0})`, typ: 'zahl', punkte: 1, loesung: Kx0, toleranz: KONFIG.toleranz.geld },
+        { id: 'Kx0', label: `K(${x0})`, typ: 'zahl', punkte: 1, loesung: Kx0, toleranz: KONFIG.toleranz.geld, teilLabel: 'b)' },
       ],
       loesung: {
         schritte: [

@@ -183,7 +183,14 @@ const LAYOUT_PRUEFSKRIPT = `
   // der tatsächlich erreichbare Bestwert, nicht mehr die über 180px von
   // vorher.
   const MAX_LUECKE_VOR_KNOPFREIHE = 90;
-  const letzteZeile = document.querySelector('#app .eingaben .eingabe-zeile:last-child');
+  // Bei mehrteiligen Aufgaben gibt es jetzt mehrere .eingaben-Listen (eine je
+  // Teilaufgabe plus ggf. eine Rest-Liste, siehe baueAufgabenInhalt in
+  // app.js) — ":last-child"träfe nur das letzte Element der JEWEILS ERSTEN
+  // passenden Liste (querySelector nimmt den ersten Treffer in Dokument-
+  // reihenfolge), nicht die tatsächlich letzte Zeile vor der Knopf-Reihe.
+  // Stattdessen das letzte Element über ALLE .eingabe-zeile hinweg nehmen.
+  const alleZeilenFuerLetzte = document.querySelectorAll('#app .eingaben .eingabe-zeile');
+  const letzteZeile = alleZeilenFuerLetzte.length > 0 ? alleZeilenFuerLetzte[alleZeilenFuerLetzte.length - 1] : null;
   const knopfReihe = document.querySelector('#app .knopf-reihe');
   if (letzteZeile && knopfReihe) {
     // Bei koeffizienten/matrix steckt die Zeile mehrere Eingabefelder (ein
@@ -200,20 +207,49 @@ const LAYOUT_PRUEFSKRIPT = `
     }
   }
 
-  // Lücke zwischen je zwei aufeinanderfolgenden Eingabe-Zeilen (nicht nur vor
-  // der Knopf-Reihe, siehe oben) darf nicht größer sein als der normale
-  // Flex-Gap der .eingaben-Liste plus etwas Spielraum — sonst stapelt sich
-  // wie beim Lücke-vor-Knopfreihe-Fall eine unerwünscht große Lücke
-  // ZWISCHEN zwei Teilaufgaben, die der Last-child-Test oben nicht erfasst
-  // (iPhone-Rückmeldung: Lücke nach der a)-Box bei diff.ableitungen).
+  // Lücke zwischen je zwei aufeinanderfolgenden Eingabe-Zeilen INNERHALB
+  // DERSELBEN .eingaben-Liste (nicht nur vor der Knopf-Reihe, siehe oben)
+  // darf nicht größer sein als der normale Flex-Gap plus etwas Spielraum —
+  // sonst stapelt sich wie beim Lücke-vor-Knopfreihe-Fall eine unerwünscht
+  // große Lücke (iPhone-Rückmeldung: Lücke nach der a)-Box bei
+  // diff.ableitungen). NUR innerhalb derselben Liste: bei mehrteiligen
+  // Aufgaben liegt zwischen der letzten Zeile einer Teilaufgabe und der
+  // ersten der nächsten absichtlich ein ganzer .frage-teil-Block (Fragetext/
+  // -formel der nächsten Teilaufgabe) — das ist kein Fehler, sondern genau
+  // die gewünschte Gruppierung (baueAufgabenInhalt in app.js).
   const MAX_LUECKE_ZWISCHEN_ZEILEN = 40;
-  const alleZeilen = Array.from(document.querySelectorAll('#app .eingaben .eingabe-zeile'));
-  for (let i = 1; i < alleZeilen.length; i++) {
-    const luecke = alleZeilen[i].getBoundingClientRect().top - alleZeilen[i - 1].getBoundingClientRect().bottom;
-    if (luecke > MAX_LUECKE_ZWISCHEN_ZEILEN) {
-      probleme.push('Lücke zwischen zwei Eingabe-Zeilen zu groß (' + luecke.toFixed(1) + 'px > ' + MAX_LUECKE_ZWISCHEN_ZEILEN + 'px)');
+  // Einzelne Zahlenfelder (.zahlenfeld-reihe, kein reservierter Leerraum
+  // mehr darunter seit dem −/⁄-Knopfpaar direkt neben dem Feld) müssen enger
+  // aufeinanderfolgen als Koeffizienten-/Matrix-Zeilen.
+  const MAX_LUECKE_EINZELFELDER = 24;
+  document.querySelectorAll('#app .eingaben').forEach((liste) => {
+    const zeilenInListe = Array.from(liste.children).filter((el) => el.classList.contains('eingabe-zeile'));
+    for (let i = 1; i < zeilenInListe.length; i++) {
+      const vorherige = zeilenInListe[i - 1];
+      const aktuelle = zeilenInListe[i];
+      const luecke = aktuelle.getBoundingClientRect().top - vorherige.getBoundingClientRect().bottom;
+      const beideEinzelfelder = vorherige.querySelector('.zahlenfeld-reihe') && aktuelle.querySelector('.zahlenfeld-reihe');
+      const grenze = beideEinzelfelder ? MAX_LUECKE_EINZELFELDER : MAX_LUECKE_ZWISCHEN_ZEILEN;
+      if (luecke > grenze) {
+        probleme.push('Lücke zwischen zwei Eingabe-Zeilen zu groß (' + luecke.toFixed(1) + 'px > ' + grenze + 'px)');
+      }
     }
-  }
+  });
+
+  // Einzelnes Zahlenfeld: das −/⁄-Knopfpaar muss dauerhaft sichtbar (nicht
+  // erst beim Fokussieren) UND in derselben Zeile wie das Feld stehen, nicht
+  // darunter (iPhone-Rückmeldung).
+  document.querySelectorAll('#app .zahlenfeld-reihe').forEach((reihe) => {
+    const feld = reihe.querySelector('input');
+    const paar = reihe.querySelector('.vorzeichen-bruch-paar');
+    if (!feld || !paar) return;
+    if (getComputedStyle(paar).visibility === 'hidden') {
+      probleme.push('zahlenfeld-reihe: Vorzeichen/Bruch-Knopfpaar ist nicht dauerhaft sichtbar');
+    }
+    if (Math.abs(feld.getBoundingClientRect().top - paar.getBoundingClientRect().top) > 20) {
+      probleme.push('zahlenfeld-reihe: Knopfpaar steht nicht in derselben Zeile wie das Feld');
+    }
+  });
 
   // Eine koeffizienten-Reihe (z. B. F(x) = __x⁴ + __x³ + __x² + __x + c) muss
   // auf EINER Zeile bleiben — scrollWidth/clientWidth allein hätten einen
@@ -260,13 +296,21 @@ const FOKUS_PRUEFSKRIPT = `
         probleme.push('Feld ' + j + ' hat sich verschoben, als Feld ' + i + ' fokussiert wurde (von (' + start.left.toFixed(1) + ',' + start.top.toFixed(1) + ') zu (' + rect.left.toFixed(1) + ',' + rect.top.toFixed(1) + '))');
       }
     });
-    const zeile = feld.closest('.eingabe-zeile');
-    const paar = zeile ? zeile.querySelector('.vorzeichen-bruch-paar') : null;
-    if (paar) {
-      const paarRect = paar.getBoundingClientRect();
-      const feldRect = feld.getBoundingClientRect();
-      if (Math.abs(paarRect.left - feldRect.left) > 2) {
-        probleme.push('Knopfpaar für Feld ' + i + ' nicht ausgerichtet: paar.left=' + paarRect.left.toFixed(1) + ', feld.left=' + feldRect.left.toFixed(1));
+    // Bei einem einzelnen Zahlenfeld (.zahlenfeld-reihe) sitzt das Knopfpaar
+    // absichtlich RECHTS neben dem Feld, nicht darunter — die Links-
+    // Ausrichtung gilt nur für Koeffizientenreihen/Matrizen, wo das gemein-
+    // same Paar per margin-left unter die fokussierte Zelle wandert (siehe
+    // positioniereKnopfPaarUnterFeld in app.js). Für .zahlenfeld-reihe prüft
+    // LAYOUT_PRUEFSKRIPT bereits, dass Feld und Paar in derselben Zeile stehen.
+    if (!feld.closest('.zahlenfeld-reihe')) {
+      const zeile = feld.closest('.eingabe-zeile');
+      const paar = zeile ? zeile.querySelector('.vorzeichen-bruch-paar') : null;
+      if (paar) {
+        const paarRect = paar.getBoundingClientRect();
+        const feldRect = feld.getBoundingClientRect();
+        if (Math.abs(paarRect.left - feldRect.left) > 2) {
+          probleme.push('Knopfpaar für Feld ' + i + ' nicht ausgerichtet: paar.left=' + paarRect.left.toFixed(1) + ', feld.left=' + feldRect.left.toFixed(1));
+        }
       }
     }
     feld.blur();

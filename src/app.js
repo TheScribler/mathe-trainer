@@ -1,8 +1,8 @@
 // UI: Übungsmodus und Probeklausur. Wählt Generatoren, zeigt Fragen, prüft
 // Zahlantworten automatisch und rendert die Lösung in der Formel-Notation
 // der Folien. Die Probeklausur (Timer, Punkte-Split, Auswertung) teilt sich
-// die Frage-/Eingaben-Bausteine mit dem Übungsmodus (siehe baueFrageDarstellung,
-// baueEingabenFelder, bewerteAlleEingaben weiter unten).
+// die Frage-/Eingaben-Bausteine mit dem Übungsmodus (siehe baueAufgabenInhalt,
+// bewerteAlleEingaben weiter unten).
 
 // Hochgestellte Ziffern für Potenz-Beschriftungen in reinem UI-Text (nicht
 // LaTeX) — eigenständig hier definiert statt aus finanz.js importiert: in
@@ -162,173 +162,142 @@ function baueTabelle(tabelle) {
   return wrapper;
 }
 
-// Frage-Text, optionale Tabelle, optionale LaTeX-Formel und optionale
-// Teilaufgaben-Liste in eine Karte rendern — identisch für Übungsmodus und
-// Probeklausur, deshalb hier einmal gebaut statt zweimal.
-function baueFrageDarstellung(karte, aufgabe) {
-  if (aufgabe.frage.text) {
-    const frage = document.createElement('p');
-    frage.className = 'frage-text';
-    frage.textContent = aufgabe.frage.text;
-    karte.appendChild(frage);
+// mitEigenerHinweis=false: das Feld bekommt keinen eigenen "Eingelesen
+// als"-Hinweis direkt daneben (für Koeffizientenreihen, wo das die Zeile
+// zum Umbrechen bringen würde — ein gemeinsamer Hinweis unter der ganzen
+// Reihe wird stattdessen vom Aufrufer gebaut, siehe unten).
+function baueZahlenfeld(zeile, { mitEigenerHinweis = true, mitEigenenKnopfen = true } = {}) {
+  const feld = document.createElement('input');
+  feld.type = 'text';
+  feld.inputMode = 'decimal';
+  feld.autocomplete = 'off';
+  feld.autocorrect = 'off';
+  feld.spellcheck = false;
+
+  if (mitEigenenKnopfen) {
+    // Einzelnes Zahlenfeld: Knopfpaar direkt rechts daneben in derselben
+    // Zeile, dauerhaft sichtbar statt erst beim Fokussieren erscheinend und
+    // ohne dafür Platz unter dem Feld zu reservieren — anders als bei
+    // Koeffizientenreihen/Matrizen (eigenes, gemeinsames Paar, das erst beim
+    // Fokussieren der jeweiligen Zelle darunter erscheint, siehe unten),
+    // wo ein dauerhaft sichtbares Paar pro Zelle zu beengt wäre (iPhone-
+    // Rückmeldung: reservierter Leerraum unter jedem Einzelfeld unnötig groß).
+    const reihe = document.createElement('span');
+    reihe.className = 'zahlenfeld-reihe';
+    reihe.appendChild(feld);
+    const knopfPaar = baueVorzeichenBruchKnopfe(feld);
+    knopfPaar.classList.add('aktiv');
+    reihe.appendChild(knopfPaar);
+    zeile.appendChild(reihe);
+  } else {
+    zeile.appendChild(feld);
   }
 
-  if (aufgabe.frage.tabelle) {
-    karte.appendChild(baueTabelle(aufgabe.frage.tabelle));
+  if (mitEigenerHinweis) {
+    const eingelesenAls = document.createElement('span');
+    eingelesenAls.className = 'eingelesen-als';
+    zeile.appendChild(eingelesenAls);
+    feld.addEventListener('input', function () {
+      feld.classList.remove('gut', 'schlecht');
+      aktualisiereEingelesenAls(feld.value, eingelesenAls);
+    });
+  } else {
+    feld.addEventListener('input', function () {
+      feld.classList.remove('gut', 'schlecht');
+    });
   }
-
-  // frage.formel: LaTeX-Inhalt direkt in der Aufgabenstellung (z. B.
-  // Matrizen als echtes pmatrix statt als Fließtext-Kurzschreibweise).
-  if (aufgabe.frage.formel) {
-    const formel = document.createElement('div');
-    formel.className = 'frage-formel';
-    if (typeof window !== 'undefined' && window.katex) {
-      window.katex.render(aufgabe.frage.formel, formel, { throwOnError: false, displayMode: true });
-    } else {
-      formel.textContent = aufgabe.frage.formel;
-    }
-    karte.appendChild(formel);
-  }
-
-  // frage.teile: mehrteilige Fragen (a), b), …) als eigene Blöcke mit fetter
-  // Beschriftung statt als ein einziger Fließtext-Absatz, in dem Funktionen
-  // nur in Unicode-Kurzschreibweise ("(x+2)/(x+3)") statt als echter Bruch
-  // erscheinen würden (iPhone-Rückmeldung zu diff.ableitungen).
-  if (aufgabe.frage.teile) {
-    const liste = document.createElement('div');
-    liste.className = 'frage-teile';
-    for (const teil of aufgabe.frage.teile) {
-      const block = document.createElement('div');
-      block.className = 'frage-teil';
-      if (teil.label) {
-        const label = document.createElement('span');
-        label.className = 'frage-teil-label';
-        label.textContent = teil.label;
-        block.appendChild(label);
-      }
-      if (teil.text) {
-        const text = document.createElement('span');
-        text.className = 'frage-teil-text';
-        text.textContent = teil.text;
-        block.appendChild(text);
-      }
-      if (teil.formel) {
-        const formel = document.createElement('div');
-        formel.className = 'frage-teil-formel';
-        if (typeof window !== 'undefined' && window.katex) {
-          window.katex.render(teil.formel, formel, { throwOnError: false, displayMode: true });
-        } else {
-          formel.textContent = teil.formel;
-        }
-        block.appendChild(formel);
-      }
-      liste.appendChild(block);
-    }
-    karte.appendChild(liste);
-  }
+  return feld;
 }
 
-// Baut die komplette Eingaben-Sektion (.eingaben) für eine Aufgabe: ein Feld
-// (oder mehrere, bei koeffizienten/matrix) je Teilaufgabe, inklusive
-// Vorzeichen/Bruch-Knopfpaar und "Eingelesen als"-Hinweis. Gemeinsam genutzt
-// von Übungsmodus und Probeklausur. onAenderung (optional) wird bei jeder
-// Eingabe mit den aktuellen Antworten aufgerufen (liesAntworten()) — die
-// Probeklausur nutzt das, um nach jedem Tastendruck in localStorage zu
-// sichern; der Übungsmodus braucht es nicht.
-function baueEingabenFelder(aufgabe, { onAenderung } = {}) {
-  // mitEigenerHinweis=false: das Feld bekommt keinen eigenen "Eingelesen
-  // als"-Hinweis direkt daneben (für Koeffizientenreihen, wo das die Zeile
-  // zum Umbrechen bringen würde — ein gemeinsamer Hinweis unter der ganzen
-  // Reihe wird stattdessen vom Aufrufer gebaut, siehe unten).
-  function baueZahlenfeld(zeile, { mitEigenerHinweis = true, mitEigenenKnopfen = true } = {}) {
-    const feld = document.createElement('input');
-    feld.type = 'text';
-    feld.inputMode = 'decimal';
-    feld.autocomplete = 'off';
-    feld.autocorrect = 'off';
-    feld.spellcheck = false;
-    zeile.appendChild(feld);
+function aktualisiereEingelesenAls(text, ziel) {
+  const getrimmt = text.trim();
+  if (getrimmt === '') {
+    ziel.textContent = ' '; // geschütztes Leerzeichen: Höhe bleibt reserviert
+    return;
+  }
+  const wert = parseDeZahl(getrimmt);
+  if (!isFinite(wert)) {
+    ziel.textContent = 'Eingelesen als: keine Zahl erkannt';
+    return;
+  }
+  // Bei einem Bruch die eingegebene Schreibweise selbst zeigen (z. B.
+  // "2/3 ≈ 0,67") statt nur die lange Dezimalzahl (0,666667) — sonst ist
+  // nicht sofort zu erkennen, dass der Bruch richtig gelesen wurde.
+  ziel.textContent = getrimmt.includes('/')
+    ? `Eingelesen als ${getrimmt} ${bruchVergleichUndWert(getrimmt, wert)}`
+    : 'Eingelesen als ' + formatDeZahlFrei(wert);
+}
 
-    if (mitEigenenKnopfen) {
-      const knopfPaar = baueVorzeichenBruchKnopfe(feld);
-      zeile.appendChild(knopfPaar);
-      feld.addEventListener('focus', () => knopfPaar.classList.add('aktiv'));
-      feld.addEventListener('blur', () => knopfPaar.classList.remove('aktiv'));
-    }
-
-    if (mitEigenerHinweis) {
-      const eingelesenAls = document.createElement('span');
-      eingelesenAls.className = 'eingelesen-als';
-      zeile.appendChild(eingelesenAls);
-      feld.addEventListener('input', function () {
-        feld.classList.remove('gut', 'schlecht');
-        aktualisiereEingelesenAls(feld.value, eingelesenAls);
-      });
+// Baut EINE .frage-teil-Box (Beschriftung + Fragetext/-formel eines Teils).
+function baueFrageTeilBlock(teil) {
+  const block = document.createElement('div');
+  block.className = 'frage-teil';
+  if (teil.label) {
+    const label = document.createElement('span');
+    label.className = 'frage-teil-label';
+    label.textContent = teil.label;
+    block.appendChild(label);
+  }
+  if (teil.text) {
+    const text = document.createElement('span');
+    text.className = 'frage-teil-text';
+    text.textContent = teil.text;
+    block.appendChild(text);
+  }
+  if (teil.formel) {
+    const formel = document.createElement('div');
+    formel.className = 'frage-teil-formel';
+    if (typeof window !== 'undefined' && window.katex) {
+      window.katex.render(teil.formel, formel, { throwOnError: false, displayMode: true });
     } else {
-      feld.addEventListener('input', function () {
-        feld.classList.remove('gut', 'schlecht');
-      });
+      formel.textContent = teil.formel;
     }
-    return feld;
+    block.appendChild(formel);
+  }
+  return block;
+}
+
+// Baut EINE .eingabe-zeile (oder bei typ 'term' gar keine) und registriert
+// das/die Feld(er) in felder[eingabe.id] — die Rumpf-Logik je Eingabetyp,
+// extrahiert aus der früheren baueEingabenFelder-Schleife (jetzt Teil von
+// baueAufgabenInhalt), damit
+// baueAufgabenInhalt (unten) sie sowohl gruppiert je Teilaufgabe als auch
+// als flache Liste aufrufen kann.
+function baueEingabeZeile(eingabe, felder) {
+  // Symbolterme (z. B. "a) f'(x)") bekommen keine eigene Zeile: ihr
+  // Hinweistext wandert als teilHinweis in die Zeile der zugehörigen
+  // Zahlencheck-Eingabe — zwei fast leere, gestapelte Zeilen ("Teilaufgabe
+  // a): f'(x):" direkt über "Zahlencheck a): f'(-1):") sahen wie eine
+  // doppelte Beschriftung aus und rissen eine ungleichmäßig große Lücke
+  // zwischen den Teilaufgaben auf (iPhone-Rückmeldung).
+  if (eingabe.typ === 'term') {
+    felder[eingabe.id] = null;
+    return null;
   }
 
-  function aktualisiereEingelesenAls(text, ziel) {
-    const getrimmt = text.trim();
-    if (getrimmt === '') {
-      ziel.textContent = ' '; // geschütztes Leerzeichen: Höhe bleibt reserviert
-      return;
-    }
-    const wert = parseDeZahl(getrimmt);
-    if (!isFinite(wert)) {
-      ziel.textContent = 'Eingelesen als: keine Zahl erkannt';
-      return;
-    }
-    // Bei einem Bruch die eingegebene Schreibweise selbst zeigen (z. B.
-    // "2/3 ≈ 0,67") statt nur die lange Dezimalzahl (0,666667) — sonst ist
-    // nicht sofort zu erkennen, dass der Bruch richtig gelesen wurde.
-    ziel.textContent = getrimmt.includes('/')
-      ? `Eingelesen als ${getrimmt} ${bruchVergleichUndWert(getrimmt, wert)}`
-      : 'Eingelesen als ' + formatDeZahlFrei(wert);
+  const zeile = document.createElement('label');
+  zeile.className = 'eingabe-zeile';
+
+  if (eingabe.teilLabel) {
+    const teilUeberschrift = document.createElement('span');
+    teilUeberschrift.className = 'eingabe-teil-ueberschrift';
+    teilUeberschrift.textContent = eingabe.teilLabel;
+    zeile.appendChild(teilUeberschrift);
+  }
+  if (eingabe.teilHinweis) {
+    const teilHinweis = document.createElement('span');
+    teilHinweis.className = 'eingabe-teil-hinweis';
+    teilHinweis.textContent = eingabe.teilHinweis;
+    zeile.appendChild(teilHinweis);
   }
 
-  const form = document.createElement('div');
-  form.className = 'eingaben';
-  const felder = {};
-  for (const eingabe of aufgabe.eingaben) {
-    // Symbolterme (z. B. "a) f'(x)") bekommen keine eigene Zeile: ihr
-    // Hinweistext wandert als teilHinweis in die Zeile der zugehörigen
-    // Zahlencheck-Eingabe (siehe unten) — zwei fast leere, gestapelte Zeilen
-    // ("Teilaufgabe a): f'(x):" direkt über "Zahlencheck a): f'(-1):") sahen
-    // wie eine doppelte Beschriftung aus und rissen eine ungleichmäßig
-    // große Lücke zwischen den Teilaufgaben auf (iPhone-Rückmeldung).
-    if (eingabe.typ === 'term') {
-      felder[eingabe.id] = null;
-      continue;
-    }
+  const beschriftung = document.createElement('span');
+  // Kein Doppelpunkt nach einem Fragezeichen ("Ist das Produkt
+  // definiert?" statt "...definiert?:", iPhone-Rückmeldung).
+  beschriftung.textContent = eingabe.label + (eingabe.label.trim().endsWith('?') ? ' ' : ': ');
+  zeile.appendChild(beschriftung);
 
-    const zeile = document.createElement('label');
-    zeile.className = 'eingabe-zeile';
-
-    if (eingabe.teilLabel) {
-      const teilUeberschrift = document.createElement('span');
-      teilUeberschrift.className = 'eingabe-teil-ueberschrift';
-      teilUeberschrift.textContent = eingabe.teilLabel;
-      zeile.appendChild(teilUeberschrift);
-    }
-    if (eingabe.teilHinweis) {
-      const teilHinweis = document.createElement('span');
-      teilHinweis.className = 'eingabe-teil-hinweis';
-      teilHinweis.textContent = eingabe.teilHinweis;
-      zeile.appendChild(teilHinweis);
-    }
-
-    const beschriftung = document.createElement('span');
-    // Kein Doppelpunkt nach einem Fragezeichen ("Ist das Produkt
-    // definiert?" statt "...definiert?:", iPhone-Rückmeldung).
-    beschriftung.textContent = eingabe.label + (eingabe.label.trim().endsWith('?') ? ' ' : ': ');
-    zeile.appendChild(beschriftung);
-
-    if (eingabe.typ === 'koeffizienten') {
+  if (eingabe.typ === 'koeffizienten') {
       const reihe = document.createElement('span');
       reihe.className = 'koeffizienten-reihe';
       const teilfelder = [];
@@ -510,7 +479,79 @@ function baueEingabenFelder(aufgabe, { onAenderung } = {}) {
       felder[eingabe.id] = baueZahlenfeld(zeile);
     }
 
-    form.appendChild(zeile);
+  return zeile;
+}
+
+// Baut Fragetext/-tabelle/-formel UND die Eingaben-Zeilen einer Aufgabe in
+// eine Karte. Bei mehrteiligen Aufgaben (frage.teile) gehört zu jeder
+// Teilaufgabe ein zusammenhängender Block: Beschriftung + Fragetext/-formel
+// des Teils, DIREKT darunter die zu diesem Teil gehörenden Eingabefelder
+// (eingabe.teilLabel) — statt erst alle Teilfragen und erst danach gesammelt
+// alle Eingabefelder zu zeigen (iPhone-Rückmeldung: beim Scrollen war nicht
+// mehr erkennbar, welches Feld zu welcher Teilaufgabe gehört). Eingaben ohne
+// passenden teilLabel (oder wenn es gar kein frage.teile gibt) landen wie
+// bisher als eine flache Liste am Ende. Gemeinsam genutzt von Übungsmodus
+// und Probeklausur (inkl. deren Auswertung). onAenderung (optional) wird bei
+// jeder Eingabe mit den aktuellen Antworten aufgerufen (liesAntworten()) —
+// die Probeklausur nutzt das, um nach jedem Tastendruck in localStorage zu
+// sichern; der Übungsmodus braucht es nicht.
+function baueAufgabenInhalt(karte, aufgabe, { onAenderung } = {}) {
+  if (aufgabe.frage.text) {
+    const frage = document.createElement('p');
+    frage.className = 'frage-text';
+    frage.textContent = aufgabe.frage.text;
+    karte.appendChild(frage);
+  }
+
+  if (aufgabe.frage.tabelle) {
+    karte.appendChild(baueTabelle(aufgabe.frage.tabelle));
+  }
+
+  // frage.formel: LaTeX-Inhalt direkt in der Aufgabenstellung, der für ALLE
+  // Teilaufgaben gemeinsam gilt (z. B. die Ausgangsmatrizen A/B/E/P_E/P_R
+  // bei alg.produktionsprozess) — anders als frage.teile[].formel (unten),
+  // das zu genau einer Teilaufgabe gehört.
+  if (aufgabe.frage.formel) {
+    const formel = document.createElement('div');
+    formel.className = 'frage-formel';
+    if (typeof window !== 'undefined' && window.katex) {
+      window.katex.render(aufgabe.frage.formel, formel, { throwOnError: false, displayMode: true });
+    } else {
+      formel.textContent = aufgabe.frage.formel;
+    }
+    karte.appendChild(formel);
+  }
+
+  const felder = {};
+  const zugeordneteIds = new Set();
+
+  if (aufgabe.frage.teile) {
+    for (const teil of aufgabe.frage.teile) {
+      karte.appendChild(baueFrageTeilBlock(teil));
+
+      const passende = aufgabe.eingaben.filter((e) => e.teilLabel === teil.label);
+      if (passende.length > 0) {
+        const form = document.createElement('div');
+        form.className = 'eingaben';
+        for (const eingabe of passende) {
+          zugeordneteIds.add(eingabe.id);
+          const zeile = baueEingabeZeile(eingabe, felder);
+          if (zeile) form.appendChild(zeile);
+        }
+        karte.appendChild(form);
+      }
+    }
+  }
+
+  const rest = aufgabe.eingaben.filter((e) => !zugeordneteIds.has(e.id));
+  if (rest.length > 0) {
+    const form = document.createElement('div');
+    form.className = 'eingaben';
+    for (const eingabe of rest) {
+      const zeile = baueEingabeZeile(eingabe, felder);
+      if (zeile) form.appendChild(zeile);
+    }
+    karte.appendChild(form);
   }
 
   function liesAntworten() {
@@ -525,12 +566,18 @@ function baueEingabenFelder(aufgabe, { onAenderung } = {}) {
     return werte;
   }
 
+  // Ein Listener auf der ganzen Karte statt auf einem einzelnen Eingaben-Div:
+  // bei mehrteiligen Aufgaben gibt es jetzt mehrere .eingaben-Listen (eine je
+  // Teilaufgabe plus ggf. eine Rest-Liste) — 'input'/'change' blubbern von
+  // jedem Feld bis zur Karte hoch, ein gemeinsamer Listener dort erfasst
+  // darum weiterhin jede Änderung, unabhängig davon, in welcher Teilliste
+  // das Feld steht.
   if (onAenderung) {
-    form.addEventListener('input', () => onAenderung(liesAntworten()));
-    form.addEventListener('change', () => onAenderung(liesAntworten()));
+    karte.addEventListener('input', () => onAenderung(liesAntworten()));
+    karte.addEventListener('change', () => onAenderung(liesAntworten()));
   }
 
-  return { form, felder, liesAntworten };
+  return { felder, liesAntworten };
 }
 
 // Setzt zuvor gespeicherte Antworten (liesAntworten()-Form) in die Felder
@@ -827,10 +874,7 @@ function starteUebungsmodus(wurzel) {
     titel.textContent = (aktuelleAufgabe.titel ?? generator.name) + ' (' + generator.punkte + ' P)';
     karte.appendChild(titel);
 
-    baueFrageDarstellung(karte, aktuelleAufgabe);
-
-    const { form, felder } = baueEingabenFelder(aktuelleAufgabe);
-    karte.appendChild(form);
+    const { felder } = baueAufgabenInhalt(karte, aktuelleAufgabe);
 
     const ergebnisZeile = document.createElement('p');
     ergebnisZeile.className = 'pruef-ergebnis';
@@ -1069,16 +1113,13 @@ function zeichneLaufendeKlausur(wurzel, zustand) {
     titel.textContent = `Aufgabe ${idx + 1}: ${aufgabe.titel ?? generator.name} (${generator.punkte} P)`;
     karte.appendChild(titel);
 
-    baueFrageDarstellung(karte, aufgabe);
-
-    const { form, felder } = baueEingabenFelder(aufgabe, {
+    const { felder } = baueAufgabenInhalt(karte, aufgabe, {
       onAenderung(werte) {
         zustand.antworten[idx] = werte;
         speichereProbeklausurZustand(zustand);
       },
     });
     setzeAntworten(aufgabe, felder, zustand.antworten[idx]);
-    karte.appendChild(form);
 
     wurzel.appendChild(karte);
   });
@@ -1150,17 +1191,14 @@ function zeichneAuswertung(wurzel, zustand) {
     kartenTitel.textContent = `Aufgabe ${idx + 1}: ${aufgabe.titel ?? generator.name} (${generator.punkte} P)`;
     karte.appendChild(kartenTitel);
 
-    baueFrageDarstellung(karte, aufgabe);
-
-    const { form, felder } = baueEingabenFelder(aufgabe);
+    const { felder } = baueAufgabenInhalt(karte, aufgabe);
     setzeAntworten(aufgabe, felder, zustand.antworten[idx]);
-    karte.appendChild(form);
 
     const bewertung = bewerteAlleEingaben(aufgabe, felder);
     // Nach der Abgabe ist die Aufgabe fertig bewertet — Felder nicht mehr
     // bearbeitbar, sonst würde ein nachträglicher Tipp die Anzeige verfälschen
     // (die Punkte werden nicht bei jeder weiteren Eingabe neu berechnet).
-    form.querySelectorAll('input, select').forEach((el) => { el.disabled = true; });
+    karte.querySelectorAll('input, select').forEach((el) => { el.disabled = true; });
 
     const aufgabenPunkteZeile = document.createElement('p');
     aufgabenPunkteZeile.className = 'pruef-ergebnis';
