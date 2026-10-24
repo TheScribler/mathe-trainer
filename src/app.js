@@ -162,14 +162,16 @@ function baueTabelle(tabelle) {
   return wrapper;
 }
 
-// Frage-Text, optionale Tabelle und optionale LaTeX-Formel in eine Karte
-// rendern — identisch für Übungsmodus und Probeklausur, deshalb hier einmal
-// gebaut statt zweimal.
+// Frage-Text, optionale Tabelle, optionale LaTeX-Formel und optionale
+// Teilaufgaben-Liste in eine Karte rendern — identisch für Übungsmodus und
+// Probeklausur, deshalb hier einmal gebaut statt zweimal.
 function baueFrageDarstellung(karte, aufgabe) {
-  const frage = document.createElement('p');
-  frage.className = 'frage-text';
-  frage.textContent = aufgabe.frage.text;
-  karte.appendChild(frage);
+  if (aufgabe.frage.text) {
+    const frage = document.createElement('p');
+    frage.className = 'frage-text';
+    frage.textContent = aufgabe.frage.text;
+    karte.appendChild(frage);
+  }
 
   if (aufgabe.frage.tabelle) {
     karte.appendChild(baueTabelle(aufgabe.frage.tabelle));
@@ -186,6 +188,43 @@ function baueFrageDarstellung(karte, aufgabe) {
       formel.textContent = aufgabe.frage.formel;
     }
     karte.appendChild(formel);
+  }
+
+  // frage.teile: mehrteilige Fragen (a), b), …) als eigene Blöcke mit fetter
+  // Beschriftung statt als ein einziger Fließtext-Absatz, in dem Funktionen
+  // nur in Unicode-Kurzschreibweise ("(x+2)/(x+3)") statt als echter Bruch
+  // erscheinen würden (iPhone-Rückmeldung zu diff.ableitungen).
+  if (aufgabe.frage.teile) {
+    const liste = document.createElement('div');
+    liste.className = 'frage-teile';
+    for (const teil of aufgabe.frage.teile) {
+      const block = document.createElement('div');
+      block.className = 'frage-teil';
+      if (teil.label) {
+        const label = document.createElement('span');
+        label.className = 'frage-teil-label';
+        label.textContent = teil.label;
+        block.appendChild(label);
+      }
+      if (teil.text) {
+        const text = document.createElement('span');
+        text.className = 'frage-teil-text';
+        text.textContent = teil.text;
+        block.appendChild(text);
+      }
+      if (teil.formel) {
+        const formel = document.createElement('div');
+        formel.className = 'frage-teil-formel';
+        if (typeof window !== 'undefined' && window.katex) {
+          window.katex.render(teil.formel, formel, { throwOnError: false, displayMode: true });
+        } else {
+          formel.textContent = teil.formel;
+        }
+        block.appendChild(formel);
+      }
+      liste.appendChild(block);
+    }
+    karte.appendChild(liste);
   }
 }
 
@@ -256,8 +295,33 @@ function baueEingabenFelder(aufgabe, { onAenderung } = {}) {
   form.className = 'eingaben';
   const felder = {};
   for (const eingabe of aufgabe.eingaben) {
+    // Symbolterme (z. B. "a) f'(x)") bekommen keine eigene Zeile: ihr
+    // Hinweistext wandert als teilHinweis in die Zeile der zugehörigen
+    // Zahlencheck-Eingabe (siehe unten) — zwei fast leere, gestapelte Zeilen
+    // ("Teilaufgabe a): f'(x):" direkt über "Zahlencheck a): f'(-1):") sahen
+    // wie eine doppelte Beschriftung aus und rissen eine ungleichmäßig
+    // große Lücke zwischen den Teilaufgaben auf (iPhone-Rückmeldung).
+    if (eingabe.typ === 'term') {
+      felder[eingabe.id] = null;
+      continue;
+    }
+
     const zeile = document.createElement('label');
     zeile.className = 'eingabe-zeile';
+
+    if (eingabe.teilLabel) {
+      const teilUeberschrift = document.createElement('span');
+      teilUeberschrift.className = 'eingabe-teil-ueberschrift';
+      teilUeberschrift.textContent = eingabe.teilLabel;
+      zeile.appendChild(teilUeberschrift);
+    }
+    if (eingabe.teilHinweis) {
+      const teilHinweis = document.createElement('span');
+      teilHinweis.className = 'eingabe-teil-hinweis';
+      teilHinweis.textContent = eingabe.teilHinweis;
+      zeile.appendChild(teilHinweis);
+    }
+
     const beschriftung = document.createElement('span');
     // Kein Doppelpunkt nach einem Fragezeichen ("Ist das Produkt
     // definiert?" statt "...definiert?:", iPhone-Rückmeldung).
@@ -442,15 +506,6 @@ function baueEingabenFelder(aufgabe, { onAenderung } = {}) {
       });
       zeile.appendChild(auswahl);
       felder[eingabe.id] = auswahl;
-    } else if (eingabe.typ === 'term') {
-      // Symbolterme (z. B. Ableitungen) werden nicht automatisch geprüft:
-      // schriftlich lösen, dann mit "Lösung zeigen" (Übungsmodus) bzw. in
-      // der Auswertung (Probeklausur) selbst vergleichen.
-      const hinweis = document.createElement('span');
-      hinweis.className = 'eingelesen-als';
-      hinweis.textContent = 'Schriftlich lösen, dann mit „Lösung zeigen" vergleichen.';
-      zeile.appendChild(hinweis);
-      felder[eingabe.id] = null;
     } else {
       felder[eingabe.id] = baueZahlenfeld(zeile);
     }

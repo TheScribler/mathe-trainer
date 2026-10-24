@@ -197,11 +197,13 @@ export const gewinnBreakeven = {
 
     return {
       frage: {
-        text: VORLAGEN_GEWINN[vorlageIndex](a, b, c, d, e) +
-          ` a) Bestimmen Sie die Erlös- und Gewinnfunktion (soweit wie möglich vereinfacht). ` +
-          `b) Wie lauten die Grenzkosten für x = ${x0}? ` +
-          `c) Bestimmen Sie die Gewinnschwelle (Break-Even) und die Gewinngrenze (beide Nullstellen des Gewinns). ` +
-          `d) Bestimmen Sie die gewinnmaximale Menge, den gewinnmaximalen Preis und den maximalen Gewinn.`,
+        text: VORLAGEN_GEWINN[vorlageIndex](a, b, c, d, e),
+        teile: [
+          { label: 'a)', text: 'Bestimmen Sie die Erlös- und Gewinnfunktion (soweit wie möglich vereinfacht).' },
+          { label: 'b)', text: `Wie lauten die Grenzkosten für x = ${x0}?` },
+          { label: 'c)', text: 'Bestimmen Sie die Gewinnschwelle (Break-Even) und die Gewinngrenze (beide Nullstellen des Gewinns).' },
+          { label: 'd)', text: 'Bestimmen Sie die gewinnmaximale Menge, den gewinnmaximalen Preis und den maximalen Gewinn.' },
+        ],
       },
       eingaben: [
         { id: 'E', label: 'Erlösfunktion E(x)', typ: 'koeffizienten', punkte: 1, exponenten: [2, 1, 0], loesung: eKoeff, toleranz: KONFIG.toleranz.exakt },
@@ -785,16 +787,13 @@ export const ableitungen = {
 
     // a) f(x) = a x² + 1/x  =>  f'(x) = 2a x - 1/x²  (MK6a: a=-3)
     const faLatex = `${bauePolynomAusdruck([[a, 'x^2']], zahlZuLatex, '-')} + \\dfrac{1}{x}`;
-    const faProse = `${bauePolynomAusdruck([[a, 'x²']], formatDeZahl, '−')} + 1/x`;
     const faStrich = `${bauePolynomAusdruck([[2 * a, 'x']], zahlZuLatex, '-')} - \\dfrac{1}{x^2}`;
     const faStrichWert = runde(2 * a * x0a - 1 / (x0a * x0a), 2);
     const faAusgewertet = polynomEingesetztLatex([2 * a, -1], [1, -2], x0a);
 
     // b) f(x) = (x - b)√(x² - c)  =>  f'(x) = √(x²-c) + (x-b)x/√(x²-c)  (MK6b: b=1,c=1)
     const vorzeichenLatex = (k) => (k < 0 ? '+' : '-');
-    const vorzeichenProse = (k) => (k < 0 ? '+' : '−');
     const fbLatex = `(x ${vorzeichenLatex(b)} ${zahlZuLatex(Math.abs(b), 0)})\\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}`;
-    const fbProse = `(x ${vorzeichenProse(b)} ${formatDeZahl(Math.abs(b), 0)})√(x² ${vorzeichenProse(c)} ${formatDeZahl(Math.abs(c), 0)})`;
     const fbStrich = `\\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}} + \\dfrac{(x ${vorzeichenLatex(b)} ${zahlZuLatex(Math.abs(b), 0)})x}{\\sqrt{x^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}}`;
     const wurzelB = Math.sqrt(x0b * x0b - c);
     const fbStrichWert = runde(wurzelB + ((x0b - b) * x0b) / wurzelB, 2);
@@ -804,19 +803,33 @@ export const ableitungen = {
     const x0bKlar = x0b < 0 ? `(${zahlZuLatex(x0b, 0)})` : zahlZuLatex(x0b, 0);
     const nWert = x0b * x0b - c; // immer positiv, siehe Parameterherleitung oben
     const mWert = (x0b - b) * x0b; // immer positiv, siehe Parameterherleitung oben
+    // Führender Summand der Differenz (x0b − b) OHNE x0bKlars eigene Klammern:
+    // die runde Klammer um die ganze Differenz kommt hier schon fest aus dem
+    // Template — mit x0bKlar davor entstünden zwei öffnende Klammern direkt
+    // hintereinander ("((−8) − 2)" statt "(−8 − 2)", iPhone-Rückmeldung).
     const fbEingesetzt = `\\sqrt{${x0bKlar}^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}} + ` +
-      `\\dfrac{(${x0bKlar} ${vorzeichenLatex(b)} ${zahlZuLatex(Math.abs(b), 0)})${x0bKlar}}{\\sqrt{${x0bKlar}^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}}`;
+      `\\dfrac{(${zahlZuLatex(x0b, 0)} ${vorzeichenLatex(b)} ${zahlZuLatex(Math.abs(b), 0)})${x0bKlar}}{\\sqrt{${x0bKlar}^2 ${vorzeichenLatex(c)} ${zahlZuLatex(Math.abs(c), 0)}}}`;
     const fbVereinfacht = `\\sqrt{${zahlZuLatex(nWert, 0)}} + \\dfrac{${zahlZuLatex(mWert, 0)}}{\\sqrt{${zahlZuLatex(nWert, 0)}}}`;
 
     return {
       frage: {
-        text: `Bilden Sie die Ableitung der folgenden Funktionen. a) f(x) = ${faProse}. b) f(x) = ${fbProse}.`,
+        text: 'Bilden Sie die Ableitung der folgenden Funktionen.',
+        teile: [
+          { label: 'a)', formel: `f(x) = ${faLatex}` },
+          { label: 'b)', formel: `f(x) = ${fbLatex}` },
+        ],
       },
       eingaben: [
-        { id: 'a_term', label: 'Teilaufgabe a): f\'(x)', typ: 'term', punkte: 1 },
-        { id: 'a_check', label: `Zahlencheck a): f'(${x0a})`, typ: 'zahl', punkte: 1, loesung: faStrichWert, toleranz: KONFIG.toleranz.geld },
-        { id: 'b_term', label: 'Teilaufgabe b): f\'(x)', typ: 'term', punkte: 1 },
-        { id: 'b_check', label: `Zahlencheck b): f'(${x0b})`, typ: 'zahl', punkte: 1, loesung: fbStrichWert, toleranz: KONFIG.toleranz.geld },
+        { id: 'a_term', label: 'a) f\'(x)', typ: 'term', punkte: 1 },
+        {
+          id: 'a_check', label: `f'(${prosaLabelZahl(x0a)})`, typ: 'zahl', punkte: 1, loesung: faStrichWert, toleranz: KONFIG.toleranz.geld,
+          teilLabel: 'a)', teilHinweis: 'f\'(x) schriftlich bilden, dann Zahlencheck:',
+        },
+        { id: 'b_term', label: 'b) f\'(x)', typ: 'term', punkte: 1 },
+        {
+          id: 'b_check', label: `f'(${prosaLabelZahl(x0b)})`, typ: 'zahl', punkte: 1, loesung: fbStrichWert, toleranz: KONFIG.toleranz.geld,
+          teilLabel: 'b)', teilHinweis: 'f\'(x) schriftlich bilden, dann Zahlencheck:',
+        },
       ],
       loesung: {
         schritte: [
@@ -852,7 +865,7 @@ export const ableitungen = {
           {
             titel: 'Einsetzen',
             latex: mehrzeiligeKette([
-              `f'(${x0bKlar}) &= ${fbEingesetzt}`,
+              `f'(${zahlZuLatex(x0b, 0)}) &= ${fbEingesetzt}`,
               `&= ${fbVereinfacht} \\approx ${zahlZuLatex(fbStrichWert, minimaleNachkommastellen(fbStrichWert))}`,
             ]),
           },
@@ -867,22 +880,12 @@ export const ableitungen = {
   },
 };
 
-// Hoch-/Tiefgestellte Ziffern für reinen Fließtext (kein LaTeX-Markup
-// außerhalb von Formelfeldern, siehe LATEX_RESTE in test/alle.mjs — ein
-// rohes "^" oder "_" in frage.text wäre ein Testfehler). Eigene, kleine
-// Kopien statt eines Imports, dieselbe Begründung wie überall sonst in
-// dieser Datei (echte Modul-Grenzen unter Node, keine stille Kopplung).
+// Hochgestellte Ziffern für reinen Fließtext (kein LaTeX-Markup außerhalb
+// von Formelfeldern, siehe LATEX_RESTE in test/alle.mjs — ein rohes "^" oder
+// "_" in frage.text wäre ein Testfehler). Eigene, kleine Kopie statt eines
+// Imports, dieselbe Begründung wie überall sonst in dieser Datei (echte
+// Modul-Grenzen unter Node, keine stille Kopplung).
 const ABL_HOCH = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
-const ABL_TIEF = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
-function hochgestelltCXProse(c) {
-  // c·x als Hochzahl in reinem Fließtext, z. B. c=2 -> "²ˣ", c=1 -> "ˣ", c=-1 -> "⁻ˣ".
-  const abs = Math.abs(c);
-  const ziffern = abs === 1 ? '' : String(abs).split('').map((z) => ABL_HOCH[Number(z)]).join('');
-  return (c < 0 ? '⁻' : '') + ziffern + 'ˣ';
-}
-function tiefgestelltProse(n) {
-  return String(n).split('').map((z) => ABL_TIEF[Number(z)]).join('');
-}
 // Reine Hochzahl ohne Basis in Fließtext, z. B. n=2 -> "²", n=-1 -> "⁻¹",
 // n=1 -> "" (x¹ wird als "x" geschrieben, kein sichtbarer Exponent).
 function hochzahlProse(n) {
@@ -890,6 +893,13 @@ function hochzahlProse(n) {
   const abs = Math.abs(n);
   const ziffern = String(abs).split('').map((z) => ABL_HOCH[Number(z)]).join('');
   return (n < 0 ? '⁻' : '') + ziffern;
+}
+
+// Ganze Zahl für ein Eingabefeld-Label mit echtem Unicode-Minus "−" statt
+// des ASCII-Bindestrichs, den eine einfache Template-Interpolation oder
+// formatDeZahl liefern würde ("f'(-1)" statt "f'(−1)", iPhone-Rückmeldung).
+function prosaLabelZahl(n) {
+  return n < 0 ? `−${Math.abs(n)}` : String(n);
 }
 
 // koeffVariable (diff.js, oben) lässt den Koeffizienten nur bei genau +1
@@ -911,20 +921,25 @@ function baueAbleitungenQuotientExp(params) {
   const zaehlerLatex = `${koeffVariable(m, 'x')} ${n < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(n), 0)}`;
   const nennerLatex = `${koeffVariable(p, 'x')} ${q < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(q), 0)}`;
   const faLatex = bruch(zaehlerLatex, nennerLatex);
-  const zaehlerProse = `${m === 1 ? 'x' : formatDeZahl(m, 0) + 'x'} ${n < 0 ? '−' : '+'} ${formatDeZahl(Math.abs(n), 0)}`;
-  const nennerProse = `${p === 1 ? 'x' : formatDeZahl(p, 0) + 'x'} ${q < 0 ? '−' : '+'} ${formatDeZahl(Math.abs(q), 0)}`;
-  const faProse = `(${zaehlerProse}) / (${nennerProse})`;
 
   const K = m * q - n * p;
   const faStrich = bruch(zahlZuLatex(K, 0), `(${nennerLatex})^2`);
-  const x0aKlar = x0a < 0 ? `(${zahlZuLatex(x0a, 0)})` : zahlZuLatex(x0a, 0);
-  const nennerBeiX0a = `${koeffVariable(p, x0aKlar)} ${q < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(q), 0)}`;
+  // Bei p=1 ist x0a der führende Summand selbst — dort reicht der nackte
+  // Wert (die Klammer dafür kommt gleich beim Quadrieren als äußere Klammer
+  // um die ganze Summe, siehe unten; eine eigene Klammer um x0a hätte sonst
+  // zwei öffnende Klammern direkt hintereinander ergeben, "((−1) + 3)²"
+  // statt "(−1 + 3)²", iPhone-Rückmeldung). Bei p≠1 wird x0a dagegen mit p
+  // multipliziert (Juxtaposition p·x0a) — dort IMMER in Klammern, auch wenn
+  // x0a positiv ist: ohne sie verschmelzen zwei direkt aneinandergereihte
+  // Ziffern zu einer falschen Zahl ("22 − 2" statt "2 · 2 − 2" bei p=2,
+  // x0a=2 — real aufgetreten).
+  const x0aAlsSummand = p === 1 ? zahlZuLatex(x0a, 0) : koeffVariable(p, `(${zahlZuLatex(x0a, 0)})`);
+  const nennerBeiX0a = `${x0aAlsSummand} ${q < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(q), 0)}`;
   const nennerWertA = p * x0a + q;
   const faStrichWert = runde(K / (nennerWertA * nennerWertA), 2);
 
   const innenLatex = koeffVariableVorzeichen(c, 'x');
   const fbLatex = cdotWennNicht1(k, `e^{${innenLatex}}`);
-  const fbProse = `${Math.abs(k) === 1 ? '' : formatDeZahl(Math.abs(k), 0) + '·'}e${hochgestelltCXProse(c)}`;
   const fbStrichFaktor = k * c;
   const fbStrichVorzeichen = fbStrichFaktor < 0 ? '-' : '';
   const fbStrich = `${fbStrichVorzeichen}${cdotWennNicht1(fbStrichFaktor, `e^{${innenLatex}}`)}`;
@@ -936,13 +951,23 @@ function baueAbleitungenQuotientExp(params) {
   return {
     titel: 'Quotientenregel und e-Funktion',
     frage: {
-      text: `Bilden Sie die Ableitung der folgenden Funktionen. a) f(x) = ${faProse}. b) f(x) = ${fbProse}.`,
+      text: 'Bilden Sie die Ableitung der folgenden Funktionen.',
+      teile: [
+        { label: 'a)', formel: `f(x) = ${faLatex}` },
+        { label: 'b)', formel: `f(x) = ${fbLatex}` },
+      ],
     },
     eingaben: [
-      { id: 'a_term', label: 'Teilaufgabe a): f\'(x)', typ: 'term', punkte: 1 },
-      { id: 'a_check', label: `Zahlencheck a): f'(${x0a})`, typ: 'zahl', punkte: 1, loesung: faStrichWert, toleranz: KONFIG.toleranz.geld },
-      { id: 'b_term', label: 'Teilaufgabe b): f\'(x)', typ: 'term', punkte: 1 },
-      { id: 'b_check', label: `Zahlencheck b): f'(${x0b})`, typ: 'zahl', punkte: 1, loesung: fbStrichWert, toleranz: KONFIG.toleranz.geld },
+      { id: 'a_term', label: 'a) f\'(x)', typ: 'term', punkte: 1 },
+      {
+        id: 'a_check', label: `f'(${prosaLabelZahl(x0a)})`, typ: 'zahl', punkte: 1, loesung: faStrichWert, toleranz: KONFIG.toleranz.geld,
+        teilLabel: 'a)', teilHinweis: 'f\'(x) schriftlich bilden, dann Zahlencheck:',
+      },
+      { id: 'b_term', label: 'b) f\'(x)', typ: 'term', punkte: 1 },
+      {
+        id: 'b_check', label: `f'(${prosaLabelZahl(x0b)})`, typ: 'zahl', punkte: 1, loesung: fbStrichWert, toleranz: KONFIG.toleranz.geld,
+        teilLabel: 'b)', teilHinweis: 'f\'(x) schriftlich bilden, dann Zahlencheck:',
+      },
     ],
     loesung: {
       schritte: [
@@ -963,8 +988,8 @@ function baueAbleitungenQuotientExp(params) {
         {
           titel: 'Einsetzen',
           latex: mehrzeiligeKette([
-            `f'(${x0aKlar}) &= \\dfrac{${zahlZuLatex(K, 0)}}{(${nennerBeiX0a})^2}`,
-            `&= \\dfrac{${zahlZuLatex(K, 0)}}{(${zahlZuLatex(nennerWertA, 0)})^2} = ${zahlZuLatex(faStrichWert, minimaleNachkommastellen(faStrichWert))}`,
+            `f'(${zahlZuLatex(x0a, 0)}) &= \\dfrac{${zahlZuLatex(K, 0)}}{(${nennerBeiX0a})^2}`,
+            `&= \\dfrac{${zahlZuLatex(K, 0)}}{${klammerWennNegativ(nennerWertA, 0)}^2} = ${zahlZuLatex(faStrichWert, minimaleNachkommastellen(faStrichWert))}`,
           ]),
         },
         {
@@ -976,7 +1001,7 @@ function baueAbleitungenQuotientExp(params) {
         {
           titel: 'Einsetzen',
           latex: mehrzeiligeKette([
-            `f'(${x0bKlar}) &= ${fbStrichVorzeichen}${cdotWennNicht1(fbStrichFaktor, `e^{${innenBeiX0b}}`)}`,
+            `f'(${zahlZuLatex(x0b, 0)}) &= ${fbStrichVorzeichen}${cdotWennNicht1(fbStrichFaktor, `e^{${innenBeiX0b}}`)}`,
             `&= ${fbStrichVorzeichen}${cdotWennNicht1(fbStrichFaktor, `e^{${zahlZuLatex(expWertB, 0)}}`)} \\approx ${zahlZuLatex(fbStrichWert, minimaleNachkommastellen(fbStrichWert))}`,
           ]),
         },
@@ -998,28 +1023,35 @@ function baueAbleitungenLnLogA(params) {
 
   const innenLatex = `${koeffVariable(c, 'x')} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), 0)}`;
   const faLatex = cdotWennNicht1(k, `\\ln(${innenLatex})`);
-  const innenProse = `${c === 1 ? 'x' : formatDeZahl(c, 0) + 'x'} ${d < 0 ? '−' : '+'} ${formatDeZahl(Math.abs(d), 0)}`;
-  const faProse = `${Math.abs(k) === 1 ? '' : formatDeZahl(Math.abs(k), 0) + '·'}ln(${innenProse})`;
   const innenWertA = c * x0a + d;
   const faStrich = cdotWennNicht1(k * c, bruch('1', innenLatex));
   const faStrichWert = runde((k * c) / innenWertA, 2);
 
   const fbLatex = cdotWennNicht1(kB, `\\log_{${zahlZuLatex(basis, 0)}}(x)`);
-  const fbProse = `${Math.abs(kB) === 1 ? '' : formatDeZahl(Math.abs(kB), 0) + '·'}log${tiefgestelltProse(basis)}(x)`;
   const lnBasis = Math.log(basis);
   const fbStrich = `\\dfrac{${zahlZuLatex(kB, 0)}}{x \\cdot \\ln(${zahlZuLatex(basis, 0)})}`;
   const fbStrichWert = runde(kB / (x0b * lnBasis), 2);
 
   return {
-    titel: 'ln-Funktion und log_a-Funktion',
+    titel: 'ln-Funktion und Logarithmus zur Basis a',
     frage: {
-      text: `Bilden Sie die Ableitung der folgenden Funktionen. a) f(x) = ${faProse}. b) f(x) = ${fbProse}.`,
+      text: 'Bilden Sie die Ableitung der folgenden Funktionen.',
+      teile: [
+        { label: 'a)', formel: `f(x) = ${faLatex}` },
+        { label: 'b)', formel: `f(x) = ${fbLatex}` },
+      ],
     },
     eingaben: [
-      { id: 'a_term', label: 'Teilaufgabe a): f\'(x)', typ: 'term', punkte: 1 },
-      { id: 'a_check', label: `Zahlencheck a): f'(${x0a})`, typ: 'zahl', punkte: 1, loesung: faStrichWert, toleranz: KONFIG.toleranz.geld },
-      { id: 'b_term', label: 'Teilaufgabe b): f\'(x)', typ: 'term', punkte: 1 },
-      { id: 'b_check', label: `Zahlencheck b): f'(${x0b})`, typ: 'zahl', punkte: 1, loesung: fbStrichWert, toleranz: KONFIG.toleranz.geld },
+      { id: 'a_term', label: 'a) f\'(x)', typ: 'term', punkte: 1 },
+      {
+        id: 'a_check', label: `f'(${prosaLabelZahl(x0a)})`, typ: 'zahl', punkte: 1, loesung: faStrichWert, toleranz: KONFIG.toleranz.geld,
+        teilLabel: 'a)', teilHinweis: 'f\'(x) schriftlich bilden, dann Zahlencheck:',
+      },
+      { id: 'b_term', label: 'b) f\'(x)', typ: 'term', punkte: 1 },
+      {
+        id: 'b_check', label: `f'(${prosaLabelZahl(x0b)})`, typ: 'zahl', punkte: 1, loesung: fbStrichWert, toleranz: KONFIG.toleranz.geld,
+        teilLabel: 'b)', teilHinweis: 'f\'(x) schriftlich bilden, dann Zahlencheck:',
+      },
     ],
     loesung: {
       schritte: [
@@ -1031,8 +1063,13 @@ function baueAbleitungenLnLogA(params) {
         { titel: 'Ergebnis', latex: `f'(x) = ${faStrich}` },
         {
           titel: 'Einsetzen',
+          // Bei c=1 steht x0a als nackter Summand da; bei c≠1 wird x0a mit c
+          // multipliziert (Juxtaposition c·x0a) und braucht darum IMMER
+          // Klammern — x0a ist hier stets positiv, ohne Klammer verschmelzen
+          // sonst zwei Ziffern zu einer falschen Zahl ("25 + 4" statt
+          // "2 · 5 + 4" bei c=2, x0a=5 — real aufgetreten).
           latex: mehrzeiligeGleichung(`f'(${zahlZuLatex(x0a, 0)})`, [
-            bruch(zahlZuLatex(k * c, 0), `${koeffVariable(c, zahlZuLatex(x0a, 0))} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), 0)}`),
+            bruch(zahlZuLatex(k * c, 0), `${c === 1 ? zahlZuLatex(x0a, 0) : koeffVariable(c, `(${zahlZuLatex(x0a, 0)})`)} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), 0)}`),
             `${zahlZuLatex(k * c, 0)} / ${zahlZuLatex(innenWertA, 0)} = ${zahlZuLatex(faStrichWert, minimaleNachkommastellen(faStrichWert))}`,
           ]),
         },
@@ -1065,7 +1102,6 @@ function baueAbleitungenAHochXZweiteAbleitung(params) {
   const { k, basis, x0a, p, q, x0b } = params;
 
   const faLatex = cdotWennNicht1(k, `${zahlZuLatex(basis, 0)}^x`);
-  const faProse = `${Math.abs(k) === 1 ? '' : formatDeZahl(Math.abs(k), 0) + '·'}${formatDeZahl(basis, 0)}${'ˣ'}`;
   const lnBasis = Math.log(basis);
   const faStrich = `${cdotWennNicht1(k, `${zahlZuLatex(basis, 0)}^x`)} \\cdot \\ln(${zahlZuLatex(basis, 0)})`;
   const faStrichWert = runde(k * Math.pow(basis, x0a) * lnBasis, 2);
@@ -1073,22 +1109,30 @@ function baueAbleitungenAHochXZweiteAbleitung(params) {
   const basisHochX0a = Math.pow(basis, x0a);
 
   const fbLatex = bauePolynomAusdruck([[p, 'x^3'], [q, 'x^2']], zahlZuLatex, '-');
-  const fbProse = bauePolynomAusdruck([[p, 'x³'], [q, 'x²']], formatDeZahl, '−');
   const fbStrich = bauePolynomAusdruck([[3 * p, 'x^2'], [2 * q, 'x']], zahlZuLatex, '-');
   const fbZweiteStrich = bauePolynomAusdruck([[6 * p, 'x'], [2 * q, '']], zahlZuLatex, '-');
   const fbZweiteStrichWert = runde(6 * p * x0b + 2 * q, 2);
-  const x0bKlar = x0b < 0 ? `(${zahlZuLatex(x0b, 0)})` : zahlZuLatex(x0b, 0);
 
   return {
-    titel: 'a^x-Funktion und zweite Ableitung',
+    titel: 'aˣ-Funktion und zweite Ableitung',
     frage: {
-      text: `Bilden Sie die Ableitung der folgenden Funktionen. a) f(x) = ${faProse}. b) Bilden Sie für f(x) = ${fbProse} die zweite Ableitung f''(x).`,
+      text: 'Bilden Sie die Ableitung der folgenden Funktion a) und die zweite Ableitung der Funktion b).',
+      teile: [
+        { label: 'a)', formel: `f(x) = ${faLatex}` },
+        { label: 'b)', formel: `f(x) = ${fbLatex}` },
+      ],
     },
     eingaben: [
-      { id: 'a_term', label: 'Teilaufgabe a): f\'(x)', typ: 'term', punkte: 1 },
-      { id: 'a_check', label: `Zahlencheck a): f'(${x0a})`, typ: 'zahl', punkte: 1, loesung: faStrichWert, toleranz: KONFIG.toleranz.geld },
-      { id: 'b_term', label: 'Teilaufgabe b): f\'\'(x)', typ: 'term', punkte: 1 },
-      { id: 'b_check', label: `Zahlencheck b): f''(${x0b})`, typ: 'zahl', punkte: 1, loesung: fbZweiteStrichWert, toleranz: KONFIG.toleranz.geld },
+      { id: 'a_term', label: 'a) f\'(x)', typ: 'term', punkte: 1 },
+      {
+        id: 'a_check', label: `f'(${prosaLabelZahl(x0a)})`, typ: 'zahl', punkte: 1, loesung: faStrichWert, toleranz: KONFIG.toleranz.geld,
+        teilLabel: 'a)', teilHinweis: 'f\'(x) schriftlich bilden, dann Zahlencheck:',
+      },
+      { id: 'b_term', label: 'b) f\'\'(x)', typ: 'term', punkte: 1 },
+      {
+        id: 'b_check', label: `f''(${prosaLabelZahl(x0b)})`, typ: 'zahl', punkte: 1, loesung: fbZweiteStrichWert, toleranz: KONFIG.toleranz.geld,
+        teilLabel: 'b)', teilHinweis: 'f\'\'(x) schriftlich bilden, dann Zahlencheck:',
+      },
     ],
     loesung: {
       schritte: [
@@ -1101,7 +1145,7 @@ function baueAbleitungenAHochXZweiteAbleitung(params) {
         {
           titel: 'Einsetzen',
           latex: mehrzeiligeKette([
-            `f'(${x0aKlar}) &= ${cdotWennNicht1(k, `${zahlZuLatex(basis, 0)}^{${x0aKlar}}`)} \\cdot \\ln(${zahlZuLatex(basis, 0)})`,
+            `f'(${zahlZuLatex(x0a, 0)}) &= ${cdotWennNicht1(k, `${zahlZuLatex(basis, 0)}^{${x0aKlar}}`)} \\cdot \\ln(${zahlZuLatex(basis, 0)})`,
             `&= ${cdotWennNicht1(k, zahlZuLatex(runde(basisHochX0a, 4), minimaleNachkommastellen(runde(basisHochX0a, 4))))} \\cdot ${zahlZuLatex(runde(lnBasis, 4), minimaleNachkommastellen(runde(lnBasis, 4)))} \\approx ${zahlZuLatex(faStrichWert, minimaleNachkommastellen(faStrichWert))}`,
           ]),
         },
@@ -1114,8 +1158,13 @@ function baueAbleitungenAHochXZweiteAbleitung(params) {
         { titel: 'Ergebnis', latex: `f''(x) = ${fbZweiteStrich}` },
         {
           titel: 'Einsetzen',
-          latex: mehrzeiligeGleichung(`f''(${x0bKlar})`, [
-            `${koeffVariable(6 * p, x0bKlar)} ${2 * q < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(2 * q), 0)}`,
+          // 6p ist nie ±1 (p-Pool schließt 0 aus), koeffVariable multipliziert
+          // also immer per Juxtaposition — x0b braucht darum IMMER Klammern,
+          // auch wenn positiv, sonst verschmelzen zwei Ziffern zu einer
+          // falschen Zahl ("121 + 6" statt "12 · 1 + 6" bei 6p=12, x0b=1 —
+          // real aufgetreten).
+          latex: mehrzeiligeGleichung(`f''(${zahlZuLatex(x0b, 0)})`, [
+            `${koeffVariable(6 * p, `(${zahlZuLatex(x0b, 0)})`)} ${2 * q < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(2 * q), 0)}`,
             zahlZuLatex(fbZweiteStrichWert, minimaleNachkommastellen(fbZweiteStrichWert)),
           ]),
         },
@@ -1228,10 +1277,16 @@ function baueFx(fxLatex, fxWert, fyLatex, fyWert, frageProse, x0, y0, titel, ein
     titel,
     frage: { text: `Bilden Sie die partiellen Ableitungen von f(x,y) = ${frageProse} nach x und nach y.` },
     eingaben: [
-      { id: 'fx_term', label: 'Teilaufgabe a): ∂f/∂x', typ: 'term', punkte: 1 },
-      { id: 'fx_check', label: `Zahlencheck a): ∂f/∂x bei (${x0},${y0})`, typ: 'zahl', punkte: 1, loesung: fxWert, toleranz: KONFIG.toleranz.geld },
-      { id: 'fy_term', label: 'Teilaufgabe b): ∂f/∂y', typ: 'term', punkte: 1 },
-      { id: 'fy_check', label: `Zahlencheck b): ∂f/∂y bei (${x0},${y0})`, typ: 'zahl', punkte: 1, loesung: fyWert, toleranz: KONFIG.toleranz.geld },
+      { id: 'fx_term', label: 'a) ∂f/∂x', typ: 'term', punkte: 1 },
+      {
+        id: 'fx_check', label: `∂f/∂x bei (${prosaLabelZahl(x0)},${prosaLabelZahl(y0)})`, typ: 'zahl', punkte: 1, loesung: fxWert, toleranz: KONFIG.toleranz.geld,
+        teilLabel: 'a)', teilHinweis: '∂f/∂x schriftlich bilden, dann Zahlencheck:',
+      },
+      { id: 'fy_term', label: 'b) ∂f/∂y', typ: 'term', punkte: 1 },
+      {
+        id: 'fy_check', label: `∂f/∂y bei (${prosaLabelZahl(x0)},${prosaLabelZahl(y0)})`, typ: 'zahl', punkte: 1, loesung: fyWert, toleranz: KONFIG.toleranz.geld,
+        teilLabel: 'b)', teilHinweis: '∂f/∂y schriftlich bilden, dann Zahlencheck:',
+      },
     ],
     loesung: {
       schritte: einsetzenSchritte,
@@ -1316,8 +1371,8 @@ export const partielleAbleitungen = {
         {
           titel: 'Einsetzen',
           latex: mehrzeiligeKette([
-            `f_x(${x0Klar},${y0Klar}) = ${fxVZ}${cdotWennNicht1(fxFaktor, `${hochLatex(x0Klar, m - 1)}${hochLatex(y0Klar, n)}`)} = ${zahlZuLatex(fxWert, minimaleNachkommastellen(fxWert))}`,
-            `f_y(${x0Klar},${y0Klar}) = ${cdotWennNicht1(fyFaktor, `${hochLatex(x0Klar, m)}${hochLatex(y0Klar, n - 1)}`)} = ${zahlZuLatex(fyWert, minimaleNachkommastellen(fyWert))}`,
+            `f_x(${x0Latex},${y0Latex}) = ${fxVZ}${cdotWennNicht1(fxFaktor, `${hochLatex(x0Klar, m - 1)}${hochLatex(y0Klar, n)}`)} = ${zahlZuLatex(fxWert, minimaleNachkommastellen(fxWert))}`,
+            `f_y(${x0Latex},${y0Latex}) = ${cdotWennNicht1(fyFaktor, `${hochLatex(x0Klar, m)}${hochLatex(y0Klar, n - 1)}`)} = ${zahlZuLatex(fyWert, minimaleNachkommastellen(fyWert))}`,
           ]),
         },
       ], params);
@@ -1360,8 +1415,8 @@ export const partielleAbleitungen = {
         {
           titel: 'Einsetzen',
           latex: mehrzeiligeKette([
-            `f_x(${x0Klar},${y0Klar}) = ${vorfaktorMalLatex(2 * k * x0 * y0, `e^{${innenBeiPunkt}}`)} = ${vorfaktorMalLatex(2 * k * x0 * y0, `e^{${zahlZuLatex(innenWert, 0)}}`)} \\approx ${zahlZuLatex(fxWert, minimaleNachkommastellen(fxWert))}`,
-            `f_y(${x0Klar},${y0Klar}) = ${vz}${hochLatex(x0Klar, 2)} \\cdot e^{${innenBeiPunkt}} = ${vorfaktorMalLatex(k * x0 * x0, `e^{${zahlZuLatex(innenWert, 0)}}`)} \\approx ${zahlZuLatex(fyWert, minimaleNachkommastellen(fyWert))}`,
+            `f_x(${x0Latex},${y0Latex}) = ${vorfaktorMalLatex(2 * k * x0 * y0, `e^{${innenBeiPunkt}}`)} = ${vorfaktorMalLatex(2 * k * x0 * y0, `e^{${zahlZuLatex(innenWert, 0)}}`)} \\approx ${zahlZuLatex(fxWert, minimaleNachkommastellen(fxWert))}`,
+            `f_y(${x0Latex},${y0Latex}) = ${vz}${hochLatex(x0Klar, 2)} \\cdot e^{${innenBeiPunkt}} = ${vorfaktorMalLatex(k * x0 * x0, `e^{${zahlZuLatex(innenWert, 0)}}`)} \\approx ${zahlZuLatex(fyWert, minimaleNachkommastellen(fyWert))}`,
           ]),
         },
       ], params);
@@ -1393,8 +1448,8 @@ export const partielleAbleitungen = {
       {
         titel: 'Einsetzen',
         latex: mehrzeiligeKette([
-          `f_x(${x0Klar},${y0Klar}) = ${fxVZ}${cdotWennNicht1(fxFaktor, hochLatex(x0Klar, p - 1))} = ${zahlZuLatex(fxWert, minimaleNachkommastellen(fxWert))}`,
-          `f_y(${x0Klar},${y0Klar}) = ${fyVZ}${cdotWennNicht1(fyFaktor, hochLatex(y0Klar, q - 1))} = ${zahlZuLatex(fyWert, minimaleNachkommastellen(fyWert))}`,
+          `f_x(${x0Latex},${y0Latex}) = ${fxVZ}${cdotWennNicht1(fxFaktor, hochLatex(x0Klar, p - 1))} = ${zahlZuLatex(fxWert, minimaleNachkommastellen(fxWert))}`,
+          `f_y(${x0Latex},${y0Latex}) = ${fyVZ}${cdotWennNicht1(fyFaktor, hochLatex(y0Klar, q - 1))} = ${zahlZuLatex(fyWert, minimaleNachkommastellen(fyWert))}`,
         ]),
       },
     ], params);

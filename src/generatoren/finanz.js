@@ -688,15 +688,32 @@ function baueTilgungstabelle(art, K0, i, n) {
 
   const zeilen = [];
   let restschuld = K0;
+  let letzteAnnuitaetAngepasst = false;
   for (let jahr = 1; jahr <= n; jahr++) {
     const restschuldStart = restschuld;
     const zinsen = runde(restschuld * i, 2);
-    const tilgung = art === 'raten' ? tilgungKonstant : runde(annuitaetKonstant - zinsen, 2);
-    const annuitaet = art === 'raten' ? runde(zinsen + tilgung, 2) : annuitaetKonstant;
-    restschuld = runde(restschuld - tilgung, 2);
+    let tilgung;
+    let annuitaet;
+    if (art === 'raten') {
+      tilgung = tilgungKonstant;
+      annuitaet = runde(zinsen + tilgung, 2);
+    } else if (jahr === n) {
+      // Letztes Jahr: Tilgung exakt auf die noch offene Restschuld setzen,
+      // statt die über die Jahre konstant gehaltene Annuität weiter
+      // anzuwenden — sonst bleibt durch die jährliche Rundung auf den Cent
+      // (Zinsen, Annuität je einzeln gerundet) ein winziger Rest stehen,
+      // und die Restschuld am Ende wäre nicht exakt 0.
+      tilgung = runde(restschuldStart, 2);
+      annuitaet = runde(zinsen + tilgung, 2);
+      if (Math.abs(annuitaet - annuitaetKonstant) > 1e-9) letzteAnnuitaetAngepasst = true;
+    } else {
+      tilgung = runde(annuitaetKonstant - zinsen, 2);
+      annuitaet = annuitaetKonstant;
+    }
+    restschuld = runde(restschuldStart - tilgung, 2);
     zeilen.push({ jahr, restschuldStart, restschuldEnde: restschuld, zinsen, tilgung, annuitaet });
   }
-  return zeilen;
+  return { zeilen, letzteAnnuitaetAngepasst };
 }
 
 export const tilgungsplan = {
@@ -725,7 +742,7 @@ export const tilgungsplan = {
     const q = 1 + i;
     const iLatex = anteilLatexOhneNullen(i);
     const qLatex = anteilLatexOhneNullen(q);
-    const zeilen = baueTilgungstabelle(art, K0, i, n);
+    const { zeilen, letzteAnnuitaetAngepasst } = baueTilgungstabelle(art, K0, i, n);
 
     const matrixLoesung = zeilen.map((z) => [z.restschuldEnde, z.zinsen, z.tilgung, z.annuitaet]);
     const konstante = art === 'raten' ? zeilen[0].tilgung : zeilen[0].annuitaet;
@@ -742,6 +759,7 @@ export const tilgungsplan = {
       const dritteZeile = art === 'raten'
         ? `A_{${z.jahr}} = ${zinsenLatex} + ${tilgungLatex} = ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))}`
         : `T_{${z.jahr}} = ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))} - ${zinsenLatex} = ${tilgungLatex}`;
+      const istAngepassteLetzteAnnuitaet = art === 'annuitaet' && z.jahr === n && letzteAnnuitaetAngepasst;
       return {
         titel: 'Einsetzen',
         latex: mehrzeiligeKette([
@@ -749,7 +767,8 @@ export const tilgungsplan = {
           dritteZeile,
           `S_{${z.jahr}} = ${sStart} - ${tilgungLatex} = ${sEnde}`,
         ]),
-        hinweis: `Jahr ${z.jahr} (Restschuld zu Jahresbeginn: ${formatDeZahl(z.restschuldStart, geldNachkommastellen(z.restschuldStart))} €).`,
+        hinweis: `Jahr ${z.jahr} (Restschuld zu Jahresbeginn: ${formatDeZahl(z.restschuldStart, geldNachkommastellen(z.restschuldStart))} €).` +
+          (istAngepassteLetzteAnnuitaet ? ' Letzte Annuität um Rundungsdifferenz angepasst.' : ''),
       };
     });
 

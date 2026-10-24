@@ -352,8 +352,11 @@ export const produktionsprozess = {
       frage: {
         text: `In einem zweistufigen Produktionsprozess werden aus ${anzahlRohstoffe} Rohstoffen über die Produktionskoeffizienten in A ` +
           `${anzahlZwischenprodukte} Zwischenprodukte und aus diesen über B ${anzahlEndprodukte} Endprodukte hergestellt, die in den Mengen E ` +
-          `hergestellt werden sollen. a) Wie viele Einheiten der ${anzahlRohstoffe} Rohstoffe werden dafür benötigt? ` +
-          `b) Die Endprodukte werden zu Verkaufspreisen je Einheit PE verkauft, die Rohstoffe kosten je Einheit PR. Wie hoch ist der Gewinn?`,
+          `hergestellt werden sollen.`,
+        teile: [
+          { label: 'a)', text: `Wie viele Einheiten der ${anzahlRohstoffe} Rohstoffe werden dafür benötigt?` },
+          { label: 'b)', text: 'Die Endprodukte werden zu Verkaufspreisen je Einheit PE verkauft, die Rohstoffe kosten je Einheit PR. Wie hoch ist der Gewinn?' },
+        ],
         // Jede Vorgabe auf einer eigenen Zeile statt mehrere pro Zeile
         // gebündelt — zwei oder mehr Matrizen nebeneinander liefen bei
         // 375px ab dem Bildschirmrand (iPhone-Rückmeldung: E und P_R

@@ -200,6 +200,21 @@ const LAYOUT_PRUEFSKRIPT = `
     }
   }
 
+  // Lücke zwischen je zwei aufeinanderfolgenden Eingabe-Zeilen (nicht nur vor
+  // der Knopf-Reihe, siehe oben) darf nicht größer sein als der normale
+  // Flex-Gap der .eingaben-Liste plus etwas Spielraum — sonst stapelt sich
+  // wie beim Lücke-vor-Knopfreihe-Fall eine unerwünscht große Lücke
+  // ZWISCHEN zwei Teilaufgaben, die der Last-child-Test oben nicht erfasst
+  // (iPhone-Rückmeldung: Lücke nach der a)-Box bei diff.ableitungen).
+  const MAX_LUECKE_ZWISCHEN_ZEILEN = 40;
+  const alleZeilen = Array.from(document.querySelectorAll('#app .eingaben .eingabe-zeile'));
+  for (let i = 1; i < alleZeilen.length; i++) {
+    const luecke = alleZeilen[i].getBoundingClientRect().top - alleZeilen[i - 1].getBoundingClientRect().bottom;
+    if (luecke > MAX_LUECKE_ZWISCHEN_ZEILEN) {
+      probleme.push('Lücke zwischen zwei Eingabe-Zeilen zu groß (' + luecke.toFixed(1) + 'px > ' + MAX_LUECKE_ZWISCHEN_ZEILEN + 'px)');
+    }
+  }
+
   // Eine koeffizienten-Reihe (z. B. F(x) = __x⁴ + __x³ + __x² + __x + c) muss
   // auf EINER Zeile bleiben — scrollWidth/clientWidth allein hätten einen
   // Umbruch nicht erkannt (flex-wrap bricht um, OHNE horizontal zu

@@ -140,10 +140,19 @@ function klassifiziereNumerisch(f, x, y, h = 1e-3) {
 // damit ein einziger Scan jedes Textfeld einer Aufgabe erfasst — auch neue Felder,
 // die künftige Generatoren hinzufügen.
 function sammlePlainTextFelder(aufgabe) {
-  const felder = [{ feld: 'frage.text', text: aufgabe.frage.text }];
+  const felder = [];
+  if (aufgabe.frage.text) felder.push({ feld: 'frage.text', text: aufgabe.frage.text });
+  if (aufgabe.titel) felder.push({ feld: 'titel', text: aufgabe.titel });
+
+  for (const teil of aufgabe.frage.teile ?? []) {
+    if (teil.label) felder.push({ feld: `frage.teile[${teil.label}].label`, text: teil.label });
+    if (teil.text) felder.push({ feld: `frage.teile[${teil.label}].text`, text: teil.text });
+  }
 
   for (const eingabe of aufgabe.eingaben) {
     felder.push({ feld: `eingaben[${eingabe.id}].label`, text: eingabe.label });
+    if (eingabe.teilLabel) felder.push({ feld: `eingaben[${eingabe.id}].teilLabel`, text: eingabe.teilLabel });
+    if (eingabe.teilHinweis) felder.push({ feld: `eingaben[${eingabe.id}].teilHinweis`, text: eingabe.teilHinweis });
   }
 
   for (const schritt of aufgabe.loesung.schritte) {
@@ -173,6 +182,13 @@ function sammlePlainTextFelder(aufgabe) {
 // ausgeschriebene Wörter.
 const LATEX_RESTE = /\{,\}|_|\^|\\(?:[a-zA-Z]|;)/;
 
+// In reinem Fließtext (Labels, Fragetext, Hinweise — anders als in echten
+// LaTeX-Feldern, wo "-" das korrekte Minuszeichen ist) muss eine negative
+// Zahl direkt nach einer öffnenden Klammer den echten Unicode-Minus "−"
+// zeigen, nicht den ASCII-Bindestrich ("f'(-1)" statt "f'(−1)") — tatsächlich
+// in diff.ableitungen aufgetreten (Zahlencheck-Labels, iPhone-Rückmeldung).
+const ASCII_MINUS_IN_KLAMMER = /\(-\d/;
+
 // Koeffizient 1 bzw. -1 muss weggelassen werden ("x" statt "1x", "x0" statt
 // "1 \cdot x0") — tatsächlich mehrfach in diff.js aufgetreten (P1=1, 2c=1,
 // E=±1 je nach Zufallszug). "1x"/"1\cdot" zählt nur, wenn die "1" davor nicht
@@ -198,6 +214,16 @@ const KOEFFIZIENT_EINS = /(^|[\s+\-(])1(x\b|y\b|\\lambda\b|\s*\\cdot(?!\s*\(?-?\
 // "2 + −4". Ein "(" zwischen den beiden Zeichen (bereits korrekt geklammert)
 // matcht nicht, weil dort kein zweites Vorzeichen direkt folgt.
 const DOPPELVORZEICHEN = /[+\-−]\s*[-−]/;
+
+// Zwei öffnende Klammern direkt hintereinander ("((") entstehen typischerweise,
+// wenn ein bereits geklammerter eingesetzter Wert (z. B. "(-1)" für ein
+// negatives x₀) noch einmal in eine äußere Klammer gesetzt wird — etwa als
+// Argument einer Funktion, die ihre eigenen Klammern schon mitbringt
+// ("f'((-1))" statt "f'(-1)"), oder als führender Summand, der gleich danach
+// fürs Quadrieren noch einmal umklammert wird ("((-1) + 3)²" statt
+// "(-1 + 3)²"). Tatsächlich in diff.ableitungen und diff.partielle-
+// ableitungen aufgetreten (Audit gegen Übung 9-11, iPhone-Rückmeldung).
+const DOPPELKLAMMER = /\(\(/;
 
 // Jeder "\dfrac{zaehler}{nenner}" mit rein numerischem Zähler/Nenner (keine
 // Variable, kein Dezimalkomma — das wäre kein echter Bruch, sondern eine
@@ -237,6 +263,9 @@ function sammleAlleTextfelder(aufgabe) {
   // überall, nicht nur in reiner Prosa.
   const felder = sammlePlainTextFelder(aufgabe);
   if (aufgabe.frage.formel) felder.push({ feld: 'frage.formel', text: aufgabe.frage.formel });
+  for (const teil of aufgabe.frage.teile ?? []) {
+    if (teil.formel) felder.push({ feld: `frage.teile[${teil.label}].formel`, text: teil.formel });
+  }
   for (const schritt of aufgabe.loesung.schritte) {
     felder.push({ feld: `loesung.schritte[${schritt.titel}].latex`, text: schritt.latex });
   }
@@ -781,6 +810,10 @@ function testeGenerator(generator) {
         !LATEX_RESTE.test(text),
         `${generator.id} seed=${seed}: ${feld} enthält LaTeX-Reste: "${text}"`
       );
+      pruefe(
+        !ASCII_MINUS_IN_KLAMMER.test(text),
+        `${generator.id} seed=${seed}: ${feld} zeigt ein negatives Vorzeichen mit ASCII "-" statt echtem Minus "−": "${text}"`
+      );
     }
 
     // Koeffizient 1/-1 muss überall weggelassen werden, auch in Formelfeldern
@@ -794,6 +827,10 @@ function testeGenerator(generator) {
       pruefe(
         !DOPPELVORZEICHEN.test(text),
         `${generator.id} seed=${seed}: ${feld} zeigt ein unverschmolzenes Doppelvorzeichen: "${text}"`
+      );
+      pruefe(
+        !DOPPELKLAMMER.test(text),
+        `${generator.id} seed=${seed}: ${feld} zeigt eine doppelte öffnende Klammer "((": "${text}"`
       );
       pruefeGekuerzteBrueche(text, feld, `${generator.id} seed=${seed}`);
       pruefeGeldFormat(text, feld, `${generator.id} seed=${seed}`);

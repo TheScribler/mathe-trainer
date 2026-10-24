@@ -678,8 +678,11 @@ export const integralKostenAusGrenzkosten = {
     return {
       frage: {
         text: `Die Grenzkostenfunktion eines Betriebs lautet K'(x) = ${polynomProse([m, n], [1, 0])}. ` +
-          `Die Fixkosten betragen ${formatDeZahl(Kf, 0)}. ` +
-          `a) Bestimmen Sie die Kostenfunktion K(x). b) Berechnen Sie K(${x0}).`,
+          `Die Fixkosten betragen ${formatDeZahl(Kf, 0)}.`,
+        teile: [
+          { label: 'a)', text: 'Bestimmen Sie die Kostenfunktion K(x).' },
+          { label: 'b)', text: `Berechnen Sie K(${x0}).` },
+        ],
       },
       eingaben: [
         {

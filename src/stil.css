@@ -48,6 +48,10 @@ body {
 .frage-text { margin: 0 0 1rem; }
 .frage-tabelle-wrapper { overflow-x: auto; max-width: 100%; margin: 0 0 1rem; }
 .frage-formel { overflow-x: auto; max-width: 100%; margin: 0 0 1rem; }
+.frage-teile { display: flex; flex-direction: column; gap: .75rem; margin: 0 0 1rem; }
+.frage-teil-label { font-weight: 700; display: block; }
+.frage-teil-text { display: block; }
+.frage-teil-formel { overflow-x: auto; max-width: 100%; margin-top: .2rem; }
 .frage-tabelle { border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .frage-tabelle th, .frage-tabelle td {
   border: 1px solid var(--rand); padding: 6px 12px; text-align: center;
@@ -55,6 +59,8 @@ body {
 .frage-tabelle th { color: var(--gedaempft); font-weight: 600; font-size: .85rem; }
 .eingaben { display: flex; flex-direction: column; gap: 10px; margin-bottom: .2rem; }
 .eingabe-zeile { display: flex; flex-direction: column; gap: .2rem; font-size: .9rem; color: var(--gedaempft); }
+.eingabe-teil-ueberschrift { font-weight: 700; color: var(--fg); font-size: 1rem; }
+.eingabe-teil-hinweis { font-size: .85rem; }
 .eingabe-zeile input {
   font: inherit; padding: 10px 12px; border-radius: 8px; width: 100%;
   border: 1px solid var(--rand); background: var(--bg); color: var(--fg);
