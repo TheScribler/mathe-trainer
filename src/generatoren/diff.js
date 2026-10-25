@@ -1325,13 +1325,17 @@ export const elastizitaet = {
     const variante = zufallBool(rng, 0.5) ? 1 : 0;
     if (variante === 1) {
       // x(p) = c - d·p direkt gegeben: ε = x'(p)·p/x(p) = -d·p0/x0 (regulär,
-      // keine Umkehrung). x0 aus der Zielelastizität ableiten, c daraus.
+      // keine Umkehrung). x0 ist die nachgefragte MENGE bei p0 — die muss
+      // eine plausible Stückzahl sein (ganzzahlig, ≥ 1, wie Übung 17d:
+      // x=20 bei p=8.000), nicht ein winziger Dezimalwert wie 0,08 (iPhone-
+      // Rückmeldung). x0 deshalb direkt als ganze Zahl wählen, d daraus
+      // ableiten (muss selbst noch "clean" sein, sonst neu ziehen).
       for (let versuch = 0; versuch < 500; versuch++) {
-        const d = zufallAus(rng, [0.01, 0.1, 0.2, 0.5, 1, 2, 5]);
+        const x0 = zufallAus(rng, [5, 8, 10, 15, 20, 25, 30, 40, 50, 100]);
         const p0 = zufallAus(rng, [5, 8, 10, 20, 50, 100, 1000, 8000]);
         const epsZiel = zufallAus(rng, ELASTIZITAET_EPS_POOL_X_GEGEBEN);
-        const x0 = runde(-(d * p0) / epsZiel, 4);
-        if (!(x0 > 0) || minimaleNachkommastellen(x0) > 2 || x0 > 100000) continue;
+        const d = runde((-epsZiel * x0) / p0, 4);
+        if (!(d > 0) || minimaleNachkommastellen(d) > 2) continue;
         const c = runde(x0 + d * p0, 4);
         if (minimaleNachkommastellen(c) > 2 || c <= x0) continue;
         return { variante, c, d, p0 };
@@ -1393,9 +1397,15 @@ function baueElastizitaetPreisGegeben(params) {
           hinweis: 'f\' ist bei einer linearen Funktion immer konstant — erst f\'(x), dann den Funktionswert f(x₀) getrennt berechnen.',
         },
         {
+          // Erst mit f'(x) und x0 noch unausgerechnet im Nenner (f'(x)
+          // geklammert, da immer negativ), dann der ausgerechnete Nenner,
+          // zuletzt das Ergebnis — "jeder Rechenschritt wird gezeigt", auch
+          // für die Substitution selbst (iPhone-Rückmeldung). Immer als
+          // "\dfrac", nie als bloßer Schrägstrich am Ende.
           titel: 'Einsetzen',
           latex: mehrzeiligeGleichung(`\\varepsilon(${x0Latex})`, [
-            `${zahlZuLatex(f0, minimaleNachkommastellen(f0))} / ${nennerWert < 0 ? `(${zahlZuLatex(nennerWert, minimaleNachkommastellen(nennerWert))})` : zahlZuLatex(nennerWert, minimaleNachkommastellen(nennerWert))}`,
+            `\\dfrac{${zahlZuLatex(f0, minimaleNachkommastellen(f0))}}{(${zahlZuLatex(fStrich, minimaleNachkommastellen(fStrich))}) \\cdot ${x0Latex}}`,
+            `\\dfrac{${zahlZuLatex(f0, minimaleNachkommastellen(f0))}}{${zahlZuLatex(nennerWert, minimaleNachkommastellen(nennerWert))}}`,
             zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)),
           ]),
         },
@@ -1442,9 +1452,14 @@ function baueElastizitaetMengeGegeben(params) {
           hinweis: 'x\' ist bei einer linearen Funktion immer konstant — erst x\'(p), dann den Funktionswert x(p₀) getrennt berechnen.',
         },
         {
+          // Dieselbe dreistufige Substitution wie bei der anderen Variante:
+          // erst x'(p) und p0 noch unausgerechnet im Zähler (x'(p)
+          // geklammert, da immer negativ), dann der ausgerechnete Zähler,
+          // zuletzt das Ergebnis.
           titel: 'Einsetzen',
           latex: mehrzeiligeGleichung(`\\varepsilon(${p0Latex})`, [
-            `${zahlZuLatex(zaehlerWert, minimaleNachkommastellen(zaehlerWert))} / ${x0 < 0 ? `(${zahlZuLatex(x0, minimaleNachkommastellen(x0))})` : zahlZuLatex(x0, minimaleNachkommastellen(x0))}`,
+            `\\dfrac{(${zahlZuLatex(xStrich, minimaleNachkommastellen(xStrich))}) \\cdot ${p0Latex}}{${zahlZuLatex(x0, minimaleNachkommastellen(x0))}}`,
+            `\\dfrac{${zahlZuLatex(zaehlerWert, minimaleNachkommastellen(zaehlerWert))}}{${zahlZuLatex(x0, minimaleNachkommastellen(x0))}}`,
             zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)),
           ]),
         },

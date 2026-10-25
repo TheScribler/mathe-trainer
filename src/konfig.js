@@ -9,7 +9,6 @@ export const KONFIG = {
     standard: { finanz: 12, diff: 24, integral: 12, algebra: 12 },
     original: { finanz: 12, diff: 36, integral: 0, algebra: 12 },
   },
-  zusatzthemenInKlausur: false,
   toleranz: {
     geld: 0.05,
     // Enger als die normale Geld-Toleranz: in einem Tilgungsplan wird jede

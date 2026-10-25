@@ -1009,6 +1009,30 @@ function loescheProbeklausurZustand() {
   probeklausurSpeicherFallback = null;
 }
 
+// localStorage mit In-Memory-Ersatz (dieselbe Begründung wie oben): merkt
+// sich die Einstellung des "Zusatzthemen einbeziehen"-Schalters auf dem
+// Probeklausur-Startbildschirm über einen Neustart der App hinweg. Standard
+// ist AUS — die Probeklausur folgt ohne diese Einstellung dem Aufbau der
+// Musterklausur (siehe generatorenFuerProbeklausur unten).
+const PROBEKLAUSUR_ZUSATZTHEMEN_SCHLUESSEL = 'mathe-trainer-probeklausur-zusatzthemen-v1';
+let probeklausurZusatzthemenFallback = null;
+
+function speichereProbeklausurZusatzthemen(eingeschaltet) {
+  const text = JSON.stringify(eingeschaltet);
+  try { window.localStorage.setItem(PROBEKLAUSUR_ZUSATZTHEMEN_SCHLUESSEL, text); } catch (fehler) { probeklausurZusatzthemenFallback = text; }
+}
+
+function ladeProbeklausurZusatzthemen() {
+  try {
+    const text = window.localStorage.getItem(PROBEKLAUSUR_ZUSATZTHEMEN_SCHLUESSEL);
+    if (text !== null) return JSON.parse(text) === true;
+  } catch (fehler) { /* weiter zum In-Memory-Fallback */ }
+  if (probeklausurZusatzthemenFallback !== null) {
+    try { return JSON.parse(probeklausurZusatzthemenFallback) === true; } catch (fehler) { return false; }
+  }
+  return false;
+}
+
 function formatiereZeit(sekunden) {
   const s = Math.max(0, Math.round(sekunden));
   const m = Math.floor(s / 60);
@@ -1020,19 +1044,19 @@ function formatiereZeit(sekunden) {
 // rein deterministisch über generator.baue()) und zu einer flachen, in der
 // Klausur angezeigten Reihenfolge zusammenfassen (Teil für Teil, wie im
 // Aufgabenkatalog).
-function baueAufgabenliste(teile) {
+function baueAufgabenliste(teile, zusatzthemenEinbeziehen) {
   const rngAufgaben = mulberry32(erzeugeSeed());
   const aufgaben = [];
   for (const teil of teile) {
     for (const generator of teil.generatoren) {
-      // Die Probeklausur hält sich an die Musterklausur-Form, außer
-      // KONFIG.zusatzthemenInKlausur schaltet Zusatzvarianten ausdrücklich
-      // dazu (dieselbe Einstellung, die auch ganze Zusatzthemen-Generatoren
-      // ein-/ausschließt, siehe generatorenFuerProbeklausur unten) — hier
-      // zusätzlich für Varianten INNERHALB von alg.matrixprodukt/
-      // alg.produktionsprozess (Übung 22/23), die keine eigenen Generator-
-      // Einträge sind.
-      const params = generator.waehleParameter(rngAufgaben, { erlaubeZusatzvarianten: KONFIG.zusatzthemenInKlausur });
+      // Die Probeklausur hält sich an die Musterklausur-Form, außer der
+      // "Zusatzthemen einbeziehen"-Schalter auf dem Startbildschirm schaltet
+      // Zusatzvarianten ausdrücklich dazu (dieselbe Einstellung, die auch
+      // ganze Zusatzthemen-Generatoren ein-/ausschließt, siehe
+      // generatorenFuerProbeklausur unten) — hier zusätzlich für Varianten
+      // INNERHALB von alg.matrixprodukt/alg.produktionsprozess (Übung
+      // 22/23), die keine eigenen Generator-Einträge sind.
+      const params = generator.waehleParameter(rngAufgaben, { erlaubeZusatzvarianten: zusatzthemenEinbeziehen });
       aufgaben.push({ teil: teil.teil, generatorId: generator.id, params });
     }
   }
@@ -1042,10 +1066,13 @@ function baueAufgabenliste(teile) {
 // Zusatzthemen-Generatoren (g.zusatz === true) stehen in der Probeklausur
 // standardmäßig nicht zur Verfügung — die Klausur folgt dem Aufbau der
 // Musterklausur, Zusatzthemen sind nur im Übungsmodus (dort ohnehin alle
-// GENERATOREN gleich wahrscheinlich, siehe starteUebungsmodus) gedacht.
-// KONFIG.zusatzthemenInKlausur schaltet sie bei Bedarf dazu.
-function generatorenFuerProbeklausur() {
-  if (KONFIG.zusatzthemenInKlausur) return GENERATOREN_NACH_TEIL;
+// GENERATOREN gleich wahrscheinlich, siehe starteUebungsmodus) gedacht. Der
+// "Zusatzthemen einbeziehen"-Schalter auf dem Startbildschirm schaltet sie
+// bei Bedarf dazu, ohne den Punkte-Split je Teil zu ändern — komponiereKlausur
+// sucht weiterhin eine Kombination, die genau das Teil-Ziel trifft, nur aus
+// einem größeren Generator-Pool.
+function generatorenFuerProbeklausur(zusatzthemenEinbeziehen) {
+  if (zusatzthemenEinbeziehen) return GENERATOREN_NACH_TEIL;
   const gefiltert = {};
   for (const [teil, generatoren] of Object.entries(GENERATOREN_NACH_TEIL)) {
     gefiltert[teil] = generatoren.filter((g) => !g.zusatz);
@@ -1053,10 +1080,10 @@ function generatorenFuerProbeklausur() {
   return gefiltert;
 }
 
-function erzeugeNeueProbeklausur(punkteSplit) {
+function erzeugeNeueProbeklausur(punkteSplit, zusatzthemenEinbeziehen) {
   const rngKomposer = mulberry32(erzeugeSeed());
-  const teile = komponiereKlausur(punkteSplit, generatorenFuerProbeklausur(), rngKomposer);
-  const aufgaben = baueAufgabenliste(teile);
+  const teile = komponiereKlausur(punkteSplit, generatorenFuerProbeklausur(zusatzthemenEinbeziehen), rngKomposer);
+  const aufgaben = baueAufgabenliste(teile, zusatzthemenEinbeziehen);
   const zustand = {
     version: 1,
     startZeit: Date.now(),
@@ -1094,6 +1121,28 @@ function zeichneProbeklausurStart(wurzel) {
   beschreibung.textContent = `${Math.round(KONFIG.dauer / 60)} Minuten, Aufgaben nach Punkte-Split. ` +
     'Der Fortschritt bleibt auch erhalten, wenn die App zwischendurch geschlossen wird.';
   karte.appendChild(beschreibung);
+
+  // Standard AUS (ladeProbeklausurZusatzthemen() liefert false, solange
+  // nichts gespeichert ist) — die Klausur folgt ohne diesen Schalter dem
+  // Aufbau der Musterklausur. Der Punkte-Split je Teil bleibt in jedem Fall
+  // exakt derselbe; nur der Generator-Pool, aus dem komponiereKlausur
+  // auswählt, wird bei "an" größer (siehe generatorenFuerProbeklausur).
+  let zusatzthemenEinbeziehen = ladeProbeklausurZusatzthemen();
+  const zusatzthemenZeile = document.createElement('label');
+  zusatzthemenZeile.className = 'themen-filter-zeile';
+  const zusatzthemenCheckbox = document.createElement('input');
+  zusatzthemenCheckbox.type = 'checkbox';
+  zusatzthemenCheckbox.checked = zusatzthemenEinbeziehen;
+  zusatzthemenCheckbox.addEventListener('change', () => {
+    zusatzthemenEinbeziehen = zusatzthemenCheckbox.checked;
+    speichereProbeklausurZusatzthemen(zusatzthemenEinbeziehen);
+  });
+  zusatzthemenZeile.appendChild(zusatzthemenCheckbox);
+  const zusatzthemenText = document.createElement('span');
+  zusatzthemenText.textContent = 'Zusatzthemen einbeziehen';
+  zusatzthemenZeile.appendChild(zusatzthemenText);
+  karte.appendChild(zusatzthemenZeile);
+
   wurzel.appendChild(karte);
 
   const knopfReihe = document.createElement('div');
@@ -1104,7 +1153,7 @@ function zeichneProbeklausurStart(wurzel) {
     const beschriftung = name.charAt(0).toUpperCase() + name.slice(1);
     knopf.textContent = `${beschriftung} (${split.finanz}/${split.diff}/${split.integral}/${split.algebra})`;
     knopf.addEventListener('click', () => {
-      const neu = erzeugeNeueProbeklausur(split);
+      const neu = erzeugeNeueProbeklausur(split, zusatzthemenEinbeziehen);
       zeichneLaufendeKlausur(wurzel, neu);
     });
     knopfReihe.appendChild(knopf);
@@ -1395,6 +1444,14 @@ function starteApp() {
     inhalt.innerHTML = '';
     if (abgegeben) zeichneAuswertung(inhalt, zustand);
     else zeichneLaufendeKlausur(inhalt, zustand);
+  };
+  // Nur für Tests (test/layout.mjs): zeigt den Probeklausur-Startbildschirm
+  // (Presets + "Zusatzthemen einbeziehen"-Schalter) direkt, unabhängig von
+  // einem eventuell gespeicherten Probeklausur-Zustand.
+  window.__testZeigeProbeklausurStart = function () {
+    setzeAktivenKnopf(klausurKnopf);
+    inhalt.innerHTML = '';
+    zeichneProbeklausurStart(inhalt);
   };
 
   // Eine vorhandene Probeklausur hat Vorrang vor dem Übungsmodus — egal ob

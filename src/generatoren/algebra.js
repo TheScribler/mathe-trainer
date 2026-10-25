@@ -160,9 +160,10 @@ export const matrixprodukt = {
   vorlage: 'Musterklausur 7 / Übung 22',
   waehleParameter(rng, { erlaubeZusatzvarianten = true } = {}) {
     // Übung-22-Zusatzvarianten (Transponierte, Skalar, Einheitsmatrix) nur
-    // außerhalb der Probeklausur bzw. wenn KONFIG.zusatzthemenInKlausur das
-    // ausdrücklich erlaubt — sonst bleibt Teil a) unverändert bei
-    // definiert/undefiniert (MK7a / Übung 22d).
+    // außerhalb der Probeklausur bzw. wenn der "Zusatzthemen einbeziehen"-
+    // Schalter auf dem Probeklausur-Startbildschirm das ausdrücklich
+    // erlaubt — sonst bleibt Teil a) unverändert bei definiert/undefiniert
+    // (MK7a / Übung 22d).
     const zusatzVariante = erlaubeZusatzvarianten
       ? zufallAus(rng, [
         null, null, null, 'transponiert', 'skalar', 'einheitsmatrix',
@@ -589,9 +590,9 @@ export const produktionsprozess = {
   waehleParameter(rng, { erlaubeZusatzvarianten = true } = {}) {
     // Übung 23 (Zusatzvariante): derselbe Prozess, aber nur EINE Stufe
     // (Rohstoffe direkt zu Endprodukten, kein Zwischenprodukt-Schritt über
-    // B) — nur außerhalb der Probeklausur bzw. wenn KONFIG.zusatzthemenInKlausur
-    // das ausdrücklich erlaubt; die Probeklausur bleibt sonst unverändert
-    // bei der zweistufigen Musterklausur-8-Form.
+    // B) — nur außerhalb der Probeklausur bzw. wenn der "Zusatzthemen
+    // einbeziehen"-Schalter das ausdrücklich erlaubt; die Probeklausur
+    // bleibt sonst unverändert bei der zweistufigen Musterklausur-8-Form.
     if (erlaubeZusatzvarianten && zufallBool(rng, 0.3)) {
       for (let versuch = 0; versuch < 300; versuch++) {
         const anzahlRohstoffe = zufallAus(rng, [2, 3]);

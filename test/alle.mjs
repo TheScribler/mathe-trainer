@@ -663,6 +663,11 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
       const epsNumerisch = (xStrichNumerisch * p.p0) / x0;
       pruefe(nahBei(epsNumerisch, epsWert, 0.05),
         `${kennzeichnung}: ε(${p.p0}) numerisch = ${epsNumerisch}, erwartet ${epsWert}`);
+      // Die nachgefragte Menge x(p0) muss eine plausible Stückzahl sein
+      // (ganzzahlig, ≥ 1), nicht ein winziger Dezimalwert wie 0,08 (iPhone-
+      // Rückmeldung).
+      pruefe(Number.isInteger(x0) && x0 >= 1,
+        `${kennzeichnung}: x(${p.p0}) = ${x0} ist keine plausible Stückzahl (ganzzahlig ≥ 1 erwartet)`);
     } else {
       // f(x) = a - b·x gegeben (Preis in Abhängigkeit von der Menge) — die
       // gesuchte Elastizität ist die der Menge x nach dem Preis p, also der
@@ -1069,7 +1074,16 @@ function testeGenerator(generator) {
         !CDOT_OHNE_LEERZEICHEN.test(text),
         `${generator.id} seed=${seed}: ${feld} zeigt "\\cdot" direkt vor einem Buchstaben ohne Trennung (KaTeX-Fehlerrisiko): "${text}"`
       );
-      pruefeGekuerzteBrueche(text, feld, `${generator.id} seed=${seed}`);
+      // diff.elastizitaet ausgenommen: dort ist die Zeile "zaehler/nenner"
+      // ABSICHTLICH noch nicht gekürzt (z. B. "24/(-6)") — sie zeigt den
+      // ausgerechneten, aber noch nicht vereinfachten Bruch VOR der eigenen,
+      // direkt folgenden Ergebniszeile ("= -4"), genau wie in der Übung
+      // vorgerechnet. Die DFRAC_NUMERISCH-Regel gilt für Brüche, die als
+      // FERTIGES (End-)Ergebnis auftreten (siehe int.bestimmt-Fund oben),
+      // nicht für einen bewusst noch unvereinfachten Zwischenschritt.
+      if (generator.id !== 'diff.elastizitaet') {
+        pruefeGekuerzteBrueche(text, feld, `${generator.id} seed=${seed}`);
+      }
       pruefeGeldFormat(text, feld, `${generator.id} seed=${seed}`);
     }
 

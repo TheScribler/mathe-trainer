@@ -449,6 +449,29 @@ async function main() {
       console.log(`${generatorId}: ${KLAUSUR_SEEDS_PRO_GENERATOR} Instanzen × 2 Ansichten in der Probeklausur geprüft, ${problemeFuerGenerator} Layout-Probleme`);
     }
 
+    // Probeklausur-Startbildschirm ("Zusatzthemen einbeziehen"-Schalter plus
+    // Preset-Knöpfe) — bisher nie besucht, weil die übrigen Probeklausur-
+    // Checks direkt über __testZeigeKlausurAufgabe in eine laufende Klausur
+    // springen und den Startbildschirm selbst nie rendern.
+    console.log('\nPrüfe Probeklausur-Startbildschirm ("Zusatzthemen einbeziehen") …');
+    let startbildschirmFehler = 0;
+    for (const angehakt of [false, true]) {
+      await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: 'window.__testZeigeProbeklausurStart(); document.querySelector("#app .themen-filter-zeile input[type=checkbox]").checked = arguments[0];',
+        args: [angehakt],
+      });
+      const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: LAYOUT_PRUEFSKRIPT, args: [],
+      });
+      geprueft += 1;
+      for (const problem of ergebnis.probleme) {
+        fehler += 1;
+        startbildschirmFehler += 1;
+        console.error(`FEHLER (Probeklausur-Startbildschirm, Schalter=${angehakt}): ${problem}`);
+      }
+    }
+    console.log(`Probeklausur-Startbildschirm: 2 Schalterstellungen geprüft, ${startbildschirmFehler} Layout-Probleme`);
+
     // Fokus-Stabilität: für jeden Generator ein paar Seeds durchgehen und
     // jedes Eingabefeld einzeln fokussieren (siehe FOKUS_PRUEFSKRIPT oben) —
     // kein Feld darf sich dabei verschieben, und das −/⁄-Knopfpaar muss dem
