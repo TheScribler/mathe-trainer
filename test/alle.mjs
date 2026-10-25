@@ -184,10 +184,15 @@ const LATEX_RESTE = /\{,\}|_|\^|\\(?:[a-zA-Z]|;)/;
 
 // In reinem Fließtext (Labels, Fragetext, Hinweise — anders als in echten
 // LaTeX-Feldern, wo "-" das korrekte Minuszeichen ist) muss eine negative
-// Zahl direkt nach einer öffnenden Klammer den echten Unicode-Minus "−"
-// zeigen, nicht den ASCII-Bindestrich ("f'(-1)" statt "f'(−1)") — tatsächlich
-// in diff.ableitungen aufgetreten (Zahlencheck-Labels, iPhone-Rückmeldung).
-const ASCII_MINUS_IN_KLAMMER = /\(-\d/;
+// Zahl immer den echten Unicode-Minus "−" zeigen, nicht den ASCII-
+// Bindestrich — tatsächlich mehrfach aufgetreten: "f'(-1)" statt "f'(−1)"
+// (Zahlencheck-Labels), "Grenzen -1 bis 3" (int.bestimmt, Integralgrenze),
+// "G''(x) = -5 < 0" (ein Hinweis-Satz). Ursprünglich nur direkt nach einer
+// öffnenden Klammer geprüft ("\(-\d"), jetzt JEDES "-" direkt vor einer
+// Ziffer, das nicht bereits Teil einer größeren Zahl ist (kein Buchstabe,
+// keine Ziffer, kein Punkt direkt davor — sonst würde z. B. eine Dezimalzahl
+// oder ein zusammengesetztes Bezeichner-Suffix fälschlich mitgezählt).
+const ASCII_MINUS_VOR_ZIFFER = /(?<![\w.])-\d/;
 
 // "x²", "x⁻³" usw. — ein Exponent direkt nach der Polynom-Variable x/y in
 // reinem Fließtext kann mitten im Exponenten umbrechen ("x" am Zeilenende,
@@ -197,6 +202,28 @@ const ASCII_MINUS_IN_KLAMMER = /\(-\d/;
 // "q²⁵" für den Aufzinsungsfaktor in der Finanzmathematik, siehe LATEX_RESTE-
 // Kommentar oben) — hier geht es ausschließlich um x/y als Funktionsvariable.
 const PLAINTEXT_VARIABLEN_EXPONENT = /[xy][⁰¹²³⁴⁵⁶⁷⁸⁹⁻]/;
+
+// "x₁x₂" (zwei tiefgestellte Indexvariablen OHNE Operator dazwischen, die
+// formelübliche Juxtaposition für eine Multiplikation) ist ein starkes
+// Signal für eine ganze, seedabhängige Formel in reinem Fließtext statt
+// echtem KaTeX (diff.nutzenmaximum zeigte "U(x₁,x₂) = αx₁ + βx₂ + γx₁x₂ + δ",
+// iPhone-Rückmeldung) — anders als eine einzelne, kurze Erwähnung wie
+// "an der Stelle x₀ = 4" (diff.elastizitaet), die nie mitten im Index
+// umbricht und darum nicht gemeint ist. NUR für echte Fließtext-Sätze
+// (frage.text, frage.teile[].text), nicht für Eingabefeld-Labels.
+const PLAINTEXT_INDEXVARIABLE = /[a-zA-Z][₀₁₂₃₄₅₆₇₈₉]+[a-zA-Z][₀₁₂₃₄₅₆₇₈₉]/;
+function istFliesstextFormelFeld(feld) {
+  return feld === 'frage.text' || /^frage\.teile\[.*\]\.text$/.test(feld);
+}
+
+// "\cdotI" statt "\cdot I" — ein LaTeX-Steuerwort wie "\cdot" verschluckt
+// beim Parsen ein einzelnes Leerzeichen danach, direkt gefolgt von einem
+// Buchstaben wird daraus im Textmodus ein unbekannter Befehl (roter KaTeX-
+// Fehler) — tatsächlich bei den Gauß-Zeilenlabels in alg.lgs aufgetreten
+// ("\cdot I" im Quelltext wurde zu "\cdotI" ohne sichtbares Leerzeichen,
+// iPhone-Rückmeldung). "\cdot" muss darum IMMER von einem Nicht-Buchstaben
+// gefolgt sein (Ziffer, Klammer, Backslash, Leerzeichen vor einer Zahl usw.).
+const CDOT_OHNE_LEERZEICHEN = /\\cdot[a-zA-Z]/;
 
 // Koeffizient 1 bzw. -1 muss weggelassen werden ("x" statt "1x", "x0" statt
 // "1 \cdot x0") — tatsächlich mehrfach in diff.js aufgetreten (P1=1, 2c=1,
@@ -940,7 +967,7 @@ function testeGenerator(generator) {
         `${generator.id} seed=${seed}: ${feld} enthält LaTeX-Reste: "${text}"`
       );
       pruefe(
-        !ASCII_MINUS_IN_KLAMMER.test(text),
+        !ASCII_MINUS_VOR_ZIFFER.test(text),
         `${generator.id} seed=${seed}: ${feld} zeigt ein negatives Vorzeichen mit ASCII "-" statt echtem Minus "−": "${text}"`
       );
       // Nur die eigentliche Aufgabenstellung (frage.*, Kartentitel, Eingabe-
@@ -953,6 +980,12 @@ function testeGenerator(generator) {
         pruefe(
           !PLAINTEXT_VARIABLEN_EXPONENT.test(text),
           `${generator.id} seed=${seed}: ${feld} zeigt eine Funktionsvariable mit Exponent als reinen Fließtext statt als KaTeX (frage.formel): "${text}"`
+        );
+      }
+      if (istFliesstextFormelFeld(feld)) {
+        pruefe(
+          !PLAINTEXT_INDEXVARIABLE.test(text),
+          `${generator.id} seed=${seed}: ${feld} zeigt eine Funktionsvariable mit Index als reinen Fließtext statt als KaTeX (frage.formel): "${text}"`
         );
       }
     }
@@ -976,6 +1009,10 @@ function testeGenerator(generator) {
       pruefe(
         !AUSWERTUNGSSTRICH_KURZSCHREIBWEISE.test(text),
         `${generator.id} seed=${seed}: ${feld} nutzt die "|_{x=...}"-Kurzschreibweise statt eingesetzter Zahlen: "${text}"`
+      );
+      pruefe(
+        !CDOT_OHNE_LEERZEICHEN.test(text),
+        `${generator.id} seed=${seed}: ${feld} zeigt "\\cdot" direkt vor einem Buchstaben ohne Trennung (KaTeX-Fehlerrisiko): "${text}"`
       );
       pruefeGekuerzteBrueche(text, feld, `${generator.id} seed=${seed}`);
       pruefeGeldFormat(text, feld, `${generator.id} seed=${seed}`);

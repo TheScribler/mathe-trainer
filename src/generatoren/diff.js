@@ -5,7 +5,7 @@
 
 import { zufallInt, zufallAus } from '../rng.js';
 import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
-import { zahlZuLatex, bruch, bruchGekuerzt, polynomLatex, polynomEingesetztLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette } from '../latex.js';
+import { zahlZuLatex, bruch, bruchGekuerzt, polynomLatex, polynomEingesetztLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette, ohneDuplikatZeile } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
 // Term mit Vorzeichen, Koeffizient 1/-1 wird nicht ausgeschrieben (gleiche
@@ -208,8 +208,9 @@ export const gewinnBreakeven = {
     const eKoeff = [-b, a, 0];
     // G(x) = -A x² + A(x1+x2) x - e
     const gKoeff = [-A, A * (x1 + x2), -e];
-    // Für die mit Zahlen vorgerechneten p(xMax)/G(xMax)-Schritte unten (statt
-    // der "|_{x=...}"-Kurzschreibweise, iPhone-Rückmeldung).
+    // Für die mit Zahlen vorgerechneten K'(x0)/p(xMax)/G(xMax)-Schritte unten
+    // (statt der "|_{x=...}"-Kurzschreibweise, iPhone-Rückmeldung).
+    const kStrichEingesetzt = polynomEingesetztLatex([2 * c, d], [1, 0], x0);
     const pBeiXMax = polynomEingesetztLatex([a, -b], [0, 1], xMax);
     const gBeiXMax = polynomEingesetztLatex(gKoeff, [2, 1, 0], xMax);
 
@@ -266,10 +267,13 @@ export const gewinnBreakeven = {
             hinweis: 'Grenzkosten sind die erste Ableitung der Kostenfunktion.',
           },
           {
+            // Mit eingesetzten Zahlen vollständig vorgerechnet statt nur die
+            // unausgewertete Summe zu zeigen ("K'(8) = 3·8 + 25 = 24 + 25 =
+            // 49" statt nur "K'(8) = 3·8 + 25", iPhone-Rückmeldung).
             titel: 'Einsetzen',
             latex: gleichungsKette([
               `K'(x) = ${polynomLatex([2 * c, d], [1, 0])}`,
-              `K'(${x0}) = ${cdotWennNicht1(2 * c, String(x0))} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), minimaleNachkommastellen(Math.abs(d)))}`,
+              `K'(${x0}) = ${ohneDuplikatZeile(kStrichEingesetzt.eingesetzt, kStrichEingesetzt.werte, zahlZuLatex(grenzkosten, minimaleNachkommastellen(grenzkosten))).join(' = ')}`,
             ]),
           },
           { titel: 'Ergebnis', latex: `K'(${x0}) = ${zahlZuLatex(grenzkosten, minimaleNachkommastellen(grenzkosten))}` },
@@ -305,22 +309,20 @@ export const gewinnBreakeven = {
           {
             titel: 'Einsetzen',
             latex: `G'(x) = ${polynomLatex([2 * gKoeff[0], gKoeff[1]], [1, 0])} = 0 \\;\\Rightarrow\\; x = ${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))}`,
-            hinweis: `Hinreichende Bedingung: G''(x) = ${formatDeZahl(2 * gKoeff[0], minimaleNachkommastellen(2 * gKoeff[0]))} < 0, also Maximum.`,
+            hinweis: `Hinreichende Bedingung: G''(x) = ${prosaZahlDezimal(2 * gKoeff[0], minimaleNachkommastellen(2 * gKoeff[0]))} < 0, also Maximum.`,
           },
           {
             // Mit eingesetzten Zahlen vorgerechnet statt der "|_{x=...}"-
             // Kurzschreibweise ("p(7) = 25 − 2·7 = 25 − 14 = 11" statt
             // "p(7) = 25 − 2x|_{x=7} = 11", iPhone-Rückmeldung).
             titel: 'Einsetzen',
-            latex: mehrzeiligeGleichung(`p(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))})`, [
-              pBeiXMax.eingesetzt, pBeiXMax.werte, zahlZuLatex(pMax, minimaleNachkommastellen(pMax)),
-            ]),
+            latex: mehrzeiligeGleichung(`p(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))})`,
+              ohneDuplikatZeile(pBeiXMax.eingesetzt, pBeiXMax.werte, zahlZuLatex(pMax, minimaleNachkommastellen(pMax)))),
           },
           {
             titel: 'Einsetzen',
-            latex: mehrzeiligeGleichung(`G(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))})`, [
-              gBeiXMax.eingesetzt, gBeiXMax.werte, zahlZuLatex(gMax, minimaleNachkommastellen(gMax)),
-            ]),
+            latex: mehrzeiligeGleichung(`G(${zahlZuLatex(xMax, minimaleNachkommastellen(xMax))})`,
+              ohneDuplikatZeile(gBeiXMax.eingesetzt, gBeiXMax.werte, zahlZuLatex(gMax, minimaleNachkommastellen(gMax)))),
           },
           {
             titel: 'Ergebnis',
@@ -681,15 +683,16 @@ export const nutzenmaximum = {
     const b1 = runde(alpha - beta * P1 / P2 + gamma * Y / P2, 4);
     const c1 = runde(beta * Y / P2 + delta, 4);
 
-    const uText = `U(x₁,x₂) = ${bauePolynomAusdruck([[alpha, 'x₁'], [beta, 'x₂'], [gamma, 'x₁x₂'], [delta, '']], formatDeZahl, '−')}`;
     const uLatex = bauePolynomAusdruck([[alpha, 'x_1'], [beta, 'x_2'], [gamma, 'x_1x_2'], [delta, '']], zahlZuLatex, '-');
 
     return {
       frage: {
-        text: `Gegeben sei die Nutzenfunktion ${uText}, die von den Mengen x₁ und x₂ zweier Güter ` +
-          `abhängt, bei einem Haushaltseinkommen von Y = ${formatDeZahl(Y, 0)} und Preisen ` +
-          `P₁ = ${formatDeZahl(P1, 0)} und P₂ = ${formatDeZahl(P2, 0)}. ` +
-          `Berechnen Sie das nutzenmaximale Güterbündel.`,
+        text: 'Gegeben sei die folgende Nutzenfunktion, die von den Mengen zweier Güter abhängt, ' +
+          'unter der angegebenen Budget-Nebenbedingung. Berechnen Sie das nutzenmaximale Güterbündel.',
+        formel: mehrzeiligeKette([
+          `U(x_1,x_2) = ${uLatex}`,
+          `${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} = ${zahlZuLatex(Y, 0)} \\quad \\text{(Budget)}`,
+        ]),
       },
       eingaben: [
         { id: 'x1', label: 'Nutzenmaximale Menge x₁', typ: 'zahl', punkte: 4, loesung: x1Stern, toleranz: KONFIG.toleranz.exakt },
@@ -938,6 +941,15 @@ function prosaLabelZahl(n) {
   return n < 0 ? `−${Math.abs(n)}` : String(n);
 }
 
+// Wie prosaLabelZahl, aber für bereits gerundete Dezimalzahlen (über
+// formatDeZahl statt der rohen JS-Zahl) — toLocaleString('de-DE') liefert
+// bei einer negativen Zahl den ASCII-Bindestrich, nicht den echten Unicode-
+// Minus (iPhone-Rückmeldung: "G''(x) = -5 < 0" in einem Fließtext-Hinweis).
+function prosaZahlDezimal(n, nachkommastellen) {
+  const text = formatDeZahl(Math.abs(n), nachkommastellen);
+  return n < 0 ? `−${text}` : text;
+}
+
 // koeffVariable (diff.js, oben) lässt den Koeffizienten nur bei genau +1
 // weg, nicht bei -1 ("-1x" statt "-x" wäre die Folge, iPhone-Rückmeldung).
 // Eigene Variante, die beide Vorzeichen abdeckt.
@@ -975,6 +987,10 @@ function baueAbleitungenQuotientExp(params) {
   const faStrichWert = runde(K / (nennerWertA * nennerWertA), 2);
 
   const innenLatex = koeffVariableVorzeichen(c, 'x');
+  // Für den Hinweis-Satz (reiner Fließtext): echtes Unicode-Minus statt des
+  // ASCII-Bindestrichs, den koeffVariableVorzeichen/zahlZuLatex liefern
+  // ("innere Funktion -2x" statt "innere Funktion −2x", iPhone-Rückmeldung).
+  const innenProse = `${c < 0 ? '−' : ''}${Math.abs(c) === 1 ? '' : Math.abs(c)}x`;
   const fbLatex = cdotWennNicht1(k, `e^{${innenLatex}}`);
   const fbStrichFaktor = k * c;
   const fbStrichVorzeichen = fbStrichFaktor < 0 ? '-' : '';
@@ -1031,7 +1047,7 @@ function baueAbleitungenQuotientExp(params) {
         {
           titel: 'Formel',
           latex: `f(x) = ${fbLatex}`,
-          hinweis: `Kettenregel: äußere Funktion ist e hoch (etwas), innere Funktion ${innenLatex}, innere Ableitung ${zahlZuLatex(c, 0)}.`,
+          hinweis: `Kettenregel: äußere Funktion ist e hoch (etwas), innere Funktion ${innenProse}, innere Ableitung ${prosaLabelZahl(c)}.`,
         },
         { titel: 'Ergebnis', latex: `f'(x) = ${fbStrich}` },
         {
@@ -1051,13 +1067,21 @@ function baueAbleitungenQuotientExp(params) {
   };
 }
 
+// "hauptteil ± |d|", aber OHNE den Term, wenn d genau 0 ist ("3x" statt
+// "3x + 0") — d darf laut Pool in Variante 2a (ln-Funktion) auch 0 sein,
+// "ln(3x + 0)" tatsächlich so aufgetreten (iPhone-Rückmeldung).
+function baueLinearterm(hauptteil, d) {
+  if (d === 0) return hauptteil;
+  return `${hauptteil} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), 0)}`;
+}
+
 // Variante 2a: ln-Funktion f(x) = k·ln(c·x+d) (Kettenregel: (ln u)' = u'/u).
 // Variante 2b: log_a-Funktion f(x) = k·log_b(x) mit Basis b≠e
 // ((log_b x)' = 1/(x·ln b)).
 function baueAbleitungenLnLogA(params) {
   const { k, c, d, x0a, kB, basis, x0b } = params;
 
-  const innenLatex = `${koeffVariable(c, 'x')} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), 0)}`;
+  const innenLatex = baueLinearterm(koeffVariable(c, 'x'), d);
   const faLatex = cdotWennNicht1(k, `\\ln(${innenLatex})`);
   const innenWertA = c * x0a + d;
   const faStrich = cdotWennNicht1(k * c, bruch('1', innenLatex));
@@ -1105,7 +1129,16 @@ function baueAbleitungenLnLogA(params) {
           // sonst zwei Ziffern zu einer falschen Zahl ("25 + 4" statt
           // "2 · 5 + 4" bei c=2, x0a=5 — real aufgetreten).
           latex: mehrzeiligeGleichung(`f'(${zahlZuLatex(x0a, 0)})`, [
-            bruch(zahlZuLatex(k * c, 0), `${c === 1 ? zahlZuLatex(x0a, 0) : koeffVariable(c, `(${zahlZuLatex(x0a, 0)})`)} ${d < 0 ? '-' : '+'} ${zahlZuLatex(Math.abs(d), 0)}`),
+            // Bei c=1 UND d=0 ist der Nenner-Text selbst schon eine nackte
+            // Zahl ("2") — "\dfrac{2}{2}" sähe dann wie ein ungekürzter
+            // Bruch aus (DFRAC_NUMERISCH in test/alle.mjs erwartet, dass
+            // jeder für sich stehende "\dfrac" bereits gekürzt ist), ist
+            // hier aber nur die noch nicht ausgerechnete Division — deshalb
+            // in diesem Fall ein schlichter Schrägstrich wie in der Zeile
+            // danach, sonst (echter Summe im Nenner) weiter "\dfrac".
+            (c === 1 && d === 0)
+              ? `${zahlZuLatex(k * c, 0)} / ${zahlZuLatex(x0a, 0)}`
+              : bruch(zahlZuLatex(k * c, 0), baueLinearterm(c === 1 ? zahlZuLatex(x0a, 0) : koeffVariable(c, `(${zahlZuLatex(x0a, 0)})`), d)),
             `${zahlZuLatex(k * c, 0)} / ${zahlZuLatex(innenWertA, 0)} = ${zahlZuLatex(faStrichWert, minimaleNachkommastellen(faStrichWert))}`,
           ]),
         },

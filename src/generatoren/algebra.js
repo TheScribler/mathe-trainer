@@ -912,24 +912,40 @@ function determinante3x3(m) {
 function cramerMatrix(A, b, spalte) {
   return A.map((zeile, i) => zeile.map((w, j) => (j === spalte ? b[i] : w)));
 }
-// Zeigt "D = (±a·b·c) (±a·b·c) ... = (±Wert) (±Wert) ... = Ergebnis" als
-// zweizeilige Einsetzen-Kette: erst die eingesetzten Faktoren, dann die
-// einzeln ausgerechneten Produkte — jedes der sechs Produkte einzeln
-// sichtbar, nicht nur die Summe.
+// Je höchstens 2 der 6 Dreierprodukte pro Zeile (statt aller 6 oder 3 auf
+// einer Zeile) — bei zweistelligen, geklammerten negativen Einträgen
+// ("(−24) \cdot (−2) \cdot 2") lief auch die 3er-Aufteilung bei 375px noch
+// rechts ab (iPhone-Rückmeldung: D/D₁/D₂/D₃ in alg.lgs waren weiterhin
+// abgeschnitten, obwohl schon einmal aufgeteilt). Erst Haupt-, dann
+// Gegendiagonalen, dieselbe Aufteilung für die ausgerechneten Werte, zuletzt
+// das Ergebnis.
+function inZweiergruppen(liste) {
+  const gruppen = [];
+  for (let i = 0; i < liste.length; i += 2) gruppen.push(liste.slice(i, i + 2));
+  return gruppen;
+}
 function sarrusSchritt(name, m) {
   const { positiv, negativ } = sarrusTripel(m);
   const alle = [...positiv.map((t) => [1, t]), ...negativ.map((t) => [-1, t])];
-  const eingesetzt = alle.map(([vz, [x, y, z]], i) => {
+  const eingesetztTerme = alle.map(([vz, [x, y, z]], i) => {
     const praefix = i === 0 ? (vz < 0 ? '-' : '') : (vz < 0 ? '- ' : '+ ');
     return `${praefix}${faktorLatex(x)} \\cdot ${faktorLatex(y)} \\cdot ${faktorLatex(z)}`;
-  }).join(' ');
-  const werte = alle.map(([vz, [x, y, z]], i) => {
+  });
+  const werteTerme = alle.map(([vz, [x, y, z]], i) => {
     const wert = vz * x * y * z;
     const praefix = i === 0 ? (wert < 0 ? '-' : '') : (wert < 0 ? '- ' : '+ ');
     return `${praefix}${zahlZuLatex(Math.abs(wert), 0)}`;
-  }).join(' ');
+  });
   const ergebnis = determinante3x3(m);
-  return mehrzeiligeGleichung(name, [eingesetzt, werte, zahlZuLatex(ergebnis, 0)]);
+  const eingesetztGruppen = inZweiergruppen(eingesetztTerme);
+  const werteGruppen = inZweiergruppen(werteTerme);
+  return mehrzeiligeKette([
+    `${name} &= ${eingesetztGruppen[0].join(' ')}`,
+    ...eingesetztGruppen.slice(1).map((g) => `&\\quad ${g.join(' ')}`),
+    `&= ${werteGruppen[0].join(' ')}`,
+    ...werteGruppen.slice(1).map((g) => `&\\quad ${g.join(' ')}`),
+    `&= ${zahlZuLatex(ergebnis, 0)}`,
+  ]);
 }
 
 // Exakte Bruch-Arithmetik [Zähler, Nenner] (Nenner immer positiv, über
@@ -946,7 +962,6 @@ function bSub([a, b], [c, d]) { return bruchAus(a * d - c * b, b * d); }
 function bMul([a, b], [c, d]) { return bruchAus(a * c, b * d); }
 function bDiv([a, b], [c, d]) { return bruchAus(a * d, b * c); }
 function bruchZuZahl([n, d]) { return n / d; }
-function bruchIstGanz([, d]) { return d === 1; }
 // Ganzzahl (Nenner 1) oder echter, bereits gekürzter Bruch "\dfrac{Z}{N}"
 // mit dem Vorzeichen im Zähler.
 function bruchLatex([n, d]) {
@@ -970,14 +985,16 @@ function zeilenOperationLabel(ziel, quelle, multiplikator) {
   const [n, d] = multiplikator;
   const vz = n < 0 ? '+' : '-';
   const abs = Math.abs(n);
-  if (d === 1) {
-    const faktor = abs === 1 ? '' : `${zahlZuLatex(abs, 0)}\\cdot `;
-    return `\\text{${ziel} ${vz} ${faktor}${quelle}:}`;
-  }
-  // Echter Bruch als Multiplikator: "\dfrac" ist in KaTeX im Textmodus
-  // ("\text{...}") nicht erlaubt — der Bruch selbst bleibt deshalb im
-  // Mathe-Modus, die umgebenden Wörter stehen in eigenen \text{}-Stücken.
-  return `\\text{${ziel} ${vz} }\\dfrac{${abs}}{${d}}\\text{\\,\\cdot ${quelle}:}`;
+  if (d === 1 && abs === 1) return `\\text{${ziel} ${vz} ${quelle}:}`;
+  // "\cdot" ist ein Mathe-Befehl und darf nicht innerhalb von "\text{...}"
+  // stehen (KaTeX kennt ihn dort nicht) — UND ein Steuerwort wie "\cdot"
+  // verschluckt beim Parsen das Leerzeichen direkt danach: "\cdot I" wurde
+  // dadurch zu "\cdotI" (kein Leerzeichen vor der Zeilen-Ziffer, rot
+  // markierter KaTeX-Fehler, iPhone-Rückmeldung). Der Multiplikator (Zahl
+  // oder Bruch) UND das "\cdot" bleiben deshalb beide im Mathe-Modus,
+  // zwischen zwei eigenen \text{}-Stücken statt mit Leerzeichen daneben.
+  const faktorLatexTeil = d === 1 ? zahlZuLatex(abs, 0) : `\\dfrac{${abs}}{${d}}`;
+  return `\\text{${ziel} ${vz} }${faktorLatexTeil}\\cdot\\text{${quelle}:}`;
 }
 function gaussSchritte(A, b) {
   const M = A.map((zeile) => zeile.map((w) => bruchAus(w)));
@@ -1060,16 +1077,40 @@ function lgsZwischenwerteKlein(A, b, { erfordereBruch = false } = {}) {
   if (A.flat().filter((w) => w === 0).length > 3) return false;
   return true;
 }
-// Zeigt "x_i = Zähler(-Ausdruck) / Nenner = Ergebnis": ganzzahlige Division
-// (beide Seiten Nenner 1) als schlichten Schrägstrich (wie bisher — das
-// Ergebnis ist ohnehin ganzzahlig, ein "\dfrac" wäre ein ungekürzter
-// Bruch-Anschein), eine echte Bruch-Division als "\dfrac".
+// Zeigt "x_i = Zähler-Ausdruck/Nenner = Zähler-Wert/Nenner = Ergebnis": IMMER
+// als "\dfrac" mit dem GANZEN Zähler-Ausdruck über dem Bruchstrich, nie als
+// "a - b/c" mit einem bloßen "/" — ein Schrägstrich bindet nur an den letzten
+// Summanden, "x₂ = 1 − 1·5/(−1) = 4" las sich dadurch wie "1 − (1·5/(−1))" =
+// "1 + 5" = 6 statt des gemeinten "(1 − 1·5)/(−1)" (iPhone-Rückmeldung). Die
+// zweite Zeile (Zähler bereits ausgerechnet) entfällt, wenn der Zähler-
+// Ausdruck ohnehin schon ein einzelner, nicht weiter zu vereinfachender Wert
+// ist (x₃ hat keine Subtraktion vorzurechnen) — sonst stünde zweimal
+// derselbe Bruch da.
 function bruchTeilungLatex(zaehlerAusdruck, zaehlerWert, nennerWert, ergebnis) {
-  if (bruchIstGanz(zaehlerWert) && bruchIstGanz(nennerWert)) {
-    const nennerText = nennerWert[0] < 0 ? `(${bruchLatex(nennerWert)})` : bruchLatex(nennerWert);
-    return `${zaehlerAusdruck} / ${nennerText} = ${zahlZuLatex(ergebnis, 0)}`;
+  const nennerLatex = bruchLatex(nennerWert);
+  const zaehlerWertLatex = bruchLatex(zaehlerWert);
+  const nennerSchraegstrich = nennerWert[0] < 0 ? `(${nennerLatex})` : nennerLatex;
+  // Kein Rechenschritt im Zähler nötig (x₃: der Zähler ist schon ein
+  // einzelner Wert) — dann reicht bei ganzzahligem Zähler/Nenner ein
+  // schlichter Schrägstrich, wie bisher. Ein zusammengesetzter Zähler (x₁/x₂)
+  // MUSS dagegen immer als "\dfrac" mit dem GANZEN Ausdruck über dem
+  // Bruchstrich stehen — ein bloßer Schrägstrich bindet nur an den letzten
+  // Summanden ("x₂ = 1 − 1·5/(−1) = 4" las sich wie "1 − (1·5/(−1))" = 6
+  // statt des gemeinten "(1 − 1·5)/(−1)", iPhone-Rückmeldung).
+  const istEinfach = zaehlerAusdruck === zaehlerWertLatex;
+  const beideGanz = zaehlerWert[1] === 1 && nennerWert[1] === 1;
+  const teile = [istEinfach && beideGanz
+    ? `${zaehlerAusdruck} / ${nennerSchraegstrich}`
+    : `\\dfrac{${zaehlerAusdruck}}{${nennerLatex}}`];
+  if (!istEinfach) {
+    // Zweite Zeile (Zähler bereits ausgerechnet): ganzzahlig wieder als
+    // Schrägstrich — bewusst noch NICHT gekürzt ("9/3" vor dem Ausrechnen zu
+    // "3"), kein für sich stehender Bruch, der laut Konvention bereits
+    // gekürzt sein müsste (DFRAC_NUMERISCH in test/alle.mjs).
+    teile.push(beideGanz ? `${zaehlerWertLatex} / ${nennerSchraegstrich}` : `\\dfrac{${zaehlerWertLatex}}{${nennerLatex}}`);
   }
-  return `\\dfrac{${zaehlerAusdruck}}{${bruchLatex(nennerWert)}} = ${zahlZuLatex(ergebnis, 0)}`;
+  teile.push(zahlZuLatex(ergebnis, 0));
+  return teile.join(' = ');
 }
 
 export const lgs = {

@@ -95,6 +95,17 @@ export function mehrzeiligeGleichung(lhs, rhsListe) {
   return mehrzeiligeKette(zeilen);
 }
 
+// Für eine mehrzeilige Gleichung aus polynomEingesetztLatex (eingesetzt,
+// werte, Ergebnis): lässt die "werte"-Zeile weg, wenn sie textuell identisch
+// mit "eingesetzt" ist — das passiert, wenn jeder einzelne Summand schon ohne
+// Multiplikation dasteht (Koeffizient 1/−1 vor der Variable, oder ein reiner
+// Konstantenterm), das "Ausrechnen" liefert dann wortgleich denselben Text
+// noch einmal (iPhone-Rückmeldung: "p(x*) = a − x* = a − x* = Ergebnis" bei
+// b=1 in diff.gewinn-breakeven zeigte "= 80 − 11" zweimal in Folge).
+export function ohneDuplikatZeile(eingesetzt, werte, ergebnisLatex) {
+  return eingesetzt === werte ? [eingesetzt, ergebnisLatex] : [eingesetzt, werte, ergebnisLatex];
+}
+
 // Lösungskette mit "⇒" zwischen den Schritten (z. B. "2y + 8 = 0 ⇒ 2y = −8
 // ⇒ y = −4") — bricht bei jedem "⇒" um, analog zu mehrzeiligeGleichung bei
 // "=". teile[0] ist die Ausgangsgleichung, jeder weitere Eintrag ein

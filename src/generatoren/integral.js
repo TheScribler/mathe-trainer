@@ -16,6 +16,14 @@ import { KONFIG } from '../konfig.js';
 // an private Hilfsfunktionen einer anderen Datei.
 // ---------------------------------------------------------------------------
 
+// Ganze Zahl für reinen Fließtext mit echtem Unicode-Minus "−" statt des
+// ASCII-Bindestrichs einer einfachen Template-Interpolation ("Grenzen -1 bis
+// 3" statt "Grenzen −1 bis 3", iPhone-Rückmeldung — int.bestimmt zieht die
+// untere Integralgrenze auch negativ).
+function prosaZahl(n) {
+  return n < 0 ? `−${Math.abs(n)}` : String(n);
+}
+
 // "koeffizient \cdot ausdruck", ohne den Faktor zu zeigen, wenn |koeffizient|=1.
 function cdotWennNicht1(koeffizient, ausdruck) {
   const betrag = Math.abs(koeffizient);
@@ -372,7 +380,7 @@ export const integralBestimmt = {
 
       return {
         frage: {
-          text: `Berechnen Sie das bestimmte Integral der folgenden Funktion in den Grenzen ${a} bis ${b}.`,
+          text: `Berechnen Sie das bestimmte Integral der folgenden Funktion in den Grenzen ${prosaZahl(a)} bis ${prosaZahl(b)}.`,
           formel: `f(x) = ${fLatex}`,
         },
         eingaben: [
@@ -447,7 +455,7 @@ export const integralBestimmt = {
 
     return {
       frage: {
-        text: `Berechnen Sie das bestimmte Integral der folgenden Funktion in den Grenzen ${a} bis ${b}.`,
+        text: `Berechnen Sie das bestimmte Integral der folgenden Funktion in den Grenzen ${prosaZahl(a)} bis ${prosaZahl(b)}.`,
         formel: `f(x) = ${fExakt}`,
       },
       eingaben: [

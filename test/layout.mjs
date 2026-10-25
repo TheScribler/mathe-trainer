@@ -52,6 +52,11 @@ const GENERATOR_IDS = [
   'alg.matrixrechnung',
   'alg.lgs',
 ];
+// Für gezielte Diagnose eines einzelnen Generators ohne den vollen (mehrere
+// Minuten dauernden) Durchlauf: GENERATOR_FILTER=alg.lgs node test/layout.mjs
+const AKTIVE_GENERATOR_IDS = process.env.GENERATOR_FILTER
+  ? process.env.GENERATOR_FILTER.split(',')
+  : GENERATOR_IDS;
 
 function warte(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -164,6 +169,23 @@ const LAYOUT_PRUEFSKRIPT = `
       probleme.push('Ergebnis-Schritt überläuft (scrollWidth=' + formel.scrollWidth + ' > clientWidth=' + formel.clientWidth + ') — Endantwort muss ohne Scrollen sichtbar sein');
     }
   });
+
+  // Zusätzlich für alg.lgs JEDER Schritt (nicht nur "Ergebnis"): die
+  // Sarrus-Zeilen für D/D₁/D₂/D₃ stehen als "Einsetzen"-Schritt, der bisher
+  // scrollen durfte und dadurch unbemerkt rechts ablief (iPhone-Rückmeldung).
+  // Generisch auf ALLE Generatoren ausgeweitet deckte das zusätzlich mehrere
+  // bereits bestehende, hier nicht gemeldete Überläufe in anderen Generatoren
+  // auf (fin.rente-veraenderlich, diff.nutzenmaximum/-extremwerte-2var/
+  // -partielle-ableitungen, int.unbestimmt, alg.produktionsprozess/
+  // matrixrechnung) — deren Behebung ist nicht Teil dieser Runde, darum
+  // bewusst nur für den gemeldeten Generator verschärft, nicht global.
+  if (arguments[0] === 'alg.lgs') {
+    document.querySelectorAll('#app .loesung-schritt .loesung-formel').forEach((formel) => {
+      if (formel.scrollWidth > formel.clientWidth + 3) {
+        probleme.push('Lösungsschritt überläuft (scrollWidth=' + formel.scrollWidth + ' > clientWidth=' + formel.clientWidth + ') — Rechenweg muss ohne Scrollen sichtbar sein: ' + formel.textContent.slice(0, 80));
+      }
+    });
+  }
 
   // Dieselbe Regel für die abschließende Ergebnis-Zusammenfassung
   // (loesung.ergebnisse, eigene .loesung-ergebnis-wert-Box) — auch das ist
@@ -393,7 +415,7 @@ async function main() {
     }) };
     console.log(`Tatsächliche Viewport-Breite: ${tatsaechlicheBreite}px (Ziel ≈ 375px)`);
 
-    for (const generatorId of GENERATOR_IDS) {
+    for (const generatorId of AKTIVE_GENERATOR_IDS) {
       let problemeFuerGenerator = 0;
       for (let seed = 0; seed < SEEDS_PRO_GENERATOR; seed++) {
         await wd(`/session/${id}/execute/sync`, 'POST', {
@@ -401,7 +423,7 @@ async function main() {
           args: [generatorId, seed],
         });
         const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
-          script: LAYOUT_PRUEFSKRIPT, args: [],
+          script: LAYOUT_PRUEFSKRIPT, args: [generatorId],
         });
         geprueft += 1;
         for (const problem of ergebnis.probleme) {
@@ -419,7 +441,7 @@ async function main() {
     // NIE, abgeschnittene Zeilen, die nur dort auftraten, blieben darum
     // unentdeckt (iPhone-Rückmeldung).
     console.log('\nPrüfe Probeklausur-Renderpfade (laufende Klausur + Auswertung) …');
-    for (const generatorId of GENERATOR_IDS) {
+    for (const generatorId of AKTIVE_GENERATOR_IDS) {
       let problemeFuerGenerator = 0;
       for (let seed = 0; seed < KLAUSUR_SEEDS_PRO_GENERATOR; seed++) {
         for (const abgegeben of [false, true]) {
@@ -428,7 +450,7 @@ async function main() {
             args: [generatorId, seed, abgegeben],
           });
           const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
-            script: LAYOUT_PRUEFSKRIPT, args: [],
+            script: LAYOUT_PRUEFSKRIPT, args: [generatorId],
           });
           geprueft += 1;
           for (const problem of ergebnis.probleme) {
@@ -449,7 +471,7 @@ async function main() {
     console.log('\nPrüfe Fokus-Stabilität (Eingabefelder dürfen sich nie verschieben) …');
     let fokusFehler = 0;
     let fokusGeprueft = 0;
-    for (const generatorId of GENERATOR_IDS) {
+    for (const generatorId of AKTIVE_GENERATOR_IDS) {
       for (let seed = 0; seed < FOKUS_SEEDS_PRO_GENERATOR; seed++) {
         await wd(`/session/${id}/execute/sync`, 'POST', {
           script: 'window.__testErzeugeAufgabe(arguments[0], arguments[1], false);',
@@ -484,13 +506,13 @@ async function main() {
       `, args: [],
     });
     let inselFehler = 0;
-    for (const generatorId of GENERATOR_IDS) {
+    for (const generatorId of AKTIVE_GENERATOR_IDS) {
       await wd(`/session/${id}/execute/sync`, 'POST', {
         script: 'window.__testErzeugeAufgabe(arguments[0], arguments[1], true);',
         args: [generatorId, 0],
       });
       const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
-        script: LAYOUT_PRUEFSKRIPT, args: [],
+        script: LAYOUT_PRUEFSKRIPT, args: [generatorId],
       });
       geprueft += 1;
       for (const problem of ergebnis.probleme) {
