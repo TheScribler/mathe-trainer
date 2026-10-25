@@ -830,6 +830,18 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     const erwartetB = wertVon(aufgabe, 'b');
     pruefe(nachgerechnetB.every((zeile, i) => zeile.every((w, j) => nahBei(w, erwartetB[i][j], 1e-6))),
       `${kennzeichnung}: b) nachgerechnet ${JSON.stringify(nachgerechnetB)}, erwartet ${JSON.stringify(erwartetB)}`);
+    // Dieselben Trivialitäts-Qualitätsregeln wie bei alg.produktionsprozess
+    // (keine Nullzeile/-spalte, mindestens zwei Einträge mit Betrag > 1) für
+    // die stets vorhandenen b)-Matrizen X, Y und — falls Teil a) die
+    // "definiert"-Variante ist — die dortige Matrix M.
+    for (const [name, m] of [['X', p.teilB.X], ['Y', p.teilB.Y], ...(p.teilA.art === 'definiert' ? [['M', p.teilA.M]] : [])]) {
+      pruefe(!m.some((zeile) => zeile.every((w) => w === 0)),
+        `${kennzeichnung}: ${name} hat eine Nullzeile: ${JSON.stringify(m)}`);
+      pruefe(!m[0].some((_, j) => m.every((zeile) => zeile[j] === 0)),
+        `${kennzeichnung}: ${name} hat eine Nullspalte: ${JSON.stringify(m)}`);
+      pruefe(m.flat().filter((w) => Math.abs(w) > 1).length >= 2,
+        `${kennzeichnung}: ${name} hat weniger als zwei Einträge mit Betrag > 1: ${JSON.stringify(m)}`);
+    }
     return;
   }
 
@@ -844,6 +856,22 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     pruefe(R.every((zeile) => zeile[0] > 0), `${kennzeichnung}: Rohstoffbedarf muss positiv sein, ist ${JSON.stringify(R)}`);
     pruefe(p.A.every((zeile) => zeile.every((w) => w >= 0)) && (p.stufen === 1 || p.B.every((zeile) => zeile.every((w) => w >= 0))),
       `${kennzeichnung}: A und B müssen nicht-negativ sein`);
+    // Qualitätsregeln gegen zu triviale (permutationsmatrix-artige)
+    // Produktionskoeffizienten (iPhone-Rückmeldung: A = [[1,0,0],[0,0,1],
+    // [1,0,0]] hatte eine Nullspalte und nur 0/1-Einträge): höchstens ein
+    // Drittel Nullen, keine Nullzeile/-spalte, mindestens zwei Einträge > 1.
+    for (const [name, m] of [['A', p.A], ...(p.stufen === 1 ? [] : [['B', p.B]])]) {
+      const flach = m.flat();
+      const nullen = flach.filter((w) => w === 0).length;
+      pruefe(nullen / flach.length <= 1 / 3 + 1e-9,
+        `${kennzeichnung}: ${name} hat zu viele Nullen (${nullen}/${flach.length}): ${JSON.stringify(m)}`);
+      pruefe(!m.some((zeile) => zeile.every((w) => w === 0)),
+        `${kennzeichnung}: ${name} hat eine Nullzeile: ${JSON.stringify(m)}`);
+      pruefe(!m[0].some((_, j) => m.every((zeile) => zeile[j] === 0)),
+        `${kennzeichnung}: ${name} hat eine Nullspalte: ${JSON.stringify(m)}`);
+      pruefe(flach.filter((w) => Math.abs(w) > 1).length >= 2,
+        `${kennzeichnung}: ${name} hat weniger als zwei Einträge > 1: ${JSON.stringify(m)}`);
+    }
     let kosten = 0;
     for (let i = 0; i < p.PR.length; i++) kosten += p.PR[i] * R[i][0];
     let erloes = 0;

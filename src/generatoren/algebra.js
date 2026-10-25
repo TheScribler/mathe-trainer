@@ -43,6 +43,28 @@ function nullAnteil(matrizen) {
   return nullen / gesamt;
 }
 
+// Keine Zeile und keine Spalte darf ausschließlich aus Nullen bestehen —
+// bei einer Produktionskoeffizientenmatrix hieße eine Nullspalte, ein
+// Zwischen-/Endprodukt bräuchte GAR KEINE Rohstoffe, eine Nullzeile, ein
+// Rohstoff ginge in GAR KEIN Produkt ein (iPhone-Rückmeldung: A =
+// [[1,0,0],[0,0,1],[1,0,0]] hatte eine Nullspalte).
+function keineNullzeileOderSpalte(m) {
+  if (m.some((zeile) => zeile.every((w) => w === 0))) return false;
+  for (let j = 0; j < m[0].length; j++) {
+    if (m.every((zeile) => zeile[j] === 0)) return false;
+  }
+  return true;
+}
+
+// Mindestens zwei Einträge mit Betrag > schwelle — sonst wirkt eine Matrix
+// wie eine reine Permutationsmatrix aus lauter 0/1-Einträgen, kein echtes
+// Rechenbeispiel (iPhone-Rückmeldung).
+function mindestensZweiGrosse(m, schwelle = 1) {
+  let anzahl = 0;
+  for (const zeile of m) for (const w of zeile) if (Math.abs(w) > schwelle) anzahl += 1;
+  return anzahl >= 2;
+}
+
 // a: p×q, b: q×r -> p×r. Einfache Dreifachschleife — bewusst nicht
 // "elegant", damit der unabhängige Test in test/alle.mjs eine WIRKLICH
 // andere Implementierung danebenstellen kann (siehe PLAN.md Testkonzept).
@@ -211,6 +233,8 @@ export const matrixprodukt = {
         const ergebnis = matrixMal(X, Y);
         if (ergebnis.some((zeile) => zeile.some((w) => Math.abs(w) > 99))) continue;
         if (nullAnteil([X, Y]) < 1 / 3) continue;
+        if (!keineNullzeileOderSpalte(X) || !keineNullzeileOderSpalte(Y)) continue;
+        if (!mindestensZweiGrosse(X) || !mindestensZweiGrosse(Y)) continue;
         teilB = { X, Y, ergebnis };
         break;
       }
@@ -242,6 +266,7 @@ export const matrixprodukt = {
         const ergebnis = matrixMal([v], M)[0];
         if (ergebnis.some((w) => Math.abs(w) > 99)) continue;
         if (nullAnteil([[v], M]) < 1 / 3) continue;
+        if (!keineNullzeileOderSpalte(M) || !mindestensZweiGrosse(M)) continue;
         teilA = { art: 'definiert', v, M, ergebnis };
         break;
       }
@@ -255,6 +280,8 @@ export const matrixprodukt = {
       const ergebnis = matrixMal(X, Y);
       if (ergebnis.some((zeile) => zeile.some((w) => Math.abs(w) > 99))) continue;
       if (nullAnteil([X, Y]) < 1 / 3) continue;
+      if (!keineNullzeileOderSpalte(X) || !keineNullzeileOderSpalte(Y)) continue;
+      if (!mindestensZweiGrosse(X) || !mindestensZweiGrosse(Y)) continue;
       teilB = { X, Y, ergebnis };
       break;
     }
@@ -529,7 +556,27 @@ export const matrixprodukt = {
 // R = A·B·E (muss > 0 sein) und die Kosten P_R·R berechnen, dann P_E so
 // wählen, dass der Gewinn positiv und höchstens vierstellig ist.
 // ---------------------------------------------------------------------------
-const NICHTNEGATIV_POOL = [0, 0, 1, 1, 2, 3];
+// Überwiegend 1-5, nur ein Sechstel Nullen — vorher [0,0,1,1,2,3] (zwei
+// Drittel 0/1) erzeugte regelmäßig permutationsmatrix-artige Produktions-
+// koeffizienten ohne echten Rechenaufwand (iPhone-Rückmeldung). Der
+// nullAnteil-Deckel unten (≤ 1/3) UND die beiden neuen Prüfungen
+// (keineNullzeileOderSpalte, mindestensZweiGrosse) fangen den Rest ab, der
+// trotz dieses Pools noch zu trivial geraten könnte.
+const NICHTNEGATIV_POOL = [0, 1, 2, 3, 4, 5];
+
+// Verkaufspreis-Pool für die Endprodukte, skaliert mit den Kosten pro
+// verkaufter Einheit statt eines festen Pools 1-5 — mit größeren, weniger
+// trivialen Produktionskoeffizienten (statt der alten 0/1-dominierten
+// Matrizen) wächst der Rohstoffbedarf und damit kosten oft weit über das,
+// was ein fester kleiner Preis-Pool noch mit Gewinn abdecken kann (iPhone-
+// Rückmeldung: Folgefehler der saubereren Matrizen — PE blieb bei 1-5
+// stehen, kosten lag aber im Tausenderbereich). Acht aufeinanderfolgende
+// Werte ab der gerundeten Kosten-pro-Stück-Schätzung, damit die Suche nach
+// einer Gewinnspanne von mindestens 10 % fast immer einen Treffer findet.
+function preisPoolFuerEndprodukte(kosten, mengenSumme) {
+  const basis = Math.max(1, Math.round(kosten / mengenSumme));
+  return Array.from({ length: 8 }, (_, k) => basis + k);
+}
 const PREIS_POOL = [1, 2, 3, 4, 5];
 const STUECKZAHL_POOL = [10, 12, 14, 16, 18, 20, 24, 28, 30, 36, 40, 50];
 
@@ -550,15 +597,19 @@ export const produktionsprozess = {
         const anzahlRohstoffe = zufallAus(rng, [2, 3]);
         const anzahlEndprodukte = zufallAus(rng, [2, 3]);
         const A = zufallsMatrix(rng, anzahlRohstoffe, anzahlEndprodukte, NICHTNEGATIV_POOL);
+        if (nullAnteil([A]) > 1 / 3) continue;
+        if (!keineNullzeileOderSpalte(A)) continue;
+        if (!mindestensZweiGrosse(A)) continue;
         const E = Array.from({ length: anzahlEndprodukte }, () => [zufallAus(rng, STUECKZAHL_POOL)]);
         const R = matrixMal(A, E);
         if (R.some((zeile) => zeile[0] <= 0)) continue;
         const PR = zufallsMatrix(rng, 1, anzahlRohstoffe, PREIS_POOL)[0];
         const kosten = skalarprodukt(PR, R.map((zeile) => zeile[0]));
+        const preisPoolPE = preisPoolFuerEndprodukte(kosten, E.reduce((s, zeile) => s + zeile[0], 0));
 
         let PE = null;
         for (let preisVersuch = 0; preisVersuch < 50; preisVersuch++) {
-          const kandidat = zufallsMatrix(rng, 1, anzahlEndprodukte, PREIS_POOL)[0];
+          const kandidat = zufallsMatrix(rng, 1, anzahlEndprodukte, preisPoolPE)[0];
           const erloes = skalarprodukt(kandidat, E.map((zeile) => zeile[0]));
           const gewinn = erloes - kosten;
           if (gewinn > 0 && gewinn >= 0.1 * erloes && gewinn <= 9999) { PE = kandidat; break; }
@@ -573,6 +624,9 @@ export const produktionsprozess = {
     for (let versuch = 0; versuch < 300; versuch++) {
       const A = zufallsMatrix(rng, 3, 3, NICHTNEGATIV_POOL);
       const B = zufallsMatrix(rng, 3, 2, NICHTNEGATIV_POOL);
+      if (nullAnteil([A]) > 1 / 3 || nullAnteil([B]) > 1 / 3) continue;
+      if (!keineNullzeileOderSpalte(A) || !keineNullzeileOderSpalte(B)) continue;
+      if (!mindestensZweiGrosse(A) || !mindestensZweiGrosse(B)) continue;
       const e1 = zufallAus(rng, STUECKZAHL_POOL);
       const e2 = zufallAus(rng, STUECKZAHL_POOL);
       const E = [[e1], [e2]];
@@ -581,10 +635,11 @@ export const produktionsprozess = {
       if (R.some((zeile) => zeile[0] <= 0)) continue; // Rohstoffmengen müssen positiv sein
       const PR = zufallsMatrix(rng, 1, 3, PREIS_POOL)[0];
       const kosten = skalarprodukt(PR, R.map((zeile) => zeile[0]));
+      const preisPoolPE = preisPoolFuerEndprodukte(kosten, e1 + e2);
 
       let PE = null;
       for (let preisVersuch = 0; preisVersuch < 50; preisVersuch++) {
-        const kandidat = zufallsMatrix(rng, 1, 2, PREIS_POOL)[0];
+        const kandidat = zufallsMatrix(rng, 1, 2, preisPoolPE)[0];
         const erloes = kandidat[0] * e1 + kandidat[1] * e2;
         const gewinn = erloes - kosten;
         // Gewinn nicht nur positiv, sondern plausibel: mindestens 10 % des

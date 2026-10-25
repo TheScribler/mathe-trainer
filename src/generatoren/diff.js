@@ -694,6 +694,28 @@ export const nutzenmaximum = {
 
     const uLatex = bauePolynomAusdruck([[alpha, 'x_1'], [beta, 'x_2'], [gamma, 'x_1x_2'], [delta, '']], zahlZuLatex, '-');
 
+    // Für den Ausmultiplizieren-Zwischenschritt (siehe loesung.schritte
+    // unten): x₂ = (Y - P1x1)/P2 eingesetzt, aber noch nicht ausmultipliziert
+    // — Klammer bei P2=1 (keine Division), sonst echter Bruch. Die vier
+    // Teilwerte summieren sich exakt zu a1/b1/c1 (beta*Y/P2 + delta = c1,
+    // -gamma*P1/P2 = a1, alpha - beta*P1/P2 + gamma*Y/P2 = b1) — empirisch
+    // über 20.000 Seeds geprüft, dass sie bei jeder zulässigen Instanz
+    // (a1/b1/c1 bereits auf höchstens 2 Nachkommastellen geprüft) selbst
+    // ebenfalls höchstens 2 Nachkommastellen brauchen, kein hässlicher
+    // Dezimalbruch (iPhone-Rückmeldung: Zwischenschritt beim Ausmultipli-
+    // zieren fehlte ganz, U(x₁) sprang direkt zur fertigen Normalform).
+    const x2Klammer = P2 === 1
+      ? `\\left(${zahlZuLatex(Y, 0)} - ${koeffVariable(P1, 'x_1')}\\right)`
+      : bruch(`${zahlZuLatex(Y, 0)} - ${koeffVariable(P1, 'x_1')}`, zahlZuLatex(P2, 0));
+    const uSubstituiert = `U(x_1) = ${koeffVariable(alpha, 'x_1')} + ${koeffVariable(beta, x2Klammer)} + ${koeffVariable(gamma, 'x_1')}${x2Klammer} + ${zahlZuLatex(delta, 0)}`;
+    const betaY = runde((beta * Y) / P2, 4);
+    const betaP1 = runde((beta * P1) / P2, 4);
+    const gammaY = runde((gamma * Y) / P2, 4);
+    const gammaP1 = runde((gamma * P1) / P2, 4);
+    const uAusmultipliziertAusdruck = bauePolynomAusdruck([
+      [alpha, 'x_1'], [betaY, ''], [-betaP1, 'x_1'], [gammaY, 'x_1'], [-gammaP1, 'x_1^2'], [delta, ''],
+    ], zahlZuLatex, '-');
+
     return {
       frage: {
         text: 'Gegeben sei die folgende Nutzenfunktion, die von den Mengen zweier Güter abhängt, ' +
@@ -727,7 +749,11 @@ export const nutzenmaximum = {
           },
           {
             titel: 'Einsetzen',
-            latex: `U(x_1) = ${bauePolynomAusdruck([[a1, 'x_1^2'], [b1, 'x_1'], [c1, '']], zahlZuLatex, '-')}`,
+            latex: mehrzeiligeKette([
+              uSubstituiert,
+              `= ${uAusmultipliziertAusdruck}`,
+              `= ${bauePolynomAusdruck([[a1, 'x_1^2'], [b1, 'x_1'], [c1, '']], zahlZuLatex, '-')}`,
+            ]),
             hinweis: `x₂ ersetzen und ausmultiplizieren; U wird dadurch eine quadratische Funktion von x₁ allein.`,
           },
           {
@@ -740,8 +766,11 @@ export const nutzenmaximum = {
             latex: `x_1 = ${zahlZuLatex(x1Stern, 0)}, \\quad \\text{da } U''(x_1) = ${zahlZuLatex(2 * a1, minimaleNachkommastellen(2 * a1))} < 0 \\text{ (Maximum)}`,
           },
           {
+            // Zähler erst eingesetzt (noch nicht ausgerechnet), dann
+            // ausgerechnet, dann das Ergebnis — nicht direkt von der
+            // Substitution zum fertigen x₂ springen (iPhone-Rückmeldung).
             titel: 'Einsetzen',
-            latex: `x_2 = ${bruch(`${zahlZuLatex(Y, 0)} - ${cdotWennNicht1(P1, zahlZuLatex(x1Stern, 0))}`, zahlZuLatex(P2, 0))} = ${zahlZuLatex(x2Stern, 0)}`,
+            latex: `x_2 = \\dfrac{${zahlZuLatex(Y, 0)} - ${cdotWennNicht1(P1, zahlZuLatex(x1Stern, 0))}}{${zahlZuLatex(P2, 0)}} = ${zahlZuLatex(Y - P1 * x1Stern, 0)} / ${zahlZuLatex(P2, 0)} = ${zahlZuLatex(x2Stern, 0)}`,
           },
           { titel: 'Ergebnis', latex: `(x_1;x_2) = (${zahlZuLatex(x1Stern, 0)};${zahlZuLatex(x2Stern, 0)})` },
           {

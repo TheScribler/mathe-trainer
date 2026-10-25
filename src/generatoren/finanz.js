@@ -169,7 +169,16 @@ export const renteVeraenderlich = {
     const einsetzenLatex = mehrzeiligeKette(
       einsetzenGruppen.map((g, k) => (k === 0 ? `R_0 &= ${g.join(' + ')}` : `&\\quad + ${g.join(' + ')}`))
     );
-    const termeHinweis = terme.map((x) => formatDeZahl(runde(x, 2), 2)).join(' + ');
+    // Jeden abgezinsten Einzelwert als eigenen KaTeX-Schritt zeigen statt nur
+    // als reinen Fließtext-Hinweis ("Einzelwerte: 462,96 + ...") — "jeder
+    // Rechenschritt wird gezeigt" gilt auch für die Einzelwerte selbst
+    // (iPhone-Rückmeldung).
+    const werteTeile = terme.map((x) => zahlZuLatex(runde(x, 2), minimaleNachkommastellen(runde(x, 2))));
+    const werteGruppen = [];
+    for (let k = 0; k < werteTeile.length; k += 2) werteGruppen.push(werteTeile.slice(k, k + 2));
+    const werteLatex = mehrzeiligeKette(
+      werteGruppen.map((g, k) => (k === 0 ? `R_0 &= ${g.join(' + ')}` : `&\\quad + ${g.join(' + ')}`))
+    );
 
     return {
       frage: {
@@ -190,7 +199,8 @@ export const renteVeraenderlich = {
             hinweis: 'Jede Zahlung einzeln abzinsen und addieren — die Rentenbarwertfaktor-Formel ' +
               'gilt hier nicht, weil die Zahlungen unterschiedlich hoch sind.',
           },
-          { titel: 'Einsetzen', latex: einsetzenLatex, hinweis: `Einzelwerte: ${termeHinweis}` },
+          { titel: 'Einsetzen', latex: einsetzenLatex },
+          { titel: 'Einsetzen', latex: werteLatex, hinweis: 'Jede Zahlung einzeln abgezinst.' },
           { titel: 'Ergebnis', latex: `R_0 = ${zahlZuLatex(R0, minimaleNachkommastellen(R0))}` },
         ],
         ergebnisse: [{ label: 'Rentenbarwert R₀', latex: zahlZuLatex(R0, minimaleNachkommastellen(R0)) }],
