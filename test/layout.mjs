@@ -153,39 +153,25 @@ const LAYOUT_PRUEFSKRIPT = `
     }
   });
 
-  // Ein mit "Ergebnis" betitelter Schritt ist die fertige Endantwort, keine
-  // lange Herleitung — dort ist Scrollen (anders als bei "Formel"/"Einsetzen",
-  // siehe stil.css) kein akzeptabler Rückfall, die Antwort muss auf einen
-  // Blick lesbar sein (iPhone-Rückmeldung: fin.tilgungsplans Ergebnis-Tabelle
-  // schnitt die letzte Spalte "Annuität" ab). .loesung-formel selbst erlaubt
-  // überall overflow-x:auto, darum hier gezielt nur für "Ergebnis"-Schritte
-  // verschärft statt die allgemeine Ausnahme ganz zu entfernen.
-  document.querySelectorAll('#app .loesung-schritt').forEach((schritt) => {
-    const titel = schritt.querySelector('.loesung-titel');
-    if (!titel || titel.textContent !== 'Ergebnis') return;
-    const formel = schritt.querySelector('.loesung-formel');
-    if (!formel) return;
-    if (formel.scrollWidth > formel.clientWidth + 1) {
-      probleme.push('Ergebnis-Schritt überläuft (scrollWidth=' + formel.scrollWidth + ' > clientWidth=' + formel.clientWidth + ') — Endantwort muss ohne Scrollen sichtbar sein');
+  // JEDER Lösungsschritt (nicht nur "Ergebnis") muss ohne Scrollen lesbar
+  // sein — .loesung-formel erlaubt technisch überall overflow-x:auto, das
+  // fing früher nur bei "Ergebnis"-Schritten als Fehler (fin.tilgungsplans
+  // Ergebnis-Tabelle schnitt die letzte Spalte "Annuität" ab). Ein
+  // "Einsetzen"-Schritt, der nur per Wischen sichtbar wird (kein sichtbarer
+  // Scrollbalken in mobile Safari), ist genauso ein abgeschnittener
+  // Rechenweg wie eine abgeschnittene Endantwort — zuerst bei den
+  // Sarrus-Zeilen in alg.lgs gefunden, dann bewusst auf ALLE Generatoren
+  // ausgeweitet (iPhone-Rückmeldung) und jeder dabei gefundene Überlauf
+  // behoben (fin.rente-veraenderlich, diff.nutzenmaximum/-extremwerte-2var/
+  // -partielle-ableitungen, int.unbestimmt, alg.produktionsprozess/
+  // -matrixrechnung/-lgs). Toleranz +3 statt +1 wie bei
+  // .loesung-ergebnis-wert: dasselbe Sub-Pixel-Rauschen bei
+  // pmatrix-Klammern tritt auch hier auf.
+  document.querySelectorAll('#app .loesung-schritt .loesung-formel').forEach((formel) => {
+    if (formel.scrollWidth > formel.clientWidth + 3) {
+      probleme.push('Lösungsschritt überläuft (scrollWidth=' + formel.scrollWidth + ' > clientWidth=' + formel.clientWidth + ') — Rechenweg muss ohne Scrollen sichtbar sein: ' + formel.textContent.slice(0, 80));
     }
   });
-
-  // Zusätzlich für alg.lgs JEDER Schritt (nicht nur "Ergebnis"): die
-  // Sarrus-Zeilen für D/D₁/D₂/D₃ stehen als "Einsetzen"-Schritt, der bisher
-  // scrollen durfte und dadurch unbemerkt rechts ablief (iPhone-Rückmeldung).
-  // Generisch auf ALLE Generatoren ausgeweitet deckte das zusätzlich mehrere
-  // bereits bestehende, hier nicht gemeldete Überläufe in anderen Generatoren
-  // auf (fin.rente-veraenderlich, diff.nutzenmaximum/-extremwerte-2var/
-  // -partielle-ableitungen, int.unbestimmt, alg.produktionsprozess/
-  // matrixrechnung) — deren Behebung ist nicht Teil dieser Runde, darum
-  // bewusst nur für den gemeldeten Generator verschärft, nicht global.
-  if (arguments[0] === 'alg.lgs') {
-    document.querySelectorAll('#app .loesung-schritt .loesung-formel').forEach((formel) => {
-      if (formel.scrollWidth > formel.clientWidth + 3) {
-        probleme.push('Lösungsschritt überläuft (scrollWidth=' + formel.scrollWidth + ' > clientWidth=' + formel.clientWidth + ') — Rechenweg muss ohne Scrollen sichtbar sein: ' + formel.textContent.slice(0, 80));
-      }
-    });
-  }
 
   // Dieselbe Regel für die abschließende Ergebnis-Zusammenfassung
   // (loesung.ergebnisse, eigene .loesung-ergebnis-wert-Box) — auch das ist
@@ -423,7 +409,7 @@ async function main() {
           args: [generatorId, seed],
         });
         const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
-          script: LAYOUT_PRUEFSKRIPT, args: [generatorId],
+          script: LAYOUT_PRUEFSKRIPT, args: [],
         });
         geprueft += 1;
         for (const problem of ergebnis.probleme) {
@@ -450,7 +436,7 @@ async function main() {
             args: [generatorId, seed, abgegeben],
           });
           const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
-            script: LAYOUT_PRUEFSKRIPT, args: [generatorId],
+            script: LAYOUT_PRUEFSKRIPT, args: [],
           });
           geprueft += 1;
           for (const problem of ergebnis.probleme) {
@@ -512,7 +498,7 @@ async function main() {
         args: [generatorId, 0],
       });
       const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
-        script: LAYOUT_PRUEFSKRIPT, args: [generatorId],
+        script: LAYOUT_PRUEFSKRIPT, args: [],
       });
       geprueft += 1;
       for (const problem of ergebnis.probleme) {

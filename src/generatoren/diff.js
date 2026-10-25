@@ -467,13 +467,22 @@ export const extremwerteZweiVariablenKubisch = {
             hinweis: 'Det(H)>0 und die zweite Ableitung nach x negativ: Maximum. Det(H)>0 und positiv: Minimum. Det(H)<0: Sattelpunkt.',
           },
           {
+            // H und det(H) auf getrennten Zeilen statt in einer Zeile mit
+            // Komma dazwischen — bei zweistelligen Hesse-Einträgen lief das
+            // bei 375px rechts ab (iPhone-Rückmeldung).
             titel: 'Einsetzen',
-            latex: `\\text{Punkt }(0|0)\\text{: } H = \\begin{pmatrix} ${zahlZuLatex(fxx1, 0)} & ${zahlZuLatex(fxy, 0)} \\\\ ${zahlZuLatex(fxy, 0)} & ${zahlZuLatex(fyy, 0)} \\end{pmatrix}, \\; \\det(H) = ${zahlZuLatex(det1, 0)}`,
+            latex: mehrzeiligeKette([
+              `\\text{Punkt }(0|0)\\text{: } H = \\begin{pmatrix} ${zahlZuLatex(fxx1, 0)} & ${zahlZuLatex(fxy, 0)} \\\\ ${zahlZuLatex(fxy, 0)} & ${zahlZuLatex(fyy, 0)} \\end{pmatrix}`,
+              `\\det(H) = ${zahlZuLatex(det1, 0)}`,
+            ]),
           },
           { titel: 'Ergebnis', latex: `(0|0)\\text{ ist ein } \\textbf{${typ1}}, \\; f(0,0) = ${zahlZuLatex(wert1, 0)}` },
           {
             titel: 'Einsetzen',
-            latex: `\\text{Punkt }${punktPaarLatex(x2, y2)}\\text{: } H = \\begin{pmatrix} ${zahlZuLatex(fxx2, 0)} & ${zahlZuLatex(fxy, 0)} \\\\ ${zahlZuLatex(fxy, 0)} & ${zahlZuLatex(fyy, 0)} \\end{pmatrix}, \\; \\det(H) = ${zahlZuLatex(det2, 0)}`,
+            latex: mehrzeiligeKette([
+              `\\text{Punkt }${punktPaarLatex(x2, y2)}\\text{: } H = \\begin{pmatrix} ${zahlZuLatex(fxx2, 0)} & ${zahlZuLatex(fxy, 0)} \\\\ ${zahlZuLatex(fxy, 0)} & ${zahlZuLatex(fyy, 0)} \\end{pmatrix}`,
+              `\\det(H) = ${zahlZuLatex(det2, 0)}`,
+            ]),
           },
           { titel: 'Ergebnis', latex: `${punktPaarLatex(x2, y2)}\\text{ ist ein } \\textbf{${typ2}}, \\; f(${zahlZuLatex(x2, 0)},${zahlZuLatex(y2, 0)}) = ${zahlZuLatex(wert2, minimaleNachkommastellen(wert2))}` },
         ],
@@ -701,8 +710,15 @@ export const nutzenmaximum = {
       loesung: {
         schritte: [
           {
+            // Zielfunktion und Nebenbedingung auf getrennten Zeilen statt in
+            // einer Zeile mit "u.d.N." dazwischen — lief bei 375px rechts ab
+            // (iPhone-Rückmeldung, in jeder Instanz, da U(x₁,x₂) allein schon
+            // bis zu vier Terme hat).
             titel: 'Formel',
-            latex: `\\max\\ U(x_1,x_2) = ${uLatex} \\quad \\text{u.d.N.} \\quad ${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} = ${zahlZuLatex(Y, 0)}`,
+            latex: mehrzeiligeKette([
+              `\\max\\ U(x_1,x_2) = ${uLatex}`,
+              `\\text{u.d.N.} \\quad ${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} = ${zahlZuLatex(Y, 0)}`,
+            ]),
           },
           {
             titel: 'Umstellen',
@@ -1482,10 +1498,16 @@ export const partielleAbleitungen = {
         { titel: 'Ergebnis', latex: `f_x = ${fxLatex}` },
         { titel: 'Ergebnis', latex: `f_y = ${fyLatex}` },
         {
+          // Jede der beiden Zeilen (f_x, f_y) hat drei Rechenschritte
+          // ("eingesetzt = ausgewertet ≈ Ergebnis") — alle drei in einer
+          // einzigen Zeile liefen bei 375px rechts ab (iPhone-Rückmeldung),
+          // darum je eine eigene Zeile pro Zwischenschritt.
           titel: 'Einsetzen',
           latex: mehrzeiligeKette([
-            `f_x(${x0Latex},${y0Latex}) = ${vorfaktorMalLatex(2 * k * x0 * y0, `e^{${innenBeiPunkt}}`)} = ${vorfaktorMalLatex(2 * k * x0 * y0, `e^{${zahlZuLatex(innenWert, 0)}}`)} \\approx ${zahlZuLatex(fxWert, minimaleNachkommastellen(fxWert))}`,
-            `f_y(${x0Latex},${y0Latex}) = ${vz}${hochLatex(x0Klar, 2)} \\cdot e^{${innenBeiPunkt}} = ${vorfaktorMalLatex(k * x0 * x0, `e^{${zahlZuLatex(innenWert, 0)}}`)} \\approx ${zahlZuLatex(fyWert, minimaleNachkommastellen(fyWert))}`,
+            `f_x(${x0Latex},${y0Latex}) = ${vorfaktorMalLatex(2 * k * x0 * y0, `e^{${innenBeiPunkt}}`)}`,
+            `= ${vorfaktorMalLatex(2 * k * x0 * y0, `e^{${zahlZuLatex(innenWert, 0)}}`)} \\approx ${zahlZuLatex(fxWert, minimaleNachkommastellen(fxWert))}`,
+            `f_y(${x0Latex},${y0Latex}) = ${vz}${hochLatex(x0Klar, 2)} \\cdot e^{${innenBeiPunkt}}`,
+            `= ${vorfaktorMalLatex(k * x0 * x0, `e^{${zahlZuLatex(innenWert, 0)}}`)} \\approx ${zahlZuLatex(fyWert, minimaleNachkommastellen(fyWert))}`,
           ]),
         },
       ], params);

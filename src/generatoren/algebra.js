@@ -696,13 +696,20 @@ export const produktionsprozess = {
             hinweis: 'Gewinn ist Erlös (Verkaufspreise mal Endproduktmengen) minus Kosten (Rohstoffpreise mal benötigter Rohstoffmenge).',
           },
           {
+            // Erlös- und Kosten-Teil JEDER Zeile auf eine eigene Zeile statt
+            // mit "-" in einer Zeile zusammen — bei dreistelligen Rohstoff-
+            // bedarfswerten (und bei drei statt zwei Termen je Seite) lief
+            // auch das noch bei 375px rechts ab (iPhone-Rückmeldung).
             titel: 'Einsetzen',
-            latex: mehrzeiligeGleichung('G', [
-              `${matrixLatexFormatiert([PE])} \\cdot ${matrixLatexFormatiert(E)} - ${matrixLatexFormatiert([PR])} \\cdot ${matrixLatexFormatiert(R)}`,
-              `\\left(${erloesTerme}\\right) - \\left(${kostenTerme}\\right)`,
-              `\\left(${erloesTeilprodukte.map((p) => zahlZuLatex(p, minimaleNachkommastellen(p))).join(' + ')}\\right) - \\left(${kostenTeilprodukte.map((p) => zahlZuLatex(p, minimaleNachkommastellen(p))).join(' + ')}\\right)`,
-              `${zahlZuLatex(erloes, minimaleNachkommastellen(erloes))} - ${zahlZuLatex(kosten, minimaleNachkommastellen(kosten))}`,
-              zahlZuLatex(gewinn, minimaleNachkommastellen(gewinn)),
+            latex: mehrzeiligeKette([
+              `G &= ${matrixLatexFormatiert([PE])} \\cdot ${matrixLatexFormatiert(E)}`,
+              `&\\quad - ${matrixLatexFormatiert([PR])} \\cdot ${matrixLatexFormatiert(R)}`,
+              `&= \\left(${erloesTerme}\\right)`,
+              `&\\quad - \\left(${kostenTerme}\\right)`,
+              `&= \\left(${erloesTeilprodukte.map((p) => zahlZuLatex(p, minimaleNachkommastellen(p))).join(' + ')}\\right)`,
+              `&\\quad - \\left(${kostenTeilprodukte.map((p) => zahlZuLatex(p, minimaleNachkommastellen(p))).join(' + ')}\\right)`,
+              `&= ${zahlZuLatex(erloes, minimaleNachkommastellen(erloes))} - ${zahlZuLatex(kosten, minimaleNachkommastellen(kosten))}`,
+              `&= ${zahlZuLatex(gewinn, minimaleNachkommastellen(gewinn))}`,
             ]),
           },
         ],
@@ -850,8 +857,14 @@ export const matrixrechnung = {
             hinweis: 'Transponieren einer Summe/Differenz ist dieselbe Summe/Differenz der Transponierten, und ein Skalar bleibt beim Transponieren unverändert davor stehen.',
           },
           {
+            // Beide Matrizen auf getrennten Zeilen statt in einer Zeile mit
+            // zwei "=" dazwischen — bei zweistelligen Einträgen lief das bei
+            // 375px rechts ab (iPhone-Rückmeldung).
             titel: 'Einsetzen',
-            latex: `(rA+sB-rC)^T = \\left(${matrixLatexFormatiert(ergB)}\\right)^T = ${matrixLatexFormatiert(ergD)}`,
+            latex: mehrzeiligeKette([
+              `(rA+sB-rC)^T = \\left(${matrixLatexFormatiert(ergB)}\\right)^T`,
+              `= ${matrixLatexFormatiert(ergD)}`,
+            ]),
             hinweis: 'Zeilen und Spalten des bereits berechneten Ergebnisses aus b) vertauschen.',
           },
           { titel: 'Ergebnis', latex: `(rA+sB-rC)^T = ${matrixLatexFormatiert(ergD)}` },

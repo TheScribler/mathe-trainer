@@ -159,9 +159,16 @@ export const renteVeraenderlich = {
     const R0 = runde(terme.reduce((s, x) => s + x, 0), KONFIG.nachkommastellen.geld);
 
     const iLatex = anteilLatexOhneNullen(i);
-    const einsetzenLatex = zahlungen
-      .map((rt, k) => `${bruch(zahlZuLatex(rt, 0), `(1 + ${iLatex})^{${k + 1}}`)}`)
-      .join(' + ');
+    // Je höchstens 2 Brüche pro Zeile statt aller n (3 bis 5) auf einer
+    // Zeile — bei fünf Abzinsungsbrüchen liefen auch drei pro Zeile bei
+    // 375px noch rechts ab (iPhone-Rückmeldung, gleiches Muster wie die
+    // Sarrus-Zeilen in alg.lgs).
+    const einsetzenTeile = zahlungen.map((rt, k) => bruch(zahlZuLatex(rt, 0), `(1 + ${iLatex})^{${k + 1}}`));
+    const einsetzenGruppen = [];
+    for (let k = 0; k < einsetzenTeile.length; k += 2) einsetzenGruppen.push(einsetzenTeile.slice(k, k + 2));
+    const einsetzenLatex = mehrzeiligeKette(
+      einsetzenGruppen.map((g, k) => (k === 0 ? `R_0 &= ${g.join(' + ')}` : `&\\quad + ${g.join(' + ')}`))
+    );
     const termeHinweis = terme.map((x) => formatDeZahl(runde(x, 2), 2)).join(' + ');
 
     return {
@@ -183,7 +190,7 @@ export const renteVeraenderlich = {
             hinweis: 'Jede Zahlung einzeln abzinsen und addieren — die Rentenbarwertfaktor-Formel ' +
               'gilt hier nicht, weil die Zahlungen unterschiedlich hoch sind.',
           },
-          { titel: 'Einsetzen', latex: `R_0 = ${einsetzenLatex}`, hinweis: `Einzelwerte: ${termeHinweis}` },
+          { titel: 'Einsetzen', latex: einsetzenLatex, hinweis: `Einzelwerte: ${termeHinweis}` },
           { titel: 'Ergebnis', latex: `R_0 = ${zahlZuLatex(R0, minimaleNachkommastellen(R0))}` },
         ],
         ergebnisse: [{ label: 'Rentenbarwert R₀', latex: zahlZuLatex(R0, minimaleNachkommastellen(R0)) }],

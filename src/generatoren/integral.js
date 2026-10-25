@@ -37,9 +37,13 @@ function integralTermMitVorzeichen(koeff, exponent) {
   return `${koeff < 0 ? '-' : '+'} ${cdotWennNicht1(koeff, ausdruck)}`;
 }
 
-function summenregelZeile(koeffizienten, exponenten) {
-  const teile = koeffizienten.map((a, i) => integralTermMitVorzeichen(a, exponenten[i]));
-  return teile.join(' ').replace(/^\+ /, '');
+// Je höchstens 2 Terme pro Zeile statt aller (bis zu 5, inkl. Sonderterm)
+// auf einer Zeile — lief bei 375px rechts ab (iPhone-Rückmeldung, gleiches
+// Muster wie die Sarrus-Zeilen in alg.lgs).
+function inZweiergruppen(liste) {
+  const gruppen = [];
+  for (let i = 0; i < liste.length; i += 2) gruppen.push(liste.slice(i, i + 2));
+  return gruppen;
 }
 
 // Ein Term "z/n \cdot x^exponent" als LaTeX, exakter (gekürzter) Bruch statt
@@ -241,20 +245,37 @@ export const integralUnbestimmt = {
 
     const schritte = [
       {
+        // Potenzregel und Sonderregel auf getrennten Zeilen statt mit
+        // "\qquad" in einer Zeile — lief bei 375px rechts ab (iPhone-
+        // Rückmeldung).
         titel: 'Formel',
-        latex: `\\int x^n\\,dx = ${bruch('x^{n+1}', 'n+1')} + c \\quad (n \\neq -1)` +
-          (sonderterm?.typ === 'ln' ? `, \\qquad \\int \\dfrac{1}{x}\\,dx = \\ln|x| + c` : '') +
-          (sonderterm?.typ === 'exp' ? `, \\qquad \\int e^x\\,dx = e^x + c` : ''),
+        latex: sonder
+          ? mehrzeiligeKette([
+            `\\int x^n\\,dx = ${bruch('x^{n+1}', 'n+1')} + c \\quad (n \\neq -1)`,
+            sonderterm.typ === 'ln'
+              ? `\\int \\dfrac{1}{x}\\,dx = \\ln|x| + c`
+              : `\\int e^x\\,dx = e^x + c`,
+          ])
+          : `\\int x^n\\,dx = ${bruch('x^{n+1}', 'n+1')} + c \\quad (n \\neq -1)`,
         hinweis: 'Potenzregel der Integration: Potenz um 1 erhöhen, dann durch die neue Potenz teilen.' +
           (sonder ? ` Potenzregel gilt nicht für n = −1: ${sonder.regel}` : ''),
       },
       {
+        // Die Summenregel-Zeile (bis zu 4 Potenzterme plus Sonderterm) auf
+        // mehrere Zeilen verteilt statt aller Terme in einer — lief bei
+        // 375px rechts ab (iPhone-Rückmeldung).
         titel: 'Einsetzen',
-        latex: mehrzeiligeGleichung('\\int f(x)\\,dx', [
-          `\\int (${fLatex})\\,dx`,
-          summenregelZeile(koeffizienten, exponenten) + (sonder ? ` ${sonder.summenregelLatex}` : ''),
-          `${fExakt} + c`,
-        ]),
+        latex: (() => {
+          const summenregelTeile = koeffizienten.map((a, i) => integralTermMitVorzeichen(a, exponenten[i]));
+          if (sonder) summenregelTeile.push(sonder.summenregelLatex);
+          const gruppen = inZweiergruppen(summenregelTeile);
+          return mehrzeiligeKette([
+            `\\int f(x)\\,dx &= \\int (${fLatex})\\,dx`,
+            `&= ${gruppen[0].join(' ').replace(/^\+ /, '')}`,
+            ...gruppen.slice(1).map((g) => `&\\quad ${g.join(' ')}`),
+            `&= ${fExakt} + c`,
+          ]);
+        })(),
         hinweis: 'Summenregel: jeder Summand wird einzeln integriert, konstante Faktoren bleiben stehen.',
       },
       { titel: 'Ergebnis', latex: `F(x) = ${fExakt} + c` },
