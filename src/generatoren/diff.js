@@ -3,7 +3,7 @@
 // saubere Lösung, dann die Parameter (siehe PLAN.md, Katalog
 // "2 Differentialrechnung").
 
-import { zufallInt, zufallAus } from '../rng.js';
+import { zufallInt, zufallAus, zufallBool } from '../rng.js';
 import { runde, formatDeZahl, minimaleNachkommastellen } from '../zahl.js';
 import { zahlZuLatex, bruch, bruchGekuerzt, polynomLatex, polynomEingesetztLatex, mehrzeiligeGleichung, mehrzeiligeKette, gleichungsKette, ohneDuplikatZeile } from '../latex.js';
 import { KONFIG } from '../konfig.js';
@@ -1294,11 +1294,26 @@ function baueAbleitungenAHochXZweiteAbleitung(params) {
 
 // ---------------------------------------------------------------------------
 // diff.elastizitaet — Übung 17
-// Punktelastizität ε(x) = f'(x)·x/f(x) einer linearen Funktion f(x)=a-b·x
-// (Preis-Absatz-Funktion). Rückwärts: a,b,x0 so wählen, dass f(x0)>0 und ε
-// eine glatte negative ganze Zahl ergibt (Übung 17: −1, −3, −4).
+// Preiselastizität der NACHFRAGE ε_{x,p}: wie stark ändert sich die
+// nachgefragte MENGE x relativ, wenn sich der PREIS p relativ ändert.
+// Variante 0 (Übung 17a-c): die Preis-Absatz-Funktion f(x) = a - b·x ist
+// gegeben (Preis in Abhängigkeit von der Menge, nicht Menge in Abhängigkeit
+// vom Preis) — x als Funktion von p ist dann die UMKEHRFUNKTION von f, und
+// ε_{x,p} ist deshalb der KEHRWERT von f'(x)·x/f(x), also
+// ε_{x,p}(x) = f(x) / (f'(x)·x), NICHT f'(x)·x/f(x) (das wäre ε_{p,x}, die
+// Elastizität von p nach x) — ein echter Richtungsfehler in einer früheren
+// Fassung, der nur durch den Sonderfall Übung 17a (ε=−1, selbst-reziprok)
+// unentdeckt blieb; durch Hand-Nachrechnung von Übung 17b/c aufgefallen.
+// Variante 1 (Übung 17d/e): die Nachfragefunktion x(p) = c - d·p ist direkt
+// in Abhängigkeit vom Preis gegeben — dort gilt ganz regulär (keine
+// Umkehrung nötig) ε_{x,p}(p) = x'(p)·p / x(p).
+// Rückwärts: Zielelastizität ε direkt wählen, b/x0 bzw. d/p0 dann a bzw. c
+// so ableiten, dass ε exakt herauskommt.
 // Zusatzthema (Phase 6) — in der Probeklausur standardmäßig aus.
 // ---------------------------------------------------------------------------
+const ELASTIZITAET_EPS_POOL_F_GEGEBEN = [-1, -2, -3, -4, -5, -6, -7, -8, -9, -10];
+const ELASTIZITAET_EPS_POOL_X_GEGEBEN = [-1, -2, -3, -4, -5, -0.25, -0.5, -0.75, -1.5, -2.5];
+
 export const elastizitaet = {
   id: 'diff.elastizitaet',
   teil: 'diff',
@@ -1307,74 +1322,138 @@ export const elastizitaet = {
   vorlage: 'Übung 17',
   zusatz: true,
   waehleParameter(rng) {
+    const variante = zufallBool(rng, 0.5) ? 1 : 0;
+    if (variante === 1) {
+      // x(p) = c - d·p direkt gegeben: ε = x'(p)·p/x(p) = -d·p0/x0 (regulär,
+      // keine Umkehrung). x0 aus der Zielelastizität ableiten, c daraus.
+      for (let versuch = 0; versuch < 500; versuch++) {
+        const d = zufallAus(rng, [0.01, 0.1, 0.2, 0.5, 1, 2, 5]);
+        const p0 = zufallAus(rng, [5, 8, 10, 20, 50, 100, 1000, 8000]);
+        const epsZiel = zufallAus(rng, ELASTIZITAET_EPS_POOL_X_GEGEBEN);
+        const x0 = runde(-(d * p0) / epsZiel, 4);
+        if (!(x0 > 0) || minimaleNachkommastellen(x0) > 2 || x0 > 100000) continue;
+        const c = runde(x0 + d * p0, 4);
+        if (minimaleNachkommastellen(c) > 2 || c <= x0) continue;
+        return { variante, c, d, p0 };
+      }
+      return { variante: 1, c: 100, d: 0.01, p0: 8000 }; // Rückfall: Übung 17d
+    }
+    // f(x) = a - b·x gegeben: ε = f(x0)/(f'(x)·x0) = (a-b·x0)/(-b·x0).
+    // a aus der Zielelastizität ableiten: a = b·x0·(1-ε).
     for (let versuch = 0; versuch < 500; versuch++) {
       const b = zufallAus(rng, [1, 2, 3, 4, 5]);
       const x0 = zufallInt(rng, 2, 20);
-      const a = zufallInt(rng, 10, 150);
-      const f0 = a - b * x0;
-      if (f0 <= 0) continue;
-      const epsExakt = (-b * x0) / f0;
-      if (!Number.isInteger(epsExakt) || epsExakt >= 0 || epsExakt < -10) continue;
-      return { a, b, x0 };
+      const epsZiel = zufallAus(rng, ELASTIZITAET_EPS_POOL_F_GEGEBEN);
+      const a = b * x0 * (1 - epsZiel);
+      if (!Number.isInteger(a) || a < 10 || a > 2000) continue;
+      return { variante, a, b, x0 };
     }
-    return { a: 10, b: 0.1, x0: 50 }; // Rückfall: Übung 17a (nur Zahlen, kein Aufgabentext)
+    return { variante: 0, a: 10, b: 0.1, x0: 50 }; // Rückfall: Übung 17a (nur Zahlen, kein Aufgabentext)
   },
   baue(params) {
-    const { a, b, x0 } = params;
-    const f0 = runde(a - b * x0, 4);
-    const epsExakt = runde((-b * x0) / f0, 2);
-    const aLatex = zahlZuLatex(a, minimaleNachkommastellen(a));
-    const bLatex = zahlZuLatex(b, minimaleNachkommastellen(b));
-    const x0Latex = zahlZuLatex(x0, minimaleNachkommastellen(x0));
-    const aProse = formatDeZahl(a, minimaleNachkommastellen(a));
-    const bProse = Math.abs(b) === 1 ? '' : formatDeZahl(Math.abs(b), minimaleNachkommastellen(b));
-    // -b·(x/f(x)): |b| als eigener Faktor weglassen, wenn er genau 1 ist
-    // (sonst "1 \cdot ..." statt nur das Vorzeichen) — und die gekürzte
-    // x/f(x)-Bruch auf eine blanke Zahl zurückfallen lassen, wenn der Nenner
-    // zu 1 kürzt (x ist oft ein Vielfaches von f(x), z. B. 10/5 -> 2/1).
-    const bVZ = b < 0 ? '' : '-';
-    const bAbsLatex = Math.abs(b) === 1 ? '' : zahlZuLatex(Math.abs(b), minimaleNachkommastellen(b));
-    const bCdot = bAbsLatex === '' ? '' : `${bAbsLatex} \\cdot `;
-    const { zaehler: x0Gek, nenner: f0Gek } = bruchGekuerzt(x0, f0);
-    const bruchOderZahl = f0Gek === 1 ? zahlZuLatex(x0Gek, 0) : bruch(zahlZuLatex(x0Gek, 0), zahlZuLatex(f0Gek, 0));
-
-    return {
-      frage: {
-        text: `Eine Preis-Absatz-Funktion lautet f(x) = ${aProse} ${b < 0 ? '+' : '−'} ${bProse}x. ` +
-          `Bestimmen Sie die Punktelastizität ε an der Stelle x₀ = ${x0}.`,
-      },
-      eingaben: [
-        { id: 'eps', label: 'Punktelastizität ε(x₀)', typ: 'zahl', punkte: 3, loesung: epsExakt, toleranz: KONFIG.toleranz.exakt },
-      ],
-      loesung: {
-        schritte: [
-          {
-            titel: 'Formel',
-            latex: `\\varepsilon(x) = f'(x) \\cdot \\dfrac{x}{f(x)}`,
-            hinweis: 'Punktelastizität: relative Änderung von f im Verhältnis zur relativen Änderung von x, an einer festen Stelle x.',
-          },
-          {
-            titel: 'Einsetzen',
-            latex: mehrzeiligeKette([
-              `f'(x) = ${b < 0 ? '' : '-'}${bLatex} \\quad (\\text{konstant})`,
-              `f(${x0Latex}) = ${aLatex} ${b < 0 ? '+' : '-'} ${bLatex} \\cdot ${x0Latex} = ${zahlZuLatex(f0, minimaleNachkommastellen(f0))}`,
-            ]),
-            hinweis: 'f\' ist bei einer linearen Funktion immer konstant — erst f\'(x), dann den Funktionswert f(x₀) getrennt berechnen.',
-          },
-          {
-            titel: 'Einsetzen',
-            latex: mehrzeiligeGleichung(`\\varepsilon(${x0Latex})`, [
-              `${bVZ}${bCdot}${bruchOderZahl}`,
-              zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)),
-            ]),
-          },
-        ],
-        ergebnisse: [{ label: 'Punktelastizität ε(x₀)', latex: zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)) }],
-      },
-      params,
-    };
+    if (params.variante === 1) return baueElastizitaetMengeGegeben(params);
+    return baueElastizitaetPreisGegeben(params);
   },
 };
+
+function baueElastizitaetPreisGegeben(params) {
+  const { a, b, x0 } = params;
+  const f0 = runde(a - b * x0, 4);
+  const fStrich = -b;
+  const nennerWert = runde(fStrich * x0, 4);
+  const epsExakt = runde(f0 / nennerWert, 4);
+  const aLatex = zahlZuLatex(a, minimaleNachkommastellen(a));
+  const bLatex = zahlZuLatex(b, minimaleNachkommastellen(b));
+  const x0Latex = zahlZuLatex(x0, minimaleNachkommastellen(x0));
+  const aProse = formatDeZahl(a, minimaleNachkommastellen(a));
+  const bProse = Math.abs(b) === 1 ? '' : formatDeZahl(Math.abs(b), minimaleNachkommastellen(b));
+
+  return {
+    frage: {
+      text: `Eine Preis-Absatz-Funktion lautet f(x) = ${aProse} ${b < 0 ? '+' : '−'} ${bProse}x. ` +
+        `Bestimmen Sie die Punktelastizität der Nachfrage ε an der Stelle x₀ = ${x0}.`,
+    },
+    eingaben: [
+      { id: 'eps', label: 'Punktelastizität ε(x₀)', typ: 'zahl', punkte: 3, loesung: epsExakt, toleranz: KONFIG.toleranz.exakt },
+    ],
+    loesung: {
+      schritte: [
+        {
+          titel: 'Formel',
+          latex: `\\varepsilon_{x,p}(x) = \\dfrac{f(x)}{f'(x) \\cdot x}`,
+          hinweis: 'Elastizität der nachgefragten Menge x nach dem Preis p: x ist hier nur implizit über die ' +
+            'Preis-Absatz-Funktion f (Preis in Abhängigkeit von der Menge) gegeben — deshalb der Kehrwert von f\'(x)·x/f(x).',
+        },
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeKette([
+            `f'(x) = ${b < 0 ? '' : '-'}${bLatex} \\quad (\\text{konstant})`,
+            `f(${x0Latex}) = ${aLatex} ${b < 0 ? '+' : '-'} ${bLatex} \\cdot ${x0Latex} = ${zahlZuLatex(f0, minimaleNachkommastellen(f0))}`,
+          ]),
+          hinweis: 'f\' ist bei einer linearen Funktion immer konstant — erst f\'(x), dann den Funktionswert f(x₀) getrennt berechnen.',
+        },
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeGleichung(`\\varepsilon(${x0Latex})`, [
+            `${zahlZuLatex(f0, minimaleNachkommastellen(f0))} / ${nennerWert < 0 ? `(${zahlZuLatex(nennerWert, minimaleNachkommastellen(nennerWert))})` : zahlZuLatex(nennerWert, minimaleNachkommastellen(nennerWert))}`,
+            zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)),
+          ]),
+        },
+      ],
+      ergebnisse: [{ label: 'Punktelastizität ε(x₀)', latex: zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)) }],
+    },
+    params,
+  };
+}
+
+function baueElastizitaetMengeGegeben(params) {
+  const { c, d, p0 } = params;
+  const x0 = runde(c - d * p0, 4);
+  const xStrich = -d;
+  const zaehlerWert = runde(xStrich * p0, 4);
+  const epsExakt = runde(zaehlerWert / x0, 4);
+  const cLatex = zahlZuLatex(c, minimaleNachkommastellen(c));
+  const dLatex = zahlZuLatex(d, minimaleNachkommastellen(d));
+  const p0Latex = zahlZuLatex(p0, minimaleNachkommastellen(p0));
+  const cProse = formatDeZahl(c, minimaleNachkommastellen(c));
+  const dProse = Math.abs(d) === 1 ? '' : formatDeZahl(Math.abs(d), minimaleNachkommastellen(d));
+
+  return {
+    frage: {
+      text: `Eine Nachfragefunktion lautet x(p) = ${cProse} ${d < 0 ? '+' : '−'} ${dProse}p. ` +
+        `Bestimmen Sie die Punktelastizität der Nachfrage ε an der Stelle p₀ = ${p0}.`,
+    },
+    eingaben: [
+      { id: 'eps', label: 'Punktelastizität ε(p₀)', typ: 'zahl', punkte: 3, loesung: epsExakt, toleranz: KONFIG.toleranz.exakt },
+    ],
+    loesung: {
+      schritte: [
+        {
+          titel: 'Formel',
+          latex: `\\varepsilon_{x,p}(p) = \\dfrac{x'(p) \\cdot p}{x(p)}`,
+          hinweis: 'x ist hier direkt als Funktion des Preises p gegeben — keine Umkehrung nötig, die Formel gilt direkt.',
+        },
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeKette([
+            `x'(p) = ${d < 0 ? '' : '-'}${dLatex} \\quad (\\text{konstant})`,
+            `x(${p0Latex}) = ${cLatex} ${d < 0 ? '+' : '-'} ${dLatex} \\cdot ${p0Latex} = ${zahlZuLatex(x0, minimaleNachkommastellen(x0))}`,
+          ]),
+          hinweis: 'x\' ist bei einer linearen Funktion immer konstant — erst x\'(p), dann den Funktionswert x(p₀) getrennt berechnen.',
+        },
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeGleichung(`\\varepsilon(${p0Latex})`, [
+            `${zahlZuLatex(zaehlerWert, minimaleNachkommastellen(zaehlerWert))} / ${x0 < 0 ? `(${zahlZuLatex(x0, minimaleNachkommastellen(x0))})` : zahlZuLatex(x0, minimaleNachkommastellen(x0))}`,
+            zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)),
+          ]),
+        },
+      ],
+      ergebnisse: [{ label: 'Punktelastizität ε(p₀)', latex: zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)) }],
+    },
+    params,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // diff.partielle-ableitungen — Übung 14

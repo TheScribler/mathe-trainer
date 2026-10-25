@@ -643,25 +643,23 @@ export const integralKostenAusGrenzkosten = {
   punkte: 3,
   vorlage: 'Folien 153/154',
   waehleParameter(rng) {
-    for (let versuch = 0; versuch < 200; versuch++) {
-      let m = zufallInt(rng, -8, 8);
-      if (m === 0) m = 2;
-      // K'(0) = n muss positiv sein, sonst wären die Grenzkosten am
-      // Produktionsbeginn negativ — ökonomisch unsinnig und von vornherein
-      // ausgeschlossen statt nachträglich verworfen.
-      const n = zufallInt(rng, 1, 10);
-      const Kf = zufallInt(rng, 2, 30) * 10;
-      const mUngerade = Math.abs(m % 2) === 1;
-      let x0 = zufallInt(rng, 1, 10);
-      if (mUngerade && x0 % 2 !== 0) x0 += 1;
-      // K'(x) = mx + n ist linear — ihr Minimum auf [0, x0] liegt an einem
-      // der beiden Ränder. K'(0) = n > 0 ist schon erzwungen, K'(x0) muss
-      // zusätzlich geprüft werden (fällt K' mit wachsendem x, kann es bei
-      // x0 negativ werden).
-      if (m * x0 + n <= 0) continue;
-      return { m, n, Kf, x0 };
-    }
-    return { m: 2, n: 4, Kf: 100, x0: 6 }; // Rückfall: K'(x)=2x+4, auf [0,6] sicher positiv
+    // m muss positiv sein (nicht nur ungleich 0): K'(x) = mx + n mit m < 0
+    // fällt mit wachsendem x und wird irgendwann negativ — ökonomisch
+    // unsinnige Grenzkosten jenseits des konkret abgefragten x0 (iPhone-
+    // Rückmeldung: K'(x) = −x + 6 war für x > 6 negativ, derselbe Fehler
+    // wie vorher bei diff.gewinn-breakeven). Mit m > 0 UND n > 0 ist K' auf
+    // ganz [0, ∞) streng steigend ab einem positiven Start, also garantiert
+    // positiv — kein Reject-Sampling nötig.
+    const m = zufallInt(rng, 1, 8);
+    // K'(0) = n muss positiv sein, sonst wären die Grenzkosten am
+    // Produktionsbeginn negativ — ökonomisch unsinnig und von vornherein
+    // ausgeschlossen statt nachträglich verworfen.
+    const n = zufallInt(rng, 1, 10);
+    const Kf = zufallInt(rng, 2, 30) * 10;
+    const mUngerade = m % 2 === 1;
+    let x0 = zufallInt(rng, 1, 10);
+    if (mUngerade && x0 % 2 !== 0) x0 += 1;
+    return { m, n, Kf, x0 };
   },
   baue(params) {
     const { m, n, Kf, x0 } = params;

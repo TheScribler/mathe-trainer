@@ -655,12 +655,29 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
 
   if (generator.id === 'diff.elastizitaet') {
     const epsWert = wertVon(aufgabe, 'eps');
-    const fVon = (x) => p.a - p.b * x;
-    const f0 = fVon(p.x0);
-    const fStrichNumerisch = ableitungNumerisch(fVon, p.x0);
-    const epsNumerisch = (fStrichNumerisch * p.x0) / f0;
-    pruefe(nahBei(epsNumerisch, epsWert, 0.05),
-      `${kennzeichnung}: ε(${p.x0}) numerisch = ${epsNumerisch}, erwartet ${epsWert}`);
+    if (p.variante === 1) {
+      // x(p) = c - d·p direkt gegeben: ε = x'(p)·p/x(p), regulär.
+      const xVon = (preis) => p.c - p.d * preis;
+      const x0 = xVon(p.p0);
+      const xStrichNumerisch = ableitungNumerisch(xVon, p.p0);
+      const epsNumerisch = (xStrichNumerisch * p.p0) / x0;
+      pruefe(nahBei(epsNumerisch, epsWert, 0.05),
+        `${kennzeichnung}: ε(${p.p0}) numerisch = ${epsNumerisch}, erwartet ${epsWert}`);
+    } else {
+      // f(x) = a - b·x gegeben (Preis in Abhängigkeit von der Menge) — die
+      // gesuchte Elastizität ist die der Menge x nach dem Preis p, also der
+      // KEHRWERT von f'(x)·x/f(x), nicht f'(x)·x/f(x) selbst (das wäre die
+      // Elastizität von p nach x). Unabhängig über den Differenzenquotient
+      // von f UND explizit den Kehrwert gebildet, nicht denselben Bruch wie
+      // der Generator.
+      const fVon = (x) => p.a - p.b * x;
+      const f0 = fVon(p.x0);
+      const fStrichNumerisch = ableitungNumerisch(fVon, p.x0);
+      const epsPXNumerisch = (fStrichNumerisch * p.x0) / f0; // ε_{p,x}
+      const epsNumerisch = 1 / epsPXNumerisch; // ε_{x,p} = Kehrwert
+      pruefe(nahBei(epsNumerisch, epsWert, 0.05),
+        `${kennzeichnung}: ε(${p.x0}) numerisch (Kehrwert) = ${epsNumerisch}, erwartet ${epsWert}`);
+    }
     return;
   }
 
@@ -750,6 +767,16 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     pruefe(nahBei(ableitungNumerisch(KVon, 3), p.m * 3 + p.n, 1e-3),
       `${kennzeichnung}: K'(3) numerisch ${ableitungNumerisch(KVon, 3)}, erwartet ${p.m * 3 + p.n}`);
     pruefe(nahBei(KVon(0), p.Kf, 1e-6), `${kennzeichnung}: K(0)=${KVon(0)}, erwartet Kf=${p.Kf}`);
+    // Grenzkosten müssen auf dem gesamten ökonomisch relevanten Bereich
+    // positiv sein, nicht nur am konkret abgefragten x0 — dieselbe Regel wie
+    // bei diff.gewinn-breakeven (iPhone-Rückmeldung: K'(x) = −x + 6 war für
+    // x > 6 negativ). m > 0 UND n > 0 garantieren das für ALLE x ≥ 0 (K'
+    // steigt streng von einem positiven Start), darum reicht ein Stichprobe
+    // weit über x0 hinaus statt nur bis x0.
+    for (const x of [0, p.x0, p.x0 * 5, 100]) {
+      const kStrich = p.m * x + p.n;
+      pruefe(kStrich > 0, `${kennzeichnung}: K'(${x}) = ${kStrich} ist nicht positiv (Grenzkosten müssen für alle x ≥ 0 positiv sein)`);
+    }
     return;
   }
 

@@ -450,12 +450,46 @@ export function testeFixtures() {
     faelle.push('Übung 8');
   }
 
-  // Übung 17a: f(x)=10-0,1x -> Punktelastizität ε(50) = -1.
+  // Übung 17a: f(x)=10-0,1x -> Punktelastizität ε(50) = -1 (Sonderfall:
+  // selbst-reziprok, deckt einen Richtungsfehler ε_{p,x} statt ε_{x,p}
+  // NICHT auf — siehe 17b/c unten, die genau deshalb ergänzt wurden).
   {
-    const a = elastizitaet.baue({ a: 10, b: 0.1, x0: 50 });
+    const a = elastizitaet.baue({ variante: 0, a: 10, b: 0.1, x0: 50 });
     const werte = Object.fromEntries(a.eingaben.map((e) => [e.id, e.loesung]));
     pruefe(nahBei(werte.eps, -1, 1e-9), `Übung 17a: ε=${werte.eps}, erwartet -1`);
     faelle.push('Übung 17a');
+  }
+
+  // Übung 17b: f(x)=20-x (p₁=f(5)=15, p'(x)=-1) -> ε(5) = -3.
+  {
+    const a = elastizitaet.baue({ variante: 0, a: 20, b: 1, x0: 5 });
+    const werte = Object.fromEntries(a.eingaben.map((e) => [e.id, e.loesung]));
+    pruefe(nahBei(werte.eps, -3, 1e-9), `Übung 17b: ε=${werte.eps}, erwartet -3`);
+    faelle.push('Übung 17b');
+  }
+
+  // Übung 17c: f(x)=10000-x (p₁=f(2000)=8000, p'(x)=-1) -> ε(2000) = -4.
+  {
+    const a = elastizitaet.baue({ variante: 0, a: 10000, b: 1, x0: 2000 });
+    const werte = Object.fromEntries(a.eingaben.map((e) => [e.id, e.loesung]));
+    pruefe(nahBei(werte.eps, -4, 1e-9), `Übung 17c: ε=${werte.eps}, erwartet -4`);
+    faelle.push('Übung 17c');
+  }
+
+  // Übung 17d: x(p)=100-0,01p direkt gegeben (x'(p)=-0,01, p=8000, x=20) -> ε(8000) = -4.
+  {
+    const a = elastizitaet.baue({ variante: 1, c: 100, d: 0.01, p0: 8000 });
+    const werte = Object.fromEntries(a.eingaben.map((e) => [e.id, e.loesung]));
+    pruefe(nahBei(werte.eps, -4, 1e-9), `Übung 17d: ε=${werte.eps}, erwartet -4`);
+    faelle.push('Übung 17d');
+  }
+
+  // Übung 17e: x(p)=10-0,2p direkt gegeben (x'(p)=-0,2, p=10, x=8) -> ε(10) = -0,25.
+  {
+    const a = elastizitaet.baue({ variante: 1, c: 10, d: 0.2, p0: 10 });
+    const werte = Object.fromEntries(a.eingaben.map((e) => [e.id, e.loesung]));
+    pruefe(nahBei(werte.eps, -0.25, 1e-9), `Übung 17e: ε=${werte.eps}, erwartet -0,25`);
+    faelle.push('Übung 17e');
   }
 
   console.log(`Fixtures: ${faelle.length} geprüft (${faelle.join(', ')})`);
