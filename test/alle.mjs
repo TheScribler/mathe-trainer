@@ -1102,6 +1102,43 @@ function testeBruchToleranz() {
 }
 
 // ---------------------------------------------------------------------------
+// Grenzwerte der übrigen KONFIG.toleranz-Kategorien (geld, jahre,
+// tilgungszelle) — bisher nur prozentpunkte/bruch/exakt mit konkreten
+// Grenzfällen geprüft (testeEffektivzinsToleranz/testeBruchToleranz). Jede
+// Kategorie: am Rand noch richtig, direkt dahinter schon falsch — sonst
+// könnte sich eine zu lockere oder zu enge Toleranz unbemerkt einschleichen
+// (Phase-7-Rundungsreview).
+// ---------------------------------------------------------------------------
+function testeToleranzGrenzen() {
+  const kategorien = [
+    ['geld', KONFIG.toleranz.geld, 1000],
+    ['jahre', KONFIG.toleranz.jahre, 12],
+    ['tilgungszelle', KONFIG.toleranz.tilgungszelle, 5000],
+  ];
+  let anzahl = 0;
+  for (const [name, toleranz, erwartet] of kategorien) {
+    // Knapp INNERHALB statt genau auf der Grenze — exakt auf der Grenze
+    // (erwartet + toleranz) ist durch Gleitkomma-Rauschen (0,01 wird nicht
+    // immer exakt dargestellt) nicht zuverlässig testbar, siehe der
+    // Toleranz-Kommentar bei prozentpunkte in konfig.js.
+    const knappInnerhalb = zahlZuKommaText(erwartet + toleranz * 0.9);
+    const knappDahinter = zahlZuKommaText(erwartet + toleranz * 1.2);
+    for (const [eingabe, sollRichtigSein] of [[knappInnerhalb, true], [knappDahinter, false]]) {
+      const ergebnis = pruefeZahl(eingabe, erwartet, toleranz);
+      pruefe(
+        ergebnis.korrekt === sollRichtigSein,
+        `Toleranzgrenze ${name}: "${eingabe}" korrekt=${ergebnis.korrekt}, erwartet ${sollRichtigSein} (Antwort=${erwartet}, Toleranz=${toleranz})`
+      );
+      anzahl += 1;
+    }
+  }
+  console.log(`Toleranzgrenzen (geld/jahre/tilgungszelle): ${anzahl} Fälle geprüft`);
+}
+function zahlZuKommaText(zahl) {
+  return (Math.round(zahl * 1e6) / 1e6).toString().replace('.', ',');
+}
+
+// ---------------------------------------------------------------------------
 // Box-weise Bewertung von Koeffizientenzeilen (app.js-Prüflogik, hier als
 // reine Funktion in pruefung.js getestet statt im Browser): nur eine KOMPLETT
 // leere Zeile zählt als leer; sobald mindestens eine Box gefüllt ist, zählt
@@ -1227,6 +1264,7 @@ function testeKomposer() {
 testeZahlenparser();
 testeEffektivzinsToleranz();
 testeBruchToleranz();
+testeToleranzGrenzen();
 testeBewerteKoeffizientenZeile();
 testeBewerteMatrix();
 testeRundePunkteAbwaerts();
