@@ -24,6 +24,10 @@ body {
   background: var(--bg); color: var(--fg);
   font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
   -webkit-text-size-adjust: 100%;
+  /* Verhindert den Doppeltipp-Zoom auf iOS zusätzlich zum viewport-meta
+     (maximum-scale=1, user-scalable=no, siehe build.mjs) — ohne das eine
+     reicht das andere laut iPhone-Rückmeldung nicht immer aus. */
+  touch-action: manipulation;
 }
 #app { max-width: 36rem; margin: 0 auto; }
 #status-leiste {
@@ -73,7 +77,11 @@ body {
 .eingabe-teil-ueberschrift { font-weight: 700; color: var(--fg); font-size: 1rem; }
 .eingabe-teil-hinweis { font-size: .85rem; }
 .eingabe-zeile input {
-  font: inherit; padding: 10px 12px; border-radius: 8px; width: 100%;
+  /* font-size fest auf 16px statt des geerbten .9rem (14,4px) der Zeile —
+     unter 16px zoomt iOS beim Fokussieren eines Textfelds automatisch
+     hinein, ohne von selbst wieder herauszuzoomen (iPhone-Rückmeldung).
+     font-family/-weight bleiben über "font: inherit" trotzdem geerbt. */
+  font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 8px; width: 100%;
   border: 1px solid var(--rand); background: var(--bg); color: var(--fg);
   -webkit-appearance: none; min-height: 44px;
 }
@@ -176,20 +184,41 @@ body {
 .koeffizienten-plus { color: var(--gedaempft); }
 .matrix-gitter {
   display: grid;
-  gap: .4rem;
+  gap: 8px;
   /* Nur oben Abstand zum Label — unten reicht der ohnehin folgende Flex-Gap
      der .eingabe-zeile, ein zusätzlicher Margin hätte die Lücke vor der
      Knopf-Reihe nur unnötig vergrößert (iPhone-Rückmeldung). */
   margin: .2rem 0 0;
 }
-.matrix-zelle { width: 3.6rem; text-align: center; padding-left: 4px; padding-right: 4px; }
+/* Kompakt für ~4 Zeichen (z. B. "-12,5") statt der breiteren 3,6rem von
+   früher — passt zum "sieht aus wie das Ergebnis selbst"-Design unten
+   (iPhone-Rückmeldung: Matrixeingaben wirkten unnötig breit). */
+.matrix-zelle { width: 2.75rem; text-align: center; padding-left: 4px; padding-right: 4px; }
 .matrix-spalten-label, .matrix-zeilen-label, .matrix-kopf-leer {
   display: flex; align-items: center; justify-content: center;
   font-size: .8rem; color: var(--gedaempft); text-align: center;
 }
 .matrix-zeilen-label { justify-content: flex-start; font-weight: 600; }
+/* Einfache Matrixeingabe (kein Tilgungsplan mit Spalten-/Zeilenbeschriftung,
+   siehe istEinfacheMatrix in app.js): Name + "=" links, das Gitter wirkt
+   dadurch wie "A · B = (…)" statt wie eine separat beschriftete Box darüber
+   (iPhone-Rückmeldung). flex-wrap als Sicherheitsnetz für einen langen Namen
+   bei 375px (z. B. "AᵗC − (CᵗA)ᵗ"). */
+.matrix-eingabe-zeile { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.matrix-eingabe-label { font-size: .9rem; color: var(--gedaempft); white-space: nowrap; }
+.matrix-mit-klammern { display: flex; align-items: stretch; gap: 3px; }
+/* Große runde Klammern aus reinem CSS statt eines Unicode-Zeichens: Rand auf
+   drei Seiten plus border-radius:50% rundet die offene Seite weg zu einer
+   "("/")"-Kurve, die sich per align-items:stretch automatisch auf die
+   Gitterhöhe streckt (1 bis 3 Matrixzeilen) — kein Messen der Höhe in JS
+   nötig. */
+.matrix-klammer { flex: 0 0 auto; width: 7px; border-top: 2px solid var(--fg); border-bottom: 2px solid var(--fg); border-radius: 50%; }
+.matrix-klammer-links { border-left: 2px solid var(--fg); border-radius: 50% 0 0 50%; }
+.matrix-klammer-rechts { border-right: 2px solid var(--fg); border-radius: 0 50% 50% 0; }
 .eingabe-zeile select {
-  font: inherit; padding: 10px 12px; border-radius: 8px; width: 100%;
+  /* Derselbe Grund wie bei .eingabe-zeile input oben: 16px statt des
+     geerbten .9rem, sonst zoomt iOS beim Öffnen des Dropdowns hinein. */
+  font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 8px; width: 100%;
   border: 1px solid var(--rand); background: var(--bg); color: var(--fg);
   -webkit-appearance: none; min-height: 44px;
 }

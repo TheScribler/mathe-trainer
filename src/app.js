@@ -307,7 +307,12 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
   // Kein Doppelpunkt nach einem Fragezeichen ("Ist das Produkt
   // definiert?" statt "...definiert?:", iPhone-Rückmeldung).
   beschriftung.textContent = eingabe.label + (eingabe.label.trim().endsWith('?') ? ' ' : ': ');
-  zeile.appendChild(beschriftung);
+  // Eine "einfache" Matrix (kein Tilgungsplan mit eigenen Spalten-/
+  // Zeilenbeschriftungen) bekommt ihr Label stattdessen als "<Name> ="
+  // links neben dem geklammerten Gitter (siehe unten) — die generische,
+  // mit ": " endende Beschriftungszeile darüber entfällt dafür.
+  const istEinfacheMatrix = eingabe.typ === 'matrix' && !eingabe.spaltenLabels && !eingabe.zeilenLabels;
+  if (!istEinfacheMatrix) zeile.appendChild(beschriftung);
 
   if (eingabe.typ === 'koeffizienten') {
       const reihe = document.createElement('span');
@@ -434,7 +439,38 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
         }
         zellen.push(zeilenFelder);
       }
-      zeile.appendChild(gitter);
+
+      // Einfache Matrix (siehe istEinfacheMatrix oben): Name + "=" links,
+      // große runde Klammern um das Gitter — sieht dadurch wie das Ergebnis
+      // selbst aus ("A · B ="), nicht wie eine separat beschriftete Box
+      // darüber. Die Klammern sind reine CSS-Elemente, die sich per
+      // align-self:stretch in .matrix-mit-klammern automatisch auf die
+      // Gitterhöhe strecken (1 bis 3 Zeilen), ohne die Höhe in JS messen zu
+      // müssen. Tilgungsplan (spaltenLabels/zeilenLabels gesetzt) bleibt
+      // unverändert beim einfachen Gitter ohne Klammern.
+      if (istEinfacheMatrix) {
+        const matrixZeile = document.createElement('div');
+        matrixZeile.className = 'matrix-eingabe-zeile';
+        const matrixLabel = document.createElement('span');
+        matrixLabel.className = 'matrix-eingabe-label';
+        matrixLabel.textContent = eingabe.label + ' =';
+        matrixZeile.appendChild(matrixLabel);
+
+        const mitKlammern = document.createElement('div');
+        mitKlammern.className = 'matrix-mit-klammern';
+        const klammerLinks = document.createElement('span');
+        klammerLinks.className = 'matrix-klammer matrix-klammer-links';
+        const klammerRechts = document.createElement('span');
+        klammerRechts.className = 'matrix-klammer matrix-klammer-rechts';
+        mitKlammern.appendChild(klammerLinks);
+        mitKlammern.appendChild(gitter);
+        mitKlammern.appendChild(klammerRechts);
+        matrixZeile.appendChild(mitKlammern);
+
+        zeile.appendChild(matrixZeile);
+      } else {
+        zeile.appendChild(gitter);
+      }
 
       // Ein einziges Knopfpaar für die ganze Matrix statt je Zelle eins, als
       // absolutes Overlay unter der fokussierten Zelle (siehe .vorzeichen-

@@ -129,6 +129,43 @@ const LAYOUT_PRUEFSKRIPT = `
     }
   });
 
+  // iOS zoomt beim Fokussieren eines TEXT-Eingabefelds automatisch hinein,
+  // wenn dessen berechnete Schriftgröße unter 16px liegt — der eigentliche
+  // Grund für den Zoom, den das viewport-meta (maximum-scale=1,
+  // user-scalable=no, siehe build.mjs) allein nicht behebt. Gilt NICHT für
+  // Checkboxen/Radios (kein Text-Zoom-Ziel; der Themenfilter-Schalter ist
+  // bewusst über width/height auf 18px gesetzt, nicht über font-size — ohne
+  // den Ausschluss meldete der UA-Default-Font der Checkbox, ~11px, einen
+  // Fehlalarm). Global geprüft statt nur für Matrixaufgaben, da die Regel
+  // für jedes Textfeld/Dropdown gilt.
+  document.querySelectorAll('#app input, #app select').forEach((feld) => {
+    if (feld.type === 'checkbox' || feld.type === 'radio') return;
+    const groesse = parseFloat(getComputedStyle(feld).fontSize);
+    if (groesse < 16) {
+      probleme.push((feld.className || feld.tagName) + ': Schriftgröße ' + groesse + 'px unter 16px (löst iOS-Zoom beim Fokussieren aus)');
+    }
+  });
+
+  // Matrixaufgaben (alg.matrixprodukt/-matrixrechnung/-produktionsprozess):
+  // jede "einfache" Matrixeingabe (siehe istEinfacheMatrix in app.js)
+  // bekommt genau zwei Klammer-Elemente, die sich auf die volle Gitterhöhe
+  // strecken — Regressionsschutz für das neue Klammer-Design, nicht nur ein
+  // Seitenränder-Check wie oben.
+  document.querySelectorAll('#app .matrix-mit-klammern').forEach((box) => {
+    const klammern = box.querySelectorAll('.matrix-klammer');
+    if (klammern.length !== 2) {
+      probleme.push('Matrixklammern: erwartet 2 Klammer-Elemente, gefunden ' + klammern.length);
+    }
+    const gitter = box.querySelector('.matrix-gitter');
+    const gitterHoehe = gitter ? gitter.getBoundingClientRect().height : 0;
+    klammern.forEach((k) => {
+      const hoehe = k.getBoundingClientRect().height;
+      if (gitterHoehe > 0 && hoehe < gitterHoehe - 2) {
+        probleme.push('Matrixklammer zu niedrig (' + hoehe.toFixed(1) + 'px < Gitterhöhe ' + gitterHoehe.toFixed(1) + 'px)');
+      }
+    });
+  });
+
   // KaTeX rendert mit throwOnError:false (siehe src/loesung.js) — ein
   // kaputtes LaTeX-Fragment wirft also nie eine JS-Exception, sondern
   // erscheint nur als rot markiertes .katex-error im DOM. Ohne diesen

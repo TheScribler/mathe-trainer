@@ -302,17 +302,27 @@ export const matrixprodukt = {
     const schritteA = [];
     let formelZeilenA;
     let teilAText;
+    let eingabeLabelA;
     let titel;
+    // Nur bei einer echten Multiplikation zweier (ggf. transponierter)
+    // Matrizen/Vektoren bleibt die generische Einleitung stehen — bei einer
+    // Transponierten, einem Skalarprodukt oder der Transponierten-Regel ist
+    // "Matrizenprodukte" als Oberbegriff unpassend, dort erklärt teilAText
+    // (unten) die jeweilige Teilaufgabe schon für sich allein.
+    let istEchtesProduktA = true;
 
     if (teilA.art === 'definiert') {
       const { v, M, ergebnis } = teilA;
       const n = v.length;
-      // Faktoren auf getrennte Zeilen statt nebeneinander — zwei 3×3-
-      // Matrizen (oder sogar nur eine, falls Einträge zweistellig sind)
-      // liefen bei 375px sonst gelegentlich ab (iPhone-Rückmeldung).
-      formelZeilenA = [`${matrixLatexFormatiert([v])}`, `\\cdot ${matrixLatexFormatiert(M)}`];
+      // Jede Matrix/jeder Vektor benannt und auf einer eigenen Zeile statt
+      // als unbenannte Klammerausdrücke mit einem bloßen "\cdot" am Anfang
+      // der zweiten Zeile (iPhone-Rückmeldung: sah wie ein abgeschnittener
+      // Rechenschritt aus, nicht wie eine Multiplikation zweier Faktoren).
+      formelZeilenA = [`v = ${matrixLatexFormatiert([v])}`, `M = ${matrixLatexFormatiert(M)}`];
+      teilAText = 'Berechnen Sie v · M.';
+      eingabeLabelA = 'v · M';
       eingaben.push({
-        id: 'a', label: `Ergebnis (1×${n})`, typ: 'matrix', zeilen: 1, spalten: n,
+        id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 1, spalten: n,
         punkte: 2, loesung: [ergebnis], toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
       });
       schritteA.push(
@@ -328,17 +338,19 @@ export const matrixprodukt = {
         },
         {
           titel: 'Ergebnis',
-          latex: mehrzeiligeKette([`${matrixLatexFormatiert([v])}`, `\\cdot ${matrixLatexFormatiert(M)}`, `= ${matrixLatexFormatiert([ergebnis])}`]),
+          latex: mehrzeiligeKette([`v \\cdot M`, `= ${matrixLatexFormatiert([v])} \\cdot ${matrixLatexFormatiert(M)}`, `= ${matrixLatexFormatiert([ergebnis])}`]),
         },
       );
     } else if (teilA.art === 'transponiert') {
       const { A: Amat, ergebnis } = teilA;
       const m = Amat.length; const n = Amat[0].length;
       titel = 'Matrizenprodukt und Transponierte';
-      teilAText = 'Bilden Sie die Transponierte von A.';
+      istEchtesProduktA = false;
+      teilAText = 'Berechnen Sie Aᵗ.';
+      eingabeLabelA = 'Aᵗ';
       formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`];
       eingaben.push({
-        id: 'a', label: `Ergebnis Aᵗ (${n}×${m})`, typ: 'matrix', zeilen: n, spalten: m,
+        id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: n, spalten: m,
         punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
       });
       schritteA.push(
@@ -355,10 +367,12 @@ export const matrixprodukt = {
       const m = Amat.length; const n = Amat[0].length;
       const aProse = a < 0 ? `−${Math.abs(a)}` : String(a);
       titel = 'Matrizenprodukt mit Skalar';
-      teilAText = `Multiplizieren Sie A mit ${aProse}.`;
+      istEchtesProduktA = false;
+      teilAText = `Berechnen Sie ${aProse} · A.`;
+      eingabeLabelA = `${aProse} · A`;
       formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`];
       eingaben.push({
-        id: 'a', label: `Ergebnis ${aProse}·A (${m}×${n})`, typ: 'matrix', zeilen: m, spalten: n,
+        id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: m, spalten: n,
         punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
       });
       schritteA.push(
@@ -368,16 +382,21 @@ export const matrixprodukt = {
           hinweis: 'Bei der Multiplikation mit einem Skalar wird jeder Eintrag der Matrix mit dem Skalar multipliziert.',
         },
         { titel: 'Einsetzen', latex: `A = ${matrixLatexFormatiert(Amat)}` },
-        { titel: 'Ergebnis', latex: `${zahlZuLatex(a, 0)} \\cdot ${matrixLatexFormatiert(Amat)} = ${matrixLatexFormatiert(ergebnis)}` },
+        {
+          titel: 'Ergebnis',
+          latex: mehrzeiligeKette([`${zahlZuLatex(a, 0)} \\cdot A`, `= ${zahlZuLatex(a, 0)} \\cdot ${matrixLatexFormatiert(Amat)}`, `= ${matrixLatexFormatiert(ergebnis)}`]),
+        },
       );
     } else if (teilA.art === 'einheitsmatrix') {
       const { A: Amat, E, ergebnis } = teilA;
       const m = Amat.length; const n = Amat[0].length;
       titel = 'Matrizenprodukt mit Einheitsmatrix';
-      teilAText = 'Multiplizieren Sie A mit der Einheitsmatrix E.';
+      istEchtesProduktA = false;
+      teilAText = 'Berechnen Sie A · E.';
+      eingabeLabelA = 'A · E';
       formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`];
       eingaben.push({
-        id: 'a', label: `Ergebnis A·E (${m}×${n})`, typ: 'matrix', zeilen: m, spalten: n,
+        id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: m, spalten: n,
         punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
       });
       schritteA.push(
@@ -389,17 +408,18 @@ export const matrixprodukt = {
         { titel: 'Einsetzen', latex: `A \\cdot E = ${matrixLatexFormatiert(Amat)} \\cdot ${matrixLatexFormatiert(E)}` },
         {
           titel: 'Ergebnis',
-          latex: `${matrixLatexFormatiert(Amat)} \\cdot ${matrixLatexFormatiert(E)} = ${matrixLatexFormatiert(ergebnis)}`,
+          latex: mehrzeiligeKette([`A \\cdot E`, `= ${matrixLatexFormatiert(Amat)} \\cdot ${matrixLatexFormatiert(E)}`, `= ${matrixLatexFormatiert(ergebnis)}`]),
           hinweis: 'Das Ergebnis ist wieder A, wie von A·E = A erwartet.',
         },
       );
     } else if (teilA.art === 'aussenprodukt') {
       const { D, F, ergebnis } = teilA;
       titel = 'Außenprodukt zweier Vektoren';
-      teilAText = 'Bilden Sie das Außenprodukt D·Fᵗ.';
+      teilAText = 'Berechnen Sie D · Fᵗ.';
+      eingabeLabelA = 'D · Fᵗ';
       formelZeilenA = [`D = ${matrixLatexFormatiert(D.map((w) => [w]))}`, `F^T = ${matrixLatexFormatiert([F])}`];
       eingaben.push({
-        id: 'a', label: 'Ergebnis D·Fᵗ (3×3)', typ: 'matrix', zeilen: 3, spalten: 3,
+        id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 3, spalten: 3,
         punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
       });
       schritteA.push(
@@ -420,10 +440,11 @@ export const matrixprodukt = {
       const { D, F, ergebnis } = teilA;
       const wert = ergebnis[0][0];
       titel = 'Skalarprodukt als 1×1-Matrix';
-      teilAText = 'Bilden Sie das Produkt Dᵗ·F.';
+      teilAText = 'Berechnen Sie Dᵗ · F.';
+      eingabeLabelA = 'Dᵗ · F';
       formelZeilenA = [`D^T = ${matrixLatexFormatiert([D])}`, `F = ${matrixLatexFormatiert(F.map((w) => [w]))}`];
       eingaben.push({
-        id: 'a', label: 'Ergebnis Dᵗ·F (1×1)', typ: 'matrix', zeilen: 1, spalten: 1,
+        id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 1, spalten: 1,
         punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
       });
       schritteA.push(
@@ -441,10 +462,12 @@ export const matrixprodukt = {
       const CtA = matrixMal(transponiere(C), Amat);
       const CtAt = transponiere(CtA);
       titel = 'Transponierten-Regel beim Matrizenprodukt';
+      istEchtesProduktA = false;
       teilAText = 'Zeigen Sie AᵗC − (CᵗA)ᵗ = 0.';
+      eingabeLabelA = 'AᵗC − (CᵗA)ᵗ';
       formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`, `C = ${matrixLatexFormatiert(C)}`];
       eingaben.push({
-        id: 'a', label: 'Ergebnis AᵗC − (CᵗA)ᵗ (2×2)', typ: 'matrix', zeilen: 2, spalten: 2,
+        id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 2, spalten: 2,
         punkte: 2, loesung: [[0, 0], [0, 0]], toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
       });
       schritteA.push(
@@ -476,9 +499,10 @@ export const matrixprodukt = {
     } else {
       const { C, D } = teilA;
       const p = C.length; const q = C[0].length; const r = D.length; const s = D[0].length;
-      formelZeilenA = [`${matrixLatexFormatiert(C)}`, `\\cdot ${matrixLatexFormatiert(D)}`];
+      teilAText = 'Prüfen Sie, ob C · D definiert ist.';
+      formelZeilenA = [`C = ${matrixLatexFormatiert(C)}`, `D = ${matrixLatexFormatiert(D)}`];
       eingaben.push({
-        id: 'a', label: 'Ist das Produkt definiert?', typ: 'auswahl',
+        id: 'a', label: 'Ist C · D definiert?', typ: 'auswahl',
         optionen: ['Definiert', 'Nicht definiert'], punkte: 2, loesung: 'Nicht definiert', teilLabel: 'a)',
       });
       schritteA.push(
@@ -500,18 +524,23 @@ export const matrixprodukt = {
 
     const { X, Y, ergebnis: ergebnisB } = teilB;
     eingaben.push({
-      id: 'b', label: 'Ergebnis (3×3)', typ: 'matrix', zeilen: 3, spalten: 3,
+      id: 'b', label: 'X · Y', typ: 'matrix', zeilen: 3, spalten: 3,
       punkte: 2, loesung: ergebnisB, toleranz: KONFIG.toleranz.exakt, teilLabel: 'b)',
     });
-    const formelZeilenB = [`${matrixLatexFormatiert(X)}`, `\\cdot ${matrixLatexFormatiert(Y)}`];
+    const formelZeilenB = [`X = ${matrixLatexFormatiert(X)}`, `Y = ${matrixLatexFormatiert(Y)}`];
 
     return {
       titel,
       frage: {
-        text: 'Berechnen Sie die folgenden Matrizenprodukte, soweit definiert.',
+        // Nur stehen lassen, wenn beide Teilaufgaben tatsächlich Produkte
+        // sind — bei einer Transponierten/einem Skalarprodukt/der
+        // Transponierten-Regel in a) wäre "Matrizenprodukte" als
+        // Oberbegriff falsch, dort erklärt teilAText die Teilaufgabe schon
+        // für sich (iPhone-Rückmeldung).
+        text: istEchtesProduktA ? 'Berechnen Sie die folgenden Matrizenprodukte, soweit definiert.' : undefined,
         teile: [
           { label: 'a)', text: teilAText, formel: mehrzeiligeKette(formelZeilenA) },
-          { label: 'b)', formel: mehrzeiligeKette(formelZeilenB) },
+          { label: 'b)', text: 'Berechnen Sie X · Y, falls definiert.', formel: mehrzeiligeKette(formelZeilenB) },
         ],
       },
       eingaben,
@@ -529,7 +558,7 @@ export const matrixprodukt = {
           },
           {
             titel: 'Ergebnis',
-            latex: mehrzeiligeKette([`${matrixLatexFormatiert(X)}`, `\\cdot ${matrixLatexFormatiert(Y)}`, `= ${matrixLatexFormatiert(ergebnisB)}`]),
+            latex: mehrzeiligeKette([`X \\cdot Y`, `= ${matrixLatexFormatiert(X)} \\cdot ${matrixLatexFormatiert(Y)}`, `= ${matrixLatexFormatiert(ergebnisB)}`]),
           },
         ],
         ergebnisse: [
@@ -724,7 +753,7 @@ export const produktionsprozess = {
       },
       eingaben: [
         {
-          id: 'R', label: `Rohstoffbedarf R (${anzahlRohstoffe}×1)`, typ: 'matrix', zeilen: anzahlRohstoffe, spalten: 1,
+          id: 'R', label: 'R', typ: 'matrix', zeilen: anzahlRohstoffe, spalten: 1,
           punkte: 4, loesung: R, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
         },
         { id: 'G', label: 'Gewinn G', typ: 'zahl', punkte: 4, loesung: gewinn, toleranz: KONFIG.toleranz.geld, teilLabel: 'b)' },
