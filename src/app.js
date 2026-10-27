@@ -350,16 +350,12 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
   // Kein Doppelpunkt nach einem Fragezeichen ("Ist das Produkt
   // definiert?" statt "...definiert?:", iPhone-Rückmeldung).
   beschriftung.textContent = eingabe.label + (eingabe.label.trim().endsWith('?') ? ' ' : ': ');
-  // jahresraster (Tilgungsplan): ein Block je Jahr mit eigener "Jahr n"-
-  // Überschrift statt eines durchgehenden Gitters — die generische Zeile
-  // darüber wäre dort nur redundant.
-  const istJahresraster = eingabe.typ === 'matrix' && !!eingabe.jahresraster;
   // Eine "einfache" Matrix (kein Tilgungsplan mit eigenen Spalten-/
-  // Zeilenbeschriftungen oder Jahresraster) bekommt ihr Label stattdessen
-  // als "<Name> =" links neben dem geklammerten Gitter (siehe unten) — die
-  // generische, mit ": " endende Beschriftungszeile darüber entfällt dafür.
-  const istEinfacheMatrix = eingabe.typ === 'matrix' && !eingabe.spaltenLabels && !eingabe.zeilenLabels && !istJahresraster;
-  if (!istEinfacheMatrix && !istJahresraster) zeile.appendChild(beschriftung);
+  // Zeilenbeschriftungen) bekommt ihr Label stattdessen als "<Name> ="
+  // links neben dem geklammerten Gitter (siehe unten) — die generische,
+  // mit ": " endende Beschriftungszeile darüber entfällt dafür.
+  const istEinfacheMatrix = eingabe.typ === 'matrix' && !eingabe.spaltenLabels && !eingabe.zeilenLabels;
+  if (!istEinfacheMatrix) zeile.appendChild(beschriftung);
 
   if (eingabe.typ === 'koeffizienten') {
       const reihe = document.createElement('span');
@@ -371,26 +367,29 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
       // Lösung eines LGS). trenner (optional): "," statt "+" zwischen den
       // Boxen, wenn die Werte keine Summanden sind, sondern ein Tupel.
       const beschriftungen = eingabe.beschriftungen ?? eingabe.exponenten.map(potenzBeschriftung);
-      // Das "+"/Trenner-Zeichen steckt INNERHALB der eigenen .koeffizienten-
-      // teil-Box (am Ende, nicht als eigenes Element davor) — sonst könnte
-      // der Flex-Umbruch die Box von ihrem vorangehenden "+" trennen und das
-      // Zeichen allein am Ende einer Zeile zurücklassen. So bricht bei
-      // fehlendem Platz immer die GANZE Box "Feld + Potenz + Zeichen"
-      // zusammen um, nie mitten im Zeichen (iPhone-Rückmeldung).
+      // Die Potenz-Beschriftung steht ÜBER dem Feld statt daneben (siehe
+      // .koeffizienten-teil in stil.css: flex-direction:column) — daneben
+      // hätte sie dem Eingabefeld bei vier Termen (int.unbestimmt) zu viel
+      // von der ohnehin knappen Breite genommen, um "−64,46" noch ohne
+      // Abschneiden zu zeigen (iPhone-Rückmeldung). Das "+"/Trenner-Zeichen
+      // ist wieder ein eigenes, schmales Element zwischen den Boxen (kein
+      // Umbruch mehr möglich, seit die Reihe fest auf einer Zeile bleibt
+      // — anders als in einer früheren Fassung, wo es noch in der Box
+      // selbst steckte, um bei einem Umbruch nicht verwaist zurückzubleiben).
       beschriftungen.forEach((beschriftungText, i) => {
-        const teilZeile = document.createElement('span');
+        if (i > 0) {
+          const plus = document.createElement('span');
+          plus.className = 'koeffizienten-plus';
+          plus.textContent = eingabe.trenner ?? '+';
+          reihe.appendChild(plus);
+        }
+        const teilZeile = document.createElement('label');
         teilZeile.className = 'koeffizienten-teil';
-        const feld = baueZahlenfeld(teilZeile, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
         const potenzLabel = document.createElement('span');
         potenzLabel.className = 'koeffizienten-potenz';
         potenzLabel.textContent = beschriftungText;
         teilZeile.appendChild(potenzLabel);
-        if (i < beschriftungen.length - 1) {
-          const plus = document.createElement('span');
-          plus.className = 'koeffizienten-plus';
-          plus.textContent = eingabe.trenner ?? '+';
-          teilZeile.appendChild(plus);
-        }
+        const feld = baueZahlenfeld(teilZeile, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
         reihe.appendChild(teilZeile);
         teilfelder.push(feld);
       });
@@ -452,78 +451,62 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
       felder[eingabe.id] = teilfelder;
     } else if (eingabe.typ === 'matrix') {
       let zellen;
-      if (istJahresraster) {
-        // Tilgungsplan: ein eigener Block je Jahr statt eines durchgehenden
-        // n×4-Gitters — bei großen Beträgen ("−64,46"-lange Werte) passten
-        // nicht genug Spalten nebeneinander auf 375px (iPhone-Rückmeldung).
-        // Jeder Block zeigt seine vier Werte als eigenständig beschriftete
-        // 2×2-Zellen (S/Z oben, T/A unten laut feldBeschriftungen-Reihen-
-        // folge) statt als Tabellenzeile.
-        const { titel, feldBeschriftungen } = eingabe.jahresraster;
-        const bloecke = document.createElement('div');
-        bloecke.className = 'jahresbloecke';
+      const spaltenLabels = eingabe.spaltenLabels ?? null;
+      const zeilenLabels = eingabe.zeilenLabels ?? null;
+      if (spaltenLabels || zeilenLabels) {
+        // Tilgungsplan: Tabelle mit Kopfzeile (S/Z/T/A) und einer Zeile je
+        // Jahr (Jahreszahl links) — als Flex-Zeilen statt eines CSS-Grids,
+        // damit sich die Eingabefelder die Breite teilen (flex:1 1 0) und
+        // nie umbrechen, auch bei großen Beträgen (iPhone-Rückmeldung: ein
+        // CSS-Grid mit fester Zellbreite passte bei 5-6 Spalten nicht
+        // zuverlässig auf 375px).
+        const tabelle = document.createElement('div');
+        tabelle.className = 'tilgungstabelle';
+
+        if (spaltenLabels) {
+          const kopf = document.createElement('div');
+          kopf.className = 'tilgungstabelle-zeile tilgungstabelle-kopf';
+          if (zeilenLabels) {
+            const leer = document.createElement('span');
+            leer.className = 'tilgungstabelle-zeilenlabel';
+            kopf.appendChild(leer);
+          }
+          spaltenLabels.forEach((text) => {
+            const kopfZelle = document.createElement('span');
+            kopfZelle.className = 'tilgungstabelle-spaltenlabel';
+            kopfZelle.textContent = text;
+            kopf.appendChild(kopfZelle);
+          });
+          tabelle.appendChild(kopf);
+        }
+
         zellen = [];
         for (let i = 0; i < eingabe.zeilen; i++) {
-          const block = document.createElement('div');
-          block.className = 'jahresblock';
-          const ueberschrift = document.createElement('div');
-          ueberschrift.className = 'jahresblock-titel';
-          ueberschrift.textContent = titel[i];
-          block.appendChild(ueberschrift);
-
-          const raster = document.createElement('div');
-          raster.className = 'jahresblock-raster';
+          const zeileDiv = document.createElement('div');
+          zeileDiv.className = 'tilgungstabelle-zeile';
+          if (zeilenLabels) {
+            const zeilenLabel = document.createElement('span');
+            zeilenLabel.className = 'tilgungstabelle-zeilenlabel';
+            zeilenLabel.textContent = zeilenLabels[i];
+            zeileDiv.appendChild(zeilenLabel);
+          }
           const zeilenFelder = [];
           for (let j = 0; j < eingabe.spalten; j++) {
-            const feldZelle = document.createElement('label');
-            feldZelle.className = 'jahresblock-feld';
-            const feldLabel = document.createElement('span');
-            feldLabel.className = 'jahresblock-feld-label';
-            feldLabel.textContent = feldBeschriftungen[j];
-            feldZelle.appendChild(feldLabel);
-            const feld = baueZahlenfeld(feldZelle, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
-            feld.classList.add('matrix-zelle');
-            raster.appendChild(feldZelle);
+            const feld = baueZahlenfeld(zeileDiv, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
+            feld.classList.add('matrix-zelle', 'tilgungstabelle-feld');
             zeilenFelder.push(feld);
           }
           zellen.push(zeilenFelder);
-          block.appendChild(raster);
-          bloecke.appendChild(block);
+          tabelle.appendChild(zeileDiv);
         }
-        zeile.appendChild(bloecke);
+        zeile.appendChild(tabelle);
       } else {
         const gitter = document.createElement('div');
         gitter.className = 'matrix-gitter';
-        // Optionale Spalten-/Zeilen-Beschriftungen — ohne sie war nicht
-        // erkennbar, welche Spalte welche Größe ist (iPhone-Rückmeldung).
-        // Rein additiv: ohne spaltenLabels/zeilenLabels verhält sich das
-        // Gitter exakt wie zuvor (alg.matrixprodukt u. a.).
-        const spaltenLabels = eingabe.spaltenLabels ?? null;
-        const zeilenLabels = eingabe.zeilenLabels ?? null;
-        gitter.style.gridTemplateColumns = (zeilenLabels ? 'auto ' : '') + `repeat(${eingabe.spalten}, auto)`;
-
-        if (spaltenLabels) {
-          if (zeilenLabels) {
-            const leer = document.createElement('span');
-            leer.className = 'matrix-kopf-leer';
-            gitter.appendChild(leer);
-          }
-          spaltenLabels.forEach((text) => {
-            const kopf = document.createElement('span');
-            kopf.className = 'matrix-spalten-label';
-            kopf.textContent = text;
-            gitter.appendChild(kopf);
-          });
-        }
+        gitter.style.gridTemplateColumns = `repeat(${eingabe.spalten}, auto)`;
 
         zellen = [];
         for (let i = 0; i < eingabe.zeilen; i++) {
-          if (zeilenLabels) {
-            const zeilenLabel = document.createElement('span');
-            zeilenLabel.className = 'matrix-zeilen-label';
-            zeilenLabel.textContent = zeilenLabels[i];
-            gitter.appendChild(zeilenLabel);
-          }
           const zeilenFelder = [];
           for (let j = 0; j < eingabe.spalten; j++) {
             const feld = baueZahlenfeld(gitter, { mitEigenerHinweis: false, mitEigenenKnopfen: false });

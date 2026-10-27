@@ -124,6 +124,12 @@ const LAYOUT_PRUEFSKRIPT = `
     // bereits ab — genau dafür ist er da, dieses Element selbst ist dann
     // kein eigenständiges Problem.
     if (hatScrollbarenVorfahren(el)) return;
+    // fin.tilgungsplan (.tilgungstabelle-feld): internes Scrollen eines zu
+    // langen Werts ist dort ausdrücklich erlaubt (siehe TEXTBREITE_PRUEFSKRIPT
+    // in layout.mjs) — ohne diese Ausnahme würde dieselbe allgemeine Regel
+    // das hier nach dem "−64,46"-Eingabefeld-Breite-Test erneut (und
+    // fälschlich) melden.
+    if (el.classList && el.classList.contains('tilgungstabelle-feld')) return;
     if (el.scrollWidth > el.clientWidth + 1) {
       probleme.push((el.className || el.tagName) + ': eigener Inhalt überläuft ohne Scroll-Möglichkeit (scrollWidth=' + el.scrollWidth + ' > clientWidth=' + el.clientWidth + ')');
     }
@@ -143,6 +149,38 @@ const LAYOUT_PRUEFSKRIPT = `
     const groesse = parseFloat(getComputedStyle(feld).fontSize);
     if (groesse < 16) {
       probleme.push((feld.className || feld.tagName) + ': Schriftgröße ' + groesse + 'px unter 16px (löst iOS-Zoom beim Fokussieren aus)');
+    }
+  });
+
+  // Koeffizientenzeilen (diff.gewinn-breakeven E(x)/G(x), alg.lgs x₁-x₃,
+  // int.unbestimmt, jede andere Koeffizientenreihe) dürfen NIE umbrechen —
+  // alle Eingabefelder einer Reihe müssen auf derselben Höhe (top) stehen.
+  // Die Felder teilen sich dafür die Breite (flex:1 1 0, siehe stil.css)
+  // statt eine feste Breite zu verlangen, die einen Umbruch erzwingen
+  // könnte (iPhone-Rückmeldung: eine Reihe brach wieder auf zwei Zeilen um).
+  document.querySelectorAll('#app .koeffizienten-reihe').forEach((reihe) => {
+    const felder = Array.from(reihe.querySelectorAll('input'));
+    if (felder.length < 2) return;
+    const tops = felder.map((f) => f.getBoundingClientRect().top);
+    const minTop = Math.min(...tops);
+    const maxTop = Math.max(...tops);
+    if (maxTop - minTop > 2) {
+      probleme.push('koeffizienten-reihe: Felder nicht auf einer Zeile (top weicht um ' +
+        (maxTop - minTop).toFixed(1) + 'px ab): ' + reihe.textContent.slice(0, 60));
+    }
+  });
+
+  // fin.tilgungsplan: jede Tabellenzeile (eine je Jahr) muss ihre Felder
+  // auf einer Zeile zeigen, nicht umgebrochen — Regressionsschutz für die
+  // Rückkehr zur Tabellenform mit geteilten Feldbreiten (iPhone-Rückmeldung).
+  document.querySelectorAll('#app .tilgungstabelle-zeile:not(.tilgungstabelle-kopf)').forEach((zeileDiv) => {
+    const felder = Array.from(zeileDiv.querySelectorAll('input'));
+    if (felder.length < 2) return;
+    const tops = felder.map((f) => f.getBoundingClientRect().top);
+    const minTop = Math.min(...tops);
+    const maxTop = Math.max(...tops);
+    if (maxTop - minTop > 2) {
+      probleme.push('tilgungstabelle-zeile: Felder nicht auf einer Zeile (top weicht um ' + (maxTop - minTop).toFixed(1) + 'px ab)');
     }
   });
 
@@ -501,7 +539,11 @@ async function main() {
     // Rückmeldung: Koeffizientenboxen bei 16px-Schrift zu schmal). Separat
     // von LAYOUT_PRUEFSKRIPT, weil ein zu enges <input> den Text intern
     // scrollen lässt, statt die Seite selbst zum Überlaufen zu bringen —
-    // LAYOUT_PRUEFSKRIPT allein hätte das nie gesehen.
+    // LAYOUT_PRUEFSKRIPT allein hätte das nie gesehen. Ausnahme:
+    // fin.tilgungsplan (.tilgungstabelle-feld) — dort ist internes Scrollen
+    // bei einem langen Wert ausdrücklich erlaubt (geteilte Feldbreite in
+    // einer Tabelle mit bis zu 6 Spalten, siehe stil.css), nur die Seite
+    // selbst darf nicht überlaufen (das prüft LAYOUT_PRUEFSKRIPT weiterhin).
     console.log('\nPrüfe Eingabefeld-Breite ("−64,46" in jedes Feld) …');
     const TEXTBREITE_SEEDS_PRO_GENERATOR = 10;
     const TEXTBREITE_PRUEFSKRIPT = `
@@ -510,6 +552,7 @@ async function main() {
       document.querySelectorAll('#app input[type="text"]').forEach((feld, i) => {
         feld.value = text;
         feld.dispatchEvent(new Event('input', { bubbles: true }));
+        if (feld.classList.contains('tilgungstabelle-feld')) return;
         if (feld.scrollWidth > feld.clientWidth + 1) {
           const art = feld.closest('.matrix-zelle, .koeffizienten-teil') ? (feld.closest('.matrix-zelle') ? 'matrix' : 'koeffizienten') : 'einzeln';
           probleme.push('Feld ' + i + ' (' + art + '): "' + text + '" abgeschnitten (scrollWidth=' + feld.scrollWidth + ' > clientWidth=' + feld.clientWidth + ')');

@@ -813,15 +813,8 @@ export const tilgungsplan = {
           id: 'plan', label: `Tilgungsplan, Jahre 1–${n}`,
           typ: 'matrix', zeilen: n, spalten: 4, punkte: 4, loesung: matrixLoesung,
           toleranz: KONFIG.toleranz.tilgungszelle,
-          // Ein Block je Jahr (2×2: S/Z oben, T/A unten) statt eines
-          // durchgehenden n×4-Gitters — bei großen Beträgen passten nicht
-          // genug Spalten nebeneinander auf 375px (iPhone-Rückmeldung).
-          // loesung bleibt dieselbe n×4-Form, nur die Darstellung ändert
-          // sich (siehe istJahresraster in app.js).
-          jahresraster: {
-            titel: zeilen.map((z) => `Jahr ${z.jahr}`),
-            feldBeschriftungen: ['S', 'Z', 'T', 'A'],
-          },
+          spaltenLabels: ['S', 'Z', 'T', 'A'],
+          zeilenLabels: zeilen.map((z) => String(z.jahr)),
         },
       ],
       loesung: {

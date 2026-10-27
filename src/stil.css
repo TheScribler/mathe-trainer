@@ -48,6 +48,13 @@ body {
   background: var(--karte); border: 1px solid var(--rand); border-radius: 12px;
   padding: 16px; margin-bottom: 12px;
 }
+/* Etwas weniger seitliches Padding auf schmalen Bildschirmen (375px u. ä.)
+   gewinnt ein paar zusätzliche Pixel Breite für enge Eingabereihen
+   (Koeffizientenreihen mit vier Termen, der Tilgungsplan mit bis zu sechs
+   Spalten) — vertikales Padding bleibt gleich (iPhone-Rückmeldung). */
+@media (max-width: 400px) {
+  .aufgabe-karte { padding: 16px 10px; }
+}
 .aufgabe-karte h2 { font-size: 1rem; margin: 0 0 .6rem; }
 .frage-text { margin: 0 0 1rem; }
 .frage-tabelle-wrapper { overflow-x: auto; max-width: 100%; margin: 0 0 1rem; }
@@ -174,23 +181,30 @@ body {
   text-align: center; font-size: .72rem; color: var(--gedaempft);
   margin: 1.5rem 0 0; padding-top: .5rem; opacity: .7;
 }
-.koeffizienten-reihe { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem; }
-/* flex-shrink:0 — ohne das durfte der Flex-Algorithmus die Box unter ihre
-   gesetzte Breite zusammendrücken, sobald die Reihe nicht mehr auf eine
-   Zeile passte (iPhone-Rückmeldung bei 16px-Schrift: "25" oder "−64,46"
-   wirkten beim Tippen abgeschnitten) — jetzt bricht stattdessen die ganze
-   Box samt ihrem "+" in die nächste Zeile um (siehe .koeffizienten-teil
-   input unten und die Reihenfolge [Feld, Potenz, Plus] in app.js). */
-.koeffizienten-teil { display: inline-flex; align-items: center; gap: .3rem; flex-shrink: 0; }
-/* Mindestens 6 Zeichen bei 16px Platz (z. B. "−64,46") — bricht die Reihe
-   bei zu wenig Platz um, statt den Text abzuschneiden (iPhone-Rückmeldung).
-   rem statt ch: "ch" misst nur die Breite der Ziffer "0", Komma und Minus
-   sind in -apple-system breiter — 6,5ch reichte in der Praxis nicht, 79px
-   gemessener Bedarf gegen nur 61px Boxbreite (test/layout.mjs deckte das
-   auf). 5,5rem (88px) hat spürbar Luft darüber. */
-.koeffizienten-teil input { width: 5.5rem; flex-shrink: 0; }
-.koeffizienten-potenz { font-size: .95rem; }
-.koeffizienten-plus { color: var(--gedaempft); }
+/* flex-wrap:nowrap — die Reihe MUSS auf einer Zeile bleiben (iPhone-
+   Rückmeldung: ein Umbruch wirkte verwirrender als Boxen, die sich die
+   Breite teilen). "+"/Trenner zwischen den Boxen bleibt ein schmales
+   flex:0 0 auto-Element (kein Umbruch mehr möglich, der es verwaist
+   zurücklassen könnte). align-items:flex-end richtet die "+"-Zeichen an
+   der UNTERKANTE aus, auf Höhe der Eingabefelder, nicht der (kürzeren)
+   Potenz-Beschriftung über jeder Box. */
+.koeffizienten-reihe { display: flex; flex-wrap: nowrap; align-items: flex-end; gap: 2px; }
+.koeffizienten-plus { flex: 0 0 auto; color: var(--gedaempft); }
+/* flex:1 1 0 statt einer festen Breite — die Boxen teilen sich den Platz
+   der Reihe gleichmäßig, damit sie nie umbrechen; min-width:0 erlaubt das
+   Schrumpfen unter die Inhaltsbreite (ohne das würde ein Flex-Item nie
+   unter seine eigene min-content-Breite gehen). flex-direction:column
+   stellt die Potenz-Beschriftung ÜBER statt NEBEN das Feld — daneben hätte
+   sie bei vier Termen (int.unbestimmt) zu viel von der knappen Breite
+   gekostet, um "−64,46" noch ohne Abschneiden zu zeigen (iPhone-
+   Rückmeldung); darüber kostet sie keine Breite, nur etwas Höhe, die bei
+   375px reichlich vorhanden ist. */
+.koeffizienten-teil {
+  display: inline-flex; flex-direction: column; align-items: stretch;
+  gap: 1px; flex: 1 1 0; min-width: 0;
+}
+.koeffizienten-teil input { flex: 1 1 0; min-width: 0; width: auto; padding: 8px 4px; text-align: center; }
+.koeffizienten-potenz { font-size: .8rem; text-align: center; color: var(--gedaempft); }
 .matrix-gitter {
   display: grid;
   gap: 8px;
@@ -198,22 +212,6 @@ body {
      der .eingabe-zeile, ein zusätzlicher Margin hätte die Lücke vor der
      Knopf-Reihe nur unnötig vergrößert (iPhone-Rückmeldung). */
   margin: .2rem 0 0;
-  /* Bei vielen Spalten (fin.tilgungsplan: 5-6) reicht 375px nicht für die
-     volle Breite jeder Zelle — ohne Gegenmaßnahme drückt der verfügbare
-     Platz die "auto"-Spalten unter ihre gesetzte Breite zusammen, egal was
-     auf .matrix-zelle steht (test/layout.mjs deckte das auf: Boxen blieben
-     bei 65px statt der gesetzten ~88px, Text schnitt ab). width:max-content
-     lässt das Gitter stattdessen auf seine natürliche volle Breite wachsen;
-     max-width/overflow-x fangen den Rest als eigene Scrollbox ab, statt die
-     Seite selbst zum Überlaufen zu bringen. min-width:0 hier UND auf
-     .matrix-mit-klammern (dem Flex-Elternelement) ist dafür nötig — sonst
-     bläht die natürliche Breite stattdessen die ganzen Vorfahren bis zur
-     Karte auf, statt wirklich nur hier intern zu scrollen (derselbe
-     bekannte Flexbox-"min-width:auto"-Effekt wie bei Flex-Kindern). */
-  overflow-x: auto;
-  min-width: 0;
-  width: max-content;
-  max-width: 100%;
 }
 /* Mindestens 6 Zeichen bei 16px Platz (z. B. "−64,46"), dieselbe Begründung
    wie bei .koeffizienten-teil input oben (rem statt ch) — die vorherigen
@@ -228,11 +226,17 @@ body {
    deckte es erst jetzt auf, weil kleinere Matrixwerte den Unterschied
    bisher nie sichtbar gemacht hatten). */
 input.matrix-zelle { width: 5.5rem; text-align: center; padding-left: 4px; padding-right: 4px; }
-.matrix-spalten-label, .matrix-zeilen-label, .matrix-kopf-leer {
-  display: flex; align-items: center; justify-content: center;
-  font-size: .8rem; color: var(--gedaempft); text-align: center;
+/* Tilgungsplan-Tabellenfeld: teilt sich die Breite mit den anderen Feldern
+   der Zeile (flex:1 1 0, min-width:0 statt der festen 5,5rem oben — höhere
+   Spezifität durch die zweite Klasse gewinnt gegen die Regel darüber),
+   rechtsbündig wie in einer Tabelle mit Geldbeträgen üblich. Ein Wert, der
+   trotzdem breiter als die Box ist, scrollt beim Tippen innerhalb des
+   Feldes (bewusst in Kauf genommen, siehe .tilgungstabelle oben). */
+input.matrix-zelle.tilgungstabelle-feld {
+  width: auto; flex: 1 1 0; min-width: 0;
+  padding-left: 6px; padding-right: 6px;
+  text-align: right;
 }
-.matrix-zeilen-label { justify-content: flex-start; font-weight: 600; }
 /* Einfache Matrixeingabe (kein Tilgungsplan mit Spalten-/Zeilenbeschriftung,
    siehe istEinfacheMatrix in app.js): Name + "=" links, das Gitter wirkt
    dadurch wie "A · B = (…)" statt wie eine separat beschriftete Box darüber
@@ -249,18 +253,19 @@ input.matrix-zelle { width: 5.5rem; text-align: center; padding-left: 4px; paddi
 .matrix-klammer { flex: 0 0 auto; width: 7px; border-top: 2px solid var(--fg); border-bottom: 2px solid var(--fg); border-radius: 50%; }
 .matrix-klammer-links { border-left: 2px solid var(--fg); border-radius: 50% 0 0 50%; }
 .matrix-klammer-rechts { border-right: 2px solid var(--fg); border-radius: 0 50% 50% 0; }
-/* Tilgungsplan (siehe jahresraster in app.js/finanz.js): ein Block je Jahr
-   statt eines durchgehenden n×4-Gitters, das bei großen Beträgen nicht
-   mehr auf 375px passte (iPhone-Rückmeldung). Jeder Block ist ein 2×2-
-   Raster (S/Z oben, T/A unten, Reihenfolge aus feldBeschriftungen), jede
-   Zelle mit eigener kleiner Beschriftung über dem Feld statt eines
-   gemeinsamen Spalten-/Zeilenkopfs. */
-.jahresbloecke { display: flex; flex-direction: column; gap: 12px; margin: .2rem 0 0; }
-.jahresblock { border: 1px solid var(--rand); border-radius: 8px; padding: 8px 10px; }
-.jahresblock-titel { font-weight: 700; font-size: .9rem; margin-bottom: 6px; }
-.jahresblock-raster { display: grid; grid-template-columns: repeat(2, auto); gap: 8px; }
-.jahresblock-feld { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.jahresblock-feld-label { font-size: .8rem; color: var(--gedaempft); }
+/* Tilgungsplan: Tabelle mit Kopfzeile (S/Z/T/A) und einer Flex-Zeile je
+   Jahr (Jahreszahl links) statt eines CSS-Grids mit fester Zellbreite —
+   die Eingabefelder teilen sich stattdessen die Breite (flex:1 1 0,
+   min-width:0 auf .tilgungstabelle-feld unten) und brechen dadurch nie um,
+   auch bei 5-6 Spalten und großen Beträgen (iPhone-Rückmeldung). Längere
+   Werte als die Box dürfen beim Tippen intern im Feld scrollen, statt die
+   Seite zu sprengen — das ist hier bewusst in Kauf genommen (anders als
+   bei Koeffizientenzeilen, wo das Feld immer breit genug sein soll). */
+.tilgungstabelle { display: flex; flex-direction: column; gap: 6px; margin: .2rem 0 0; }
+.tilgungstabelle-zeile { display: flex; align-items: center; gap: 6px; }
+.tilgungstabelle-kopf { font-size: .8rem; color: var(--gedaempft); font-weight: 600; }
+.tilgungstabelle-zeilenlabel { flex: 0 0 auto; width: 1.8rem; text-align: center; }
+.tilgungstabelle-spaltenlabel { flex: 1 1 0; min-width: 0; text-align: center; }
 .eingabe-zeile select {
   /* Derselbe Grund wie bei .eingabe-zeile input oben: 16px statt des
      geerbten .9rem, sonst zoomt iOS beim Öffnen des Dropdowns hinein. */
