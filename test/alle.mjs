@@ -7,7 +7,7 @@ import { parseDeZahl, nahBei, ggT, minimaleNachkommastellen } from '../src/zahl.
 import { pruefeZahl, bewerteKoeffizientenZeile, bewerteMatrix, rundePunkteAbwaerts } from '../src/pruefung.js';
 import { GENERATOREN, GENERATOREN_NACH_TEIL } from '../src/generatoren/index.js';
 import { effektivzins } from '../src/generatoren/finanz.js';
-import { komponiereKlausur } from '../src/komposer.js';
+import { komponiereKlausur, waehleKombinationMitWiederholung } from '../src/komposer.js';
 import { testeFixtures } from './fixtures.mjs';
 import { KONFIG } from '../src/konfig.js';
 
@@ -938,6 +938,23 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
           `${kennzeichnung}: d)[${i}][${j}] erwartet b)[${j}][${i}]=${b[j][i]}, war ${d[i][j]}`);
       }
     }
+    // r, s dürfen nie ±1 oder 0 sein (trivialer Faktor wäre reine
+    // Vorzeichenfrage, keine echte Skalarmultiplikation) — und r+s=0 darf
+    // nur beim gezielten Nullmatrix-Showcase für c) auftreten, nicht als
+    // Zufallsnebeneffekt irgendeiner anderen Kombination (siehe RS_POOL-
+    // Kommentar in algebra.js).
+    pruefe(![-1, 0, 1].includes(p.r), `${kennzeichnung}: r=${p.r} ist trivial (−1/0/1)`);
+    pruefe(![-1, 0, 1].includes(p.s), `${kennzeichnung}: s=${p.s} ist trivial (−1/0/1)`);
+    // Die Häufigkeit von r+s=0 (nur als gezielter Nullmatrix-Showcase
+    // erlaubt) wird separat über viele Seeds geprüft, siehe
+    // testeMatrixrechnungNullmatrixAnteil() — pro Instanz lässt sich dazu
+    // nichts Sinnvolles behaupten (s=−r folgt aus r+s=0 immer rein algebraisch).
+    // Keine Nullzeile/-spalte in A, B oder C — dieselbe Prüfung wie bei
+    // alg.produktionsprozess/-matrixprodukt.
+    for (const [name, m] of [['A', p.A], ['B', p.B], ['C', p.C]]) {
+      pruefe(!m.some((zeile) => zeile.every((w) => w === 0)), `${kennzeichnung}: ${name} hat eine Nullzeile: ${JSON.stringify(m)}`);
+      pruefe(!m[0].some((_, j) => m.every((zeile) => zeile[j] === 0)), `${kennzeichnung}: ${name} hat eine Nullspalte: ${JSON.stringify(m)}`);
+    }
     return;
   }
 
@@ -1302,6 +1319,70 @@ function testeKomposer() {
   console.log(`Komposer: ${Object.keys(KONFIG.presets).length} Presets × ${KOMPOSER_SEEDS} Seeds geprüft`);
 }
 
+// alg.matrixrechnung: r+s=0 (Nullmatrix-Showcase für c)) soll bei etwa 25 %
+// der Instanzen auftreten (siehe waehleParameter), nicht bei 0 % (Showcase
+// kaputt) und nicht bei deutlich mehr (die r+s≠0-Zurückweisung für die
+// übrigen Instanzen würde dann nicht mehr greifen). Eigene, von
+// testeGenerator unabhängige Schleife, weil es hier um eine Häufigkeit über
+// viele Seeds geht, nicht um eine Eigenschaft einer einzelnen Instanz.
+function testeMatrixrechnungNullmatrixAnteil() {
+  const generator = GENERATOREN.find((g) => g.id === 'alg.matrixrechnung');
+  const SEEDS = 2000;
+  let nullmatrixFaelle = 0;
+  for (let seed = 0; seed < SEEDS; seed++) {
+    const { r, s } = generator.waehleParameter(mulberry32(seed));
+    if (r + s === 0) nullmatrixFaelle += 1;
+  }
+  const anteil = nullmatrixFaelle / SEEDS;
+  pruefe(anteil > 0.1 && anteil < 0.4,
+    `alg.matrixrechnung: Nullmatrix-Fall (r+s=0) bei ${(anteil * 100).toFixed(1)}% von ${SEEDS} Seeds, erwartet ungefähr 25%`);
+  console.log(`alg.matrixrechnung Nullmatrix-Showcase: ${nullmatrixFaelle}/${SEEDS} Seeds (${(anteil * 100).toFixed(1)}%)`);
+}
+
+// Mini-Klausur-Komposer (app.js' erzeugeNeueProbeklausurAusFilter): anders
+// als komponiereKlausur darf hier jeder Generator bis zu zweimal vorkommen,
+// über einen potenziell großen, ungruppierten Pool — eigene Tests, weil
+// waehleKombinationMitWiederholung eine eigenständige DP-Suche ist, keine
+// Variante von waehleKombination/alleTeilmengen.
+function testeKombinationMitWiederholung() {
+  const g = (id, punkte) => ({ id, punkte });
+
+  // Pool trifft 60 nur mit Wiederholung: 1× reicht höchstens auf 36 (12+12+12),
+  // aber 5 der 6 Slots (12+12+12+12+12) ergeben exakt 60 — die Suche muss das finden.
+  const poolUnterDeckt = [g('x', 12), g('y', 12), g('z', 12)];
+  const r1 = waehleKombinationMitWiederholung(poolUnterDeckt, 60, 2);
+  pruefe(r1.exakt && r1.summe === 60, `Mini-Komposer: Pool [12,12,12]×2 sollte 60 exakt treffen, war ${r1.summe} (exakt=${r1.exakt})`);
+  for (const id of ['x', 'y', 'z']) {
+    const anzahl = r1.generatoren.filter((gg) => gg.id === id).length;
+    pruefe(anzahl <= 2, `Mini-Komposer: Generator ${id} kommt ${anzahl}× vor, erlaubt sind höchstens 2`);
+  }
+  pruefe(r1.generatoren.reduce((s, gg) => s + gg.punkte, 0) === r1.summe,
+    `Mini-Komposer: Summe der gewählten Generatoren (${r1.generatoren.reduce((s, gg) => s + gg.punkte, 0)}) ≠ gemeldete Summe (${r1.summe})`);
+
+  // Pool trifft 60 schon einfach exakt — keine Wiederholung nötig, aber auch
+  // nicht schädlich, wenn die Suche trotzdem eine fände (hier nicht möglich,
+  // da 2× jeden Typs über 60 hinausschießen würde und keine Teilmenge davon
+  // wieder exakt 60 ergibt außer der einfachen).
+  const poolExakt = [g('a', 24), g('b', 24), g('c', 12)];
+  const r2 = waehleKombinationMitWiederholung(poolExakt, 60, 2);
+  pruefe(r2.exakt && r2.summe === 60, `Mini-Komposer: Pool [24,24,12] sollte 60 exakt treffen, war ${r2.summe}`);
+
+  // Pool kann 60 selbst mit Wiederholung nicht exakt treffen (nur Dreier-
+  // Punktzahlen) — kleinste Abweichung erwartet (59 oder 61), kein Absturz.
+  const poolUnpassend = [g('p', 3), g('q', 3)];
+  const r3 = waehleKombinationMitWiederholung(poolUnpassend, 60, 2);
+  pruefe(!r3.exakt, `Mini-Komposer: Pool [3,3]×2 (max. 12) kann 60 nicht treffen, exakt=${r3.exakt} wäre falsch`);
+  pruefe(r3.summe === 12, `Mini-Komposer: Pool [3,3]×2 sollte die bestmögliche Summe 12 wählen, war ${r3.summe}`);
+
+  // Randfälle: leerer Pool und Ziel 0 dürfen nicht abstürzen.
+  const r4 = waehleKombinationMitWiederholung([], 60, 2);
+  pruefe(r4.generatoren.length === 0 && r4.summe === 0 && !r4.exakt, `Mini-Komposer: leerer Pool sollte leer/0/nicht exakt liefern, war ${JSON.stringify(r4)}`);
+  const r5 = waehleKombinationMitWiederholung(poolExakt, 0, 2);
+  pruefe(r5.generatoren.length === 0 && r5.summe === 0 && r5.exakt, `Mini-Komposer: Ziel 0 sollte leer/0/exakt liefern, war ${JSON.stringify(r5)}`);
+
+  console.log('Mini-Komposer (waehleKombinationMitWiederholung): 5 Fälle geprüft');
+}
+
 testeZahlenparser();
 testeEffektivzinsToleranz();
 testeBruchToleranz();
@@ -1310,6 +1391,8 @@ testeBewerteKoeffizientenZeile();
 testeBewerteMatrix();
 testeRundePunkteAbwaerts();
 testeKomposer();
+testeKombinationMitWiederholung();
+testeMatrixrechnungNullmatrixAnteil();
 fehler += testeFixtures();
 for (const generator of GENERATOREN) {
   testeGenerator(generator);

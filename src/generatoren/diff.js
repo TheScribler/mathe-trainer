@@ -217,6 +217,12 @@ export const gewinnBreakeven = {
     const diskriminante = runde(mfB * mfB - 4 * mfA * mfC, 4);
     const wurzelDiskriminante = runde(Math.sqrt(diskriminante), 4);
     const zweiMfA = 2 * mfA;
+    // "-b" in der Mitternachtsformel: Klammern nur, wenn b selbst negativ
+    // ist ("-(-50)"), sonst wirkt die Klammer um eine bereits positive Zahl
+    // überflüssig ("-(50)" statt einfach "-50", iPhone-Rückmeldung).
+    const minusMfBLatex = mfB < 0
+      ? `-(${zahlZuLatex(mfB, minimaleNachkommastellen(mfB))})`
+      : `-${zahlZuLatex(mfB, minimaleNachkommastellen(mfB))}`;
     // Für die mit Zahlen vorgerechneten K'(x0)/p(xMax)/G(xMax)-Schritte unten
     // (statt der "|_{x=...}"-Kurzschreibweise, iPhone-Rückmeldung).
     const kStrichEingesetzt = polynomEingesetztLatex([2 * c, d], [1, 0], x0);
@@ -314,8 +320,8 @@ export const gewinnBreakeven = {
           {
             titel: 'Einsetzen',
             latex: mehrzeiligeKette([
-              `x_1 = \\dfrac{-(${zahlZuLatex(mfB, minimaleNachkommastellen(mfB))}) + ${zahlZuLatex(wurzelDiskriminante, minimaleNachkommastellen(wurzelDiskriminante))}}{${zahlZuLatex(zweiMfA, minimaleNachkommastellen(zweiMfA))}} = ${zahlZuLatex(x1, 0)}`,
-              `x_2 = \\dfrac{-(${zahlZuLatex(mfB, minimaleNachkommastellen(mfB))}) - ${zahlZuLatex(wurzelDiskriminante, minimaleNachkommastellen(wurzelDiskriminante))}}{${zahlZuLatex(zweiMfA, minimaleNachkommastellen(zweiMfA))}} = ${zahlZuLatex(x2, 0)}`,
+              `x_1 = \\dfrac{${minusMfBLatex} + ${zahlZuLatex(wurzelDiskriminante, minimaleNachkommastellen(wurzelDiskriminante))}}{${zahlZuLatex(zweiMfA, minimaleNachkommastellen(zweiMfA))}} = ${zahlZuLatex(x1, 0)}`,
+              `x_2 = \\dfrac{${minusMfBLatex} - ${zahlZuLatex(wurzelDiskriminante, minimaleNachkommastellen(wurzelDiskriminante))}}{${zahlZuLatex(zweiMfA, minimaleNachkommastellen(zweiMfA))}} = ${zahlZuLatex(x2, 0)}`,
             ]),
           },
           { titel: 'Ergebnis', latex: `x_1 = ${x1}\\ \\text{(Break-Even)}, \\quad x_2 = ${x2}\\ \\text{(Gewinngrenze)}` },

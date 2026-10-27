@@ -172,8 +172,8 @@ export const matrixprodukt = {
       : null;
     let teilA;
     if (zusatzVariante === 'aussenprodukt' || zusatzVariante === 'skalarprodukt1x1') {
-      // Übung 22 h)/i): D, F je 3×1-Spaltenvektoren. h) D·Fᵗ ist das
-      // Außenprodukt (3×1)·(1×3) = 3×3, i) Dᵗ·F ist das Skalarprodukt als
+      // Übung 22 h)/i): D, F je 3×1-Spaltenvektoren. h) D·Fᵀ ist das
+      // Außenprodukt (3×1)·(1×3) = 3×3, i) Dᵀ·F ist das Skalarprodukt als
       // 1×1-"Matrix" (1×3)·(3×1) — derselbe Aufbau wie in Übung 22, aber als
       // zwei getrennte Varianten (wie transponiert/skalar/einheitsmatrix
       // auch je für sich gezogen werden).
@@ -194,9 +194,9 @@ export const matrixprodukt = {
       }
       if (!teilA) teilA = { art: 'aussenprodukt', D: [1, 2, 3], F: [1, 0, -1], ergebnis: [[1, 0, -1], [2, 0, -2], [3, 0, -3]] }; // Rückfall
     } else if (zusatzVariante === 'transponierte-regel') {
-      // Übung 22 k): AᵗC − (CᵗA)ᵗ = 0, weil (CᵗA)ᵗ = Aᵗ(Cᵗ)ᵗ = AᵗC gilt
-      // ((A·B)ᵗ = Bᵗ·Aᵗ, hier mit B=C). A, C gleich groß (2×2), damit sowohl
-      // AᵗC als auch CᵗA definiert sind.
+      // Übung 22 k): AᵀC − (CᵀA)ᵀ = 0, weil (CᵀA)ᵀ = Aᵀ(Cᵀ)ᵀ = AᵀC gilt
+      // ((A·B)ᵀ = Bᵀ·Aᵀ, hier mit B=C). A, C gleich groß (2×2), damit sowohl
+      // AᵀC als auch CᵀA definiert sind.
       for (let versuch = 0; versuch < 100; versuch++) {
         const A = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
         const C = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
@@ -346,8 +346,8 @@ export const matrixprodukt = {
       const m = Amat.length; const n = Amat[0].length;
       titel = 'Matrizenprodukt und Transponierte';
       istEchtesProduktA = false;
-      teilAText = 'Berechnen Sie Aᵗ.';
-      eingabeLabelA = 'Aᵗ';
+      teilAText = 'Berechnen Sie Aᵀ.';
+      eingabeLabelA = 'Aᵀ';
       formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`];
       eingaben.push({
         id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: n, spalten: m,
@@ -357,7 +357,7 @@ export const matrixprodukt = {
         {
           titel: 'Formel',
           latex: `A^T`,
-          hinweis: 'Transponieren vertauscht Zeilen und Spalten: Eintrag (i,j) von A wird zum Eintrag (j,i) von Aᵗ.',
+          hinweis: 'Transponieren vertauscht Zeilen und Spalten: Eintrag (i,j) von A wird zum Eintrag (j,i) von Aᵀ.',
         },
         { titel: 'Einsetzen', latex: `A = ${matrixLatexFormatiert(Amat)}` },
         { titel: 'Ergebnis', latex: `A^T = ${matrixLatexFormatiert(ergebnis)}` },
@@ -415,8 +415,8 @@ export const matrixprodukt = {
     } else if (teilA.art === 'aussenprodukt') {
       const { D, F, ergebnis } = teilA;
       titel = 'Außenprodukt zweier Vektoren';
-      teilAText = 'Berechnen Sie D · Fᵗ.';
-      eingabeLabelA = 'D · Fᵗ';
+      teilAText = 'Berechnen Sie D · Fᵀ.';
+      eingabeLabelA = 'D · Fᵀ';
       formelZeilenA = [`D = ${matrixLatexFormatiert(D.map((w) => [w]))}`, `F^T = ${matrixLatexFormatiert([F])}`];
       eingaben.push({
         id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 3, spalten: 3,
@@ -440,8 +440,8 @@ export const matrixprodukt = {
       const { D, F, ergebnis } = teilA;
       const wert = ergebnis[0][0];
       titel = 'Skalarprodukt als 1×1-Matrix';
-      teilAText = 'Berechnen Sie Dᵗ · F.';
-      eingabeLabelA = 'Dᵗ · F';
+      teilAText = 'Berechnen Sie Dᵀ · F.';
+      eingabeLabelA = 'Dᵀ · F';
       formelZeilenA = [`D^T = ${matrixLatexFormatiert([D])}`, `F = ${matrixLatexFormatiert(F.map((w) => [w]))}`];
       eingaben.push({
         id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 1, spalten: 1,
@@ -451,7 +451,7 @@ export const matrixprodukt = {
         {
           titel: 'Formel',
           latex: `D^T \\cdot F`,
-          hinweis: 'Dᵗ ist ein Zeilenvektor (1×3), F ein Spaltenvektor (3×1) — das Produkt (1×3)·(3×1) ist eine 1×1-"Matrix", also ein einzelner Wert: das gewöhnliche Skalarprodukt von D und F.',
+          hinweis: 'Dᵀ ist ein Zeilenvektor (1×3), F ein Spaltenvektor (3×1) — das Produkt (1×3)·(3×1) ist eine 1×1-"Matrix", also ein einzelner Wert: das gewöhnliche Skalarprodukt von D und F.',
         },
         { titel: 'Einsetzen', latex: `D^T \\cdot F = ${skalarproduktLatex(D, F)} = ${zahlZuLatex(wert, 0)}` },
         { titel: 'Ergebnis', latex: `D^T \\cdot F = ${matrixLatexFormatiert(ergebnis)}` },
@@ -463,8 +463,8 @@ export const matrixprodukt = {
       const CtAt = transponiere(CtA);
       titel = 'Transponierten-Regel beim Matrizenprodukt';
       istEchtesProduktA = false;
-      teilAText = 'Zeigen Sie AᵗC − (CᵗA)ᵗ = 0.';
-      eingabeLabelA = 'AᵗC − (CᵗA)ᵗ';
+      teilAText = 'Zeigen Sie AᵀC − (CᵀA)ᵀ = 0.';
+      eingabeLabelA = 'AᵀC − (CᵀA)ᵀ';
       formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`, `C = ${matrixLatexFormatiert(C)}`];
       eingaben.push({
         id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 2, spalten: 2,
@@ -474,7 +474,7 @@ export const matrixprodukt = {
         {
           titel: 'Formel',
           latex: `A^TC - (C^TA)^T`,
-          hinweis: 'Aus (A·B)ᵗ = Bᵗ·Aᵗ folgt mit B=C: (CᵗA)ᵗ = Aᵗ(Cᵗ)ᵗ = AᵗC — die Differenz ist deshalb immer die Nullmatrix, unabhängig von den konkreten Werten in A und C.',
+          hinweis: 'Aus (A·B)ᵀ = Bᵀ·Aᵀ folgt mit B=C: (CᵀA)ᵀ = Aᵀ(Cᵀ)ᵀ = AᵀC — die Differenz ist deshalb immer die Nullmatrix, unabhängig von den konkreten Werten in A und C.',
         },
         {
           titel: 'Einsetzen',
@@ -811,13 +811,18 @@ export const produktionsprozess = {
 // ---------------------------------------------------------------------------
 // alg.matrixrechnung — Übung 21 (Zusatzthema)
 // Addition/Subtraktion, Vielfache und Linearkombinationen von 2×2-Matrizen,
-// dazu die Transponierten-Regel (rA+sB−rC)ᵗ = rAᵗ+sBᵗ−rCᵗ und den Kurzweg
-// rA+sA = (r+s)A. Rückwärts: A, B, C klein ganzzahlig, r, s klein ganzzahlig
-// (auch r+s=0 zulässig — das macht c) gerade lehrreich, siehe Übung 21c, wo
-// r=−2, s=2 die Nullmatrix ergibt).
+// dazu die Transponierten-Regel (rA+sB−rC)ᵀ = rAᵀ+sBᵀ−rCᵀ und den Kurzweg
+// rA+sA = (r+s)A. Rückwärts: A, B, C klein ganzzahlig (keine Nullzeile/
+// -spalte, dieselbe Prüfung wie bei alg.produktionsprozess/-matrixprodukt),
+// r, s aus RS_POOL (±1 ausgeschlossen — ein trivialer Faktor von 1/−1 macht
+// die Multiplikation mit dem Skalar zu einer reinen Vorzeichenfrage). r+s=0
+// bleibt NUR für den Kurzweg in c) erlaubt (rA+sA=(r+s)A wird dort zur
+// Nullmatrix, Übung 21c: r=−2, s=2) — mit 25 % Wahrscheinlichkeit gezielt so
+// konstruiert (s=−r), sonst wird r+s=0 zurückgewiesen, sonst wäre c) de facto
+// immer dieselbe Nullmatrix.
 // Zusatzthema (Phase 6) — in der Probeklausur standardmäßig aus.
 // ---------------------------------------------------------------------------
-const RS_POOL = [-3, -2, -1, 1, 2, 3];
+const RS_POOL = [-3, -2, 2, 3];
 
 export const matrixrechnung = {
   id: 'alg.matrixrechnung',
@@ -827,13 +832,16 @@ export const matrixrechnung = {
   vorlage: 'Übung 21',
   zusatz: true,
   waehleParameter(rng) {
+    const zeigtNullmatrixFall = zufallBool(rng, 0.25);
     for (let versuch = 0; versuch < 200; versuch++) {
       const A = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
       const B = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
       const C = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
       const r = zufallAus(rng, RS_POOL);
-      const s = zufallAus(rng, RS_POOL);
+      const s = zeigtNullmatrixFall ? -r : zufallAus(rng, RS_POOL);
+      if (!zeigtNullmatrixFall && r + s === 0) continue;
       if (nullAnteil([A, B, C]) < 1 / 4) continue;
+      if (!keineNullzeileOderSpalte(A) || !keineNullzeileOderSpalte(B) || !keineNullzeileOderSpalte(C)) continue;
       return { A, B, C, r, s };
     }
     return { A: [[-1, 2], [-2, 3]], B: [[3, -1], [-5, 2]], C: [[2, 0], [0, 1]], r: -2, s: 2 }; // Rückfall: Übung 21
@@ -887,14 +895,14 @@ export const matrixrechnung = {
         { id: 'a', label: 'r·(A−C)', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: ergA, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
         { id: 'b', label: 'r·A + s·B − r·C', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: ergB, toleranz: KONFIG.toleranz.exakt, teilLabel: 'b)' },
         { id: 'c', label: 'r·A + s·A', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: ergC, toleranz: KONFIG.toleranz.exakt, teilLabel: 'c)' },
-        { id: 'd', label: '(r·A + s·B − r·C)ᵗ', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: ergD, toleranz: KONFIG.toleranz.exakt, teilLabel: 'd)' },
+        { id: 'd', label: '(r·A + s·B − r·C)ᵀ', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: ergD, toleranz: KONFIG.toleranz.exakt, teilLabel: 'd)' },
       ],
       loesung: {
         schritte: [
           {
             titel: 'Formel',
             latex: `r \\cdot (A - C)`,
-            hinweis: 'Erst die Matrizen entrywise subtrahieren, dann jeden Eintrag mit r multiplizieren.',
+            hinweis: 'Erst die Matrizen elementweise subtrahieren, dann jeden Eintrag mit r multiplizieren.',
           },
           {
             titel: 'Einsetzen',
@@ -905,7 +913,7 @@ export const matrixrechnung = {
           {
             titel: 'Formel',
             latex: `rA + sB - rC`,
-            hinweis: 'Jede Matrix zuerst mit ihrem Skalar multiplizieren, dann entrywise addieren/subtrahieren.',
+            hinweis: 'Jede Matrix zuerst mit ihrem Skalar multiplizieren, dann elementweise addieren/subtrahieren.',
           },
           {
             titel: 'Einsetzen',
@@ -920,7 +928,7 @@ export const matrixrechnung = {
             titel: 'Einsetzen',
             latex: mehrzeiligeKette(indizes.map(([i, j]) =>
               `b_{${i + 1}${j + 1}} = ${zahlZuLatex(rA[i][j], 0)} + ${klammerWennNeg(sB[i][j])} - ${klammerWennNeg(rC[i][j])} = ${zahlZuLatex(ergB[i][j], 0)}`)),
-            hinweis: 'Die drei bereits skalierten Matrizen entrywise addieren/subtrahieren.',
+            hinweis: 'Die drei bereits skalierten Matrizen elementweise addieren/subtrahieren.',
           },
           { titel: 'Ergebnis', latex: `rA + sB - rC = ${matrixLatexFormatiert(ergB)}` },
           {
@@ -958,7 +966,7 @@ export const matrixrechnung = {
           { label: 'r·(A−C)', latex: matrixLatexFormatiert(ergA) },
           { label: 'r·A + s·B − r·C', latex: matrixLatexFormatiert(ergB) },
           { label: 'r·A + s·A = (r+s)·A', latex: matrixLatexFormatiert(ergC) },
-          { label: '(r·A + s·B − r·C)ᵗ', latex: matrixLatexFormatiert(ergD) },
+          { label: '(r·A + s·B − r·C)ᵀ', latex: matrixLatexFormatiert(ergD) },
         ],
       },
       params,

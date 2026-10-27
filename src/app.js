@@ -140,6 +140,36 @@ function positioniereKnopfPaarUnterFeld(knopfPaar, feld) {
   knopfPaar.style.left = `${links}px`;
 }
 
+// iOS schiebt beim Fokussieren eines Textfelds von sich aus die ganze Seite
+// hoch ("scroll ins Sichtfeld"), selbst wenn das Feld schon sichtbar war —
+// fühlte sich wie ein Ruckeln an (iPhone-Rückmeldung). Der native Scroll wird
+// im touchend abgefangen (preventDefault, dann selbst mit
+// {preventScroll:true} fokussieren); nur Textfelder, nicht Checkbox/Select —
+// ein <select> öffnet sein Picker-Rad auf iOS nur bei einem echten Tap, nicht
+// bei einem per JS ausgelösten focus(), ein abgefangener touchend hätte das
+// Dropdown funktionslos gemacht. Nach kurzer Wartezeit (Tastatur-Einblendung)
+// wird der vorherige scrollY gezielt wiederhergestellt — aber NUR, wenn das
+// Feld auch ganz ohne jeden Scroll innerhalb von window.visualViewport
+// sichtbar bliebe. Bleibt es sonst hinter der Tastatur verborgen, bleibt der
+// (sonst unterdrückte) Scroll an dieser einen Stelle bewusst unangetastet.
+function installiereTouchFokusOhneScroll() {
+  if (typeof document === 'undefined') return;
+  document.addEventListener('touchend', function (ereignis) {
+    const feld = ereignis.target.closest('input[type="text"]');
+    if (!feld || document.activeElement === feld) return;
+    ereignis.preventDefault();
+    const vorherigeScrollY = window.scrollY;
+    feld.focus({ preventScroll: true });
+    setTimeout(() => {
+      const vp = (typeof window !== 'undefined') ? window.visualViewport : null;
+      const sichtbareHoehe = vp ? vp.height : window.innerHeight;
+      const rect = feld.getBoundingClientRect();
+      const bleibtSichtbarOhneScroll = rect.top >= 0 && rect.bottom <= sichtbareHoehe;
+      if (bleibtSichtbarOhneScroll) window.scrollTo(0, vorherigeScrollY);
+    }, 350);
+  }, { passive: false });
+}
+
 function baueTabelle(tabelle) {
   const wrapper = document.createElement('div');
   wrapper.className = 'frage-tabelle-wrapper';
@@ -1181,24 +1211,30 @@ const MINI_KLAUSUR_ZIEL_PUNKTE = 60;
 const MINI_KLAUSUR_SEKUNDEN_PRO_PUNKT = 60;
 
 function erzeugeNeueProbeklausurAusFilter(zusatzthemenEinbeziehen) {
-  const rngKomposer = mulberry32(erzeugeSeed());
   const gefiltert = generatorenAusUebungsfilter();
-  const teile = komponiereKlausur(
-    { 'Übungsfilter': MINI_KLAUSUR_ZIEL_PUNKTE },
-    { 'Übungsfilter': gefiltert },
-    rngKomposer,
-  );
+  // Reicht der gefilterte Pool bei einfacher Verwendung nicht an die 60 P
+  // heran, darf jeder Typ bis zu zweimal vorkommen (mit jeweils neuen
+  // Zahlen) — siehe waehleKombinationMitWiederholung in komposer.js.
+  const { generatoren: gewaehlteGeneratoren, summe, exakt } =
+    waehleKombinationMitWiederholung(gefiltert, MINI_KLAUSUR_ZIEL_PUNKTE, 2);
+  const teile = [{ teil: 'Übungsfilter', ziel: MINI_KLAUSUR_ZIEL_PUNKTE, summe, exakt, generatoren: gewaehlteGeneratoren }];
   const aufgaben = baueAufgabenliste(teile, zusatzthemenEinbeziehen);
-  const summeErreicht = teile.reduce((s, t) => s + t.summe, 0);
   const zustand = {
     version: 1,
     startZeit: Date.now(),
-    dauerSekunden: summeErreicht * MINI_KLAUSUR_SEKUNDEN_PRO_PUNKT,
+    dauerSekunden: summe * MINI_KLAUSUR_SEKUNDEN_PRO_PUNKT,
     teile: teile.map((t) => ({ teil: t.teil, ziel: t.ziel, summe: t.summe, exakt: t.exakt })),
     aufgaben,
     antworten: {},
     selbstbewertung: {},
     abgegeben: false,
+    // Markiert diesen Zustand für zeichneLaufendeKlausur: statt der
+    // generischen "Punkte-Ziel nicht exakt getroffen"-Warnung (gedacht für
+    // den seltenen Ausnahmefall bei den normalen Presets) zeigt die
+    // Mini-Klausur ruhig die tatsächlich erreichte Punktzahl/Dauer an — ein
+    // kleiner Übungsfilter, der die 60 P nicht erreicht, ist hier der
+    // Normalfall, kein Fehler.
+    istMiniKlausurAusFilter: true,
   };
   speichereProbeklausurZustand(zustand);
   return zustand;
@@ -1330,13 +1366,24 @@ function zeichneLaufendeKlausur(wurzel, zustand) {
   kopfzeile.appendChild(abgebenKnopf);
   wurzel.appendChild(kopfzeile);
 
-  const nichtExakt = zustand.teile.filter((t) => !t.exakt && t.ziel > 0);
-  if (nichtExakt.length > 0) {
-    const hinweis = document.createElement('p');
-    hinweis.className = 'loesung-hinweis';
-    hinweis.textContent = 'Punkte-Ziel nicht exakt getroffen: ' +
-      nichtExakt.map((t) => `${t.teil} (${t.summe} statt ${t.ziel})`).join(', ') + '.';
-    wurzel.appendChild(hinweis);
+  if (zustand.istMiniKlausurAusFilter) {
+    // Ruhige Anzeige statt der Warnung unten: ein kleiner Übungsfilter, der
+    // die 60 P nicht erreicht, ist hier der Normalfall, kein Fehler (siehe
+    // erzeugeNeueProbeklausurAusFilter).
+    const info = document.createElement('p');
+    info.className = 'frage-text';
+    const erreichtePunkte = zustand.teile[0] ? zustand.teile[0].summe : 0;
+    info.textContent = `${erreichtePunkte} P · ${Math.round(zustand.dauerSekunden / 60)} min`;
+    wurzel.appendChild(info);
+  } else {
+    const nichtExakt = zustand.teile.filter((t) => !t.exakt && t.ziel > 0);
+    if (nichtExakt.length > 0) {
+      const hinweis = document.createElement('p');
+      hinweis.className = 'loesung-hinweis';
+      hinweis.textContent = 'Punkte-Ziel nicht exakt getroffen: ' +
+        nichtExakt.map((t) => `${t.teil} (${t.summe} statt ${t.ziel})`).join(', ') + '.';
+      wurzel.appendChild(hinweis);
+    }
   }
 
   zustand.aufgaben.forEach((eintrag, idx) => {
@@ -1521,6 +1568,7 @@ function zeichneAuswertung(wurzel, zustand) {
 // ---------------------------------------------------------------------------
 
 function starteApp() {
+  installiereTouchFokusOhneScroll();
   const wurzel = document.getElementById('app');
   wurzel.innerHTML = '';
 

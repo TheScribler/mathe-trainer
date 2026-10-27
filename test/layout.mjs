@@ -575,7 +575,61 @@ async function main() {
         console.error(`FEHLER (laufende Mini-Klausur aus Übungsfilter): ${problem}`);
       }
     }
-    console.log(`Probeklausur-Startbildschirm: 5 Schalterstellungen/Ansichten geprüft, ${startbildschirmFehler} Layout-Probleme`);
+    // Übungsfilter auf genau einen kleinen Typ eingeschränkt (diff.ableitungen,
+    // 4 P): selbst 2× reicht nur auf 8 von 60 P — erzwingt sowohl den
+    // Wiederholungs-Pfad (derselbe Typ zweimal mit neuen Zahlen) als auch die
+    // ruhige "P · min"-Anzeige statt der Warnung (siehe erzeugeNeueProbeklausurAusFilter).
+    await wd(`/session/${id}/execute/sync`, 'POST', {
+      script: `
+        try {
+          const alleIds = window.__testAlleGeneratorIds();
+          const ausgeschlossen = alleIds.filter((i) => i !== 'diff.ableitungen');
+          window.localStorage.setItem('mathe-trainer-uebung-filter-v1', JSON.stringify({ teil: 'alle', ausgeschlossen, offen: false }));
+        } catch (e) {}
+        window.__testZeigeProbeklausurStart();
+        const feld = document.querySelector('#probeklausur-nur-filter-schalter');
+        feld.checked = true;
+        feld.dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelector('#app .knopf-reihe button').click();
+      `,
+      args: [],
+    });
+    {
+      const pruefungsinfo = await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: `
+          const karten = document.querySelectorAll('#app .aufgabe-karte').length;
+          const warnung = document.querySelector('#app .loesung-hinweis');
+          const infoText = document.querySelector('#app .frage-text') ? document.querySelector('#app .frage-text').textContent : null;
+          return { karten, hatWarnung: !!warnung, infoText };
+        `,
+        args: [],
+      });
+      if (pruefungsinfo.hatWarnung) {
+        fehler += 1;
+        startbildschirmFehler += 1;
+        console.error(`FEHLER (Mini-Klausur mit kleinem Filter): zeigt die Warnung statt der ruhigen Anzeige`);
+      }
+      if (!pruefungsinfo.infoText || !/P\s*·\s*\d+\s*min/.test(pruefungsinfo.infoText)) {
+        fehler += 1;
+        startbildschirmFehler += 1;
+        console.error(`FEHLER (Mini-Klausur mit kleinem Filter): ruhige Anzeige fehlt oder falsches Format ("${pruefungsinfo.infoText}")`);
+      }
+      if (pruefungsinfo.karten < 2) {
+        fehler += 1;
+        startbildschirmFehler += 1;
+        console.error(`FEHLER (Mini-Klausur mit kleinem Filter): erwartet 2 Aufgabenkarten (derselbe Typ zweimal), gefunden ${pruefungsinfo.karten}`);
+      }
+      const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: LAYOUT_PRUEFSKRIPT, args: [],
+      });
+      geprueft += 1;
+      for (const problem of ergebnis.probleme) {
+        fehler += 1;
+        startbildschirmFehler += 1;
+        console.error(`FEHLER (Mini-Klausur mit kleinem Filter): ${problem}`);
+      }
+    }
+    console.log(`Probeklausur-Startbildschirm: 6 Schalterstellungen/Ansichten geprüft, ${startbildschirmFehler} Layout-Probleme`);
 
     // Aufräumen: die gerade gestartete Mini-Klausur und der simulierte
     // Übungsfilter-Zustand sollen keine späteren Checks in dieser Sitzung

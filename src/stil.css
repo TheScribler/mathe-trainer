@@ -203,7 +203,7 @@ body {
    siehe istEinfacheMatrix in app.js): Name + "=" links, das Gitter wirkt
    dadurch wie "A · B = (…)" statt wie eine separat beschriftete Box darüber
    (iPhone-Rückmeldung). flex-wrap als Sicherheitsnetz für einen langen Namen
-   bei 375px (z. B. "AᵗC − (CᵗA)ᵗ"). */
+   bei 375px (z. B. "AᵀC − (CᵀA)ᵀ"). */
 .matrix-eingabe-zeile { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .matrix-eingabe-label { font-size: .9rem; color: var(--gedaempft); white-space: nowrap; }
 .matrix-mit-klammern { display: flex; align-items: stretch; gap: 3px; }

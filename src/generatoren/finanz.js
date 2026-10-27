@@ -314,6 +314,15 @@ function mText(m) {
   return 'monatlicher';
 }
 
+// Adverb statt Adjektiv ("halbjährlich verzinst", nicht "halbjährlicher
+// verzinst") — mText() oben bleibt für die Fälle, wo das Wort ein
+// nachfolgendes Substantiv beugt ("bei halbjährlicher Verzinsung").
+function mTextAdverb(m) {
+  if (m === 2) return 'halbjährlich';
+  if (m === 4) return 'vierteljährlich';
+  return 'monatlich';
+}
+
 export const effektivzins = {
   id: 'fin.effektivzins',
   teil: 'finanz',
@@ -478,7 +487,7 @@ export const verzinsungGrundformen = {
         titel: 'Unterjährliche Verzinsung',
         frage: {
           text: `Ein Kapital von ${formatDeZahl(K0, 0)} € wird ${n} Jahre lang bei einem Nominalzins von ` +
-            `${formatDeZahl(iProzent, iProzent % 1 === 0 ? 0 : 2)} % p.a. ${mText(m)} verzinst (m = ${m}). ` +
+            `${formatDeZahl(iProzent, iProzent % 1 === 0 ? 0 : 2)} % p.a. ${mTextAdverb(m)} verzinst (m = ${m}). ` +
             `Wie hoch ist das Endkapital Kₙ?`,
         },
         eingaben: [
