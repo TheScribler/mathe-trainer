@@ -208,6 +208,15 @@ export const gewinnBreakeven = {
     const eKoeff = [-b, a, 0];
     // G(x) = -A x² + A(x1+x2) x - e
     const gKoeff = [-A, A * (x1 + x2), -e];
+    // Mitternachtsformel statt p-q-Formel (Vorlesungsnotizen): a, b, c
+    // direkt aus G(x) = ax² + bx + c = 0 ablesen, ohne vorher durch den
+    // Koeffizienten von x² zu teilen.
+    const mfA = gKoeff[0];
+    const mfB = gKoeff[1];
+    const mfC = gKoeff[2];
+    const diskriminante = runde(mfB * mfB - 4 * mfA * mfC, 4);
+    const wurzelDiskriminante = runde(Math.sqrt(diskriminante), 4);
+    const zweiMfA = 2 * mfA;
     // Für die mit Zahlen vorgerechneten K'(x0)/p(xMax)/G(xMax)-Schritte unten
     // (statt der "|_{x=...}"-Kurzschreibweise, iPhone-Rückmeldung).
     const kStrichEingesetzt = polynomEingesetztLatex([2 * c, d], [1, 0], x0);
@@ -278,27 +287,36 @@ export const gewinnBreakeven = {
           },
           { titel: 'Ergebnis', latex: `K'(${x0}) = ${zahlZuLatex(grenzkosten, minimaleNachkommastellen(grenzkosten))}` },
           {
-            titel: 'Umstellen',
-            latex: mehrzeiligeKette([
-              `${polynomLatex(gKoeff, [2, 1, 0])} &= 0 \\quad \\Big/ \\div (${zahlZuLatex(-A, minimaleNachkommastellen(A))})`,
-              `\\Rightarrow\\; ${polynomLatex([1, -(x1 + x2), x1 * x2], [2, 1, 0])} &= 0`,
-            ]),
-            hinweis: 'Durch den Koeffizienten von x² teilen, damit vor x² eine 1 steht.',
-          },
-          {
-            titel: 'Ergebnis',
-            latex: `p = ${zahlZuLatex(-(x1 + x2), 0)}, \\quad q = ${zahlZuLatex(x1 * x2, 0)}`,
-            hinweis: 'Koeffizienten der normierten Gleichung x² + px + q = 0 ablesen.',
+            titel: 'Formel',
+            latex: `x_{1,2} = \\dfrac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}`,
+            hinweis: 'Mitternachtsformel: a, b, c direkt aus G(x) = ax² + bx + c = 0 ablesen, nicht vorher durch a teilen.',
           },
           {
             titel: 'Einsetzen',
-            latex: mehrzeiligeGleichung('x_{1,2}', [
-              `-\\dfrac{p}{2} \\pm \\sqrt{\\left(\\dfrac{p}{2}\\right)^2 - q}`,
-              `${minusBruch(-(x1 + x2), 2)} \\pm \\sqrt{\\left(${bruchAnzeige(-(x1 + x2), 2)}\\right)^2 - ${zahlZuLatex(x1 * x2, 0)}}`,
-              `${zahlZuLatex((x1 + x2) / 2, minimaleNachkommastellen((x1 + x2) / 2))} \\pm \\sqrt{${zahlZuLatex(Math.pow((x1 + x2) / 2, 2), minimaleNachkommastellen(Math.pow((x1 + x2) / 2, 2)))} - ${zahlZuLatex(x1 * x2, 0)}}`,
-              `${zahlZuLatex((x1 + x2) / 2, minimaleNachkommastellen((x1 + x2) / 2))} \\pm ${zahlZuLatex((x2 - x1) / 2, minimaleNachkommastellen((x2 - x1) / 2))}`,
+            latex: mehrzeiligeKette([
+              `${polynomLatex(gKoeff, [2, 1, 0])} = 0`,
+              `a = ${zahlZuLatex(mfA, minimaleNachkommastellen(mfA))}, \\quad b = ${zahlZuLatex(mfB, minimaleNachkommastellen(mfB))}, \\quad c = ${zahlZuLatex(mfC, minimaleNachkommastellen(mfC))}`,
             ]),
-            hinweis: 'p-q-Formel.',
+          },
+          {
+            // Jede Umformung in eine eigene Zeile statt alles in eine lange
+            // Zeile mit mehreren "=" zu packen — sonst lief die Zeile bei
+            // größeren Zahlen bei 375px rechts ab (iPhone-Rückmeldung).
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette([
+              `b^2 - 4ac &= ${klammerWennNegativ(mfB, minimaleNachkommastellen(mfB))}^2 - 4 \\cdot ${klammerWennNegativ(mfA, minimaleNachkommastellen(mfA))} \\cdot ${klammerWennNegativ(mfC, minimaleNachkommastellen(mfC))}`,
+              `&= ${zahlZuLatex(mfB * mfB, minimaleNachkommastellen(mfB * mfB))} - ${zahlZuLatex(4 * mfA * mfC, minimaleNachkommastellen(4 * mfA * mfC))}`,
+              `&= ${zahlZuLatex(diskriminante, minimaleNachkommastellen(diskriminante))}`,
+              `\\sqrt{${zahlZuLatex(diskriminante, minimaleNachkommastellen(diskriminante))}} &= ${zahlZuLatex(wurzelDiskriminante, minimaleNachkommastellen(wurzelDiskriminante))}`,
+            ]),
+            hinweis: 'Diskriminante berechnen, dann die Wurzel ziehen.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette([
+              `x_1 = \\dfrac{-(${zahlZuLatex(mfB, minimaleNachkommastellen(mfB))}) + ${zahlZuLatex(wurzelDiskriminante, minimaleNachkommastellen(wurzelDiskriminante))}}{${zahlZuLatex(zweiMfA, minimaleNachkommastellen(zweiMfA))}} = ${zahlZuLatex(x1, 0)}`,
+              `x_2 = \\dfrac{-(${zahlZuLatex(mfB, minimaleNachkommastellen(mfB))}) - ${zahlZuLatex(wurzelDiskriminante, minimaleNachkommastellen(wurzelDiskriminante))}}{${zahlZuLatex(zweiMfA, minimaleNachkommastellen(zweiMfA))}} = ${zahlZuLatex(x2, 0)}`,
+            ]),
           },
           { titel: 'Ergebnis', latex: `x_1 = ${x1}\\ \\text{(Break-Even)}, \\quad x_2 = ${x2}\\ \\text{(Gewinngrenze)}` },
           {

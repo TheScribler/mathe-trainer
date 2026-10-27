@@ -1033,6 +1033,29 @@ function ladeProbeklausurZusatzthemen() {
   return false;
 }
 
+// localStorage mit In-Memory-Ersatz (dieselbe Begründung wie oben): merkt
+// sich die Einstellung des "Nur Themen aus dem Übungsfilter"-Schalters.
+// Standard ist AUS — ohne diesen Schalter folgt die Probeklausur den
+// normalen Presets (siehe generatorenFuerProbeklausur), nicht dem Filter.
+const PROBEKLAUSUR_NUR_FILTER_SCHLUESSEL = 'mathe-trainer-probeklausur-nur-filter-v1';
+let probeklausurNurFilterFallback = null;
+
+function speichereProbeklausurNurFilter(eingeschaltet) {
+  const text = JSON.stringify(eingeschaltet);
+  try { window.localStorage.setItem(PROBEKLAUSUR_NUR_FILTER_SCHLUESSEL, text); } catch (fehler) { probeklausurNurFilterFallback = text; }
+}
+
+function ladeProbeklausurNurFilter() {
+  try {
+    const text = window.localStorage.getItem(PROBEKLAUSUR_NUR_FILTER_SCHLUESSEL);
+    if (text !== null) return JSON.parse(text) === true;
+  } catch (fehler) { /* weiter zum In-Memory-Fallback */ }
+  if (probeklausurNurFilterFallback !== null) {
+    try { return JSON.parse(probeklausurNurFilterFallback) === true; } catch (fehler) { return false; }
+  }
+  return false;
+}
+
 function formatiereZeit(sekunden) {
   const s = Math.max(0, Math.round(sekunden));
   const m = Math.floor(s / 60);
@@ -1098,6 +1121,53 @@ function erzeugeNeueProbeklausur(punkteSplit, zusatzthemenEinbeziehen) {
   return zustand;
 }
 
+// Derselbe Pool, aus dem der Übungsmodus zieht (siehe aktiverPool() in
+// starteUebungsmodus): Teil-Auswahl, dann einzeln abgewählte Typen heraus.
+// Eigenständig statt aktiverPool() wiederzuverwenden, weil letzteres eine
+// lokale Closure innerhalb von starteUebungsmodus ist — der Filterzustand
+// selbst kommt aus demselben localStorage-Schlüssel, bleibt also identisch.
+function generatorenAusUebungsfilter() {
+  const filterZustand = ladeUebungFilter();
+  if (!filterZustand || !Array.isArray(filterZustand.ausgeschlossen)) return GENERATOREN;
+  const basis = filterZustand.teil === 'alle' ? GENERATOREN : (GENERATOREN_NACH_TEIL[filterZustand.teil] || []);
+  return basis.filter((g) => !filterZustand.ausgeschlossen.includes(g.id));
+}
+
+// Mini-Klausur direkt aus dem aktuellen Übungsmodus-Filter statt aus einem
+// Preset: ein einziger Punkte-Topf über 60 P statt der getrennten
+// Teile-Vorgabe (KONFIG.punkte), weil der Filter Generatoren aus mehreren
+// Teilen gleichzeitig enthalten kann — komponiereKlausur bekommt hier also
+// nur einen künstlichen "Teil" mit dem ganzen gefilterten Pool. Die Dauer
+// richtet sich nach der tatsächlich erreichten Punktsumme (1 Minute je
+// Punkt), nicht nach KONFIG.dauer, damit eine kleinere Filterauswahl, die
+// die 60 P nicht exakt trifft, trotzdem fair timed bleibt.
+const MINI_KLAUSUR_ZIEL_PUNKTE = 60;
+const MINI_KLAUSUR_SEKUNDEN_PRO_PUNKT = 60;
+
+function erzeugeNeueProbeklausurAusFilter(zusatzthemenEinbeziehen) {
+  const rngKomposer = mulberry32(erzeugeSeed());
+  const gefiltert = generatorenAusUebungsfilter();
+  const teile = komponiereKlausur(
+    { 'Übungsfilter': MINI_KLAUSUR_ZIEL_PUNKTE },
+    { 'Übungsfilter': gefiltert },
+    rngKomposer,
+  );
+  const aufgaben = baueAufgabenliste(teile, zusatzthemenEinbeziehen);
+  const summeErreicht = teile.reduce((s, t) => s + t.summe, 0);
+  const zustand = {
+    version: 1,
+    startZeit: Date.now(),
+    dauerSekunden: summeErreicht * MINI_KLAUSUR_SEKUNDEN_PRO_PUNKT,
+    teile: teile.map((t) => ({ teil: t.teil, ziel: t.ziel, summe: t.summe, exakt: t.exakt })),
+    aufgaben,
+    antworten: {},
+    selbstbewertung: {},
+    abgegeben: false,
+  };
+  speichereProbeklausurZustand(zustand);
+  return zustand;
+}
+
 function starteProbeklausur(wurzel) {
   const zustand = ladeProbeklausurZustand();
   if (zustand && zustand.version === 1) {
@@ -1132,6 +1202,7 @@ function zeichneProbeklausurStart(wurzel) {
   zusatzthemenZeile.className = 'themen-filter-zeile';
   const zusatzthemenCheckbox = document.createElement('input');
   zusatzthemenCheckbox.type = 'checkbox';
+  zusatzthemenCheckbox.id = 'probeklausur-zusatzthemen-schalter';
   zusatzthemenCheckbox.checked = zusatzthemenEinbeziehen;
   zusatzthemenCheckbox.addEventListener('change', () => {
     zusatzthemenEinbeziehen = zusatzthemenCheckbox.checked;
@@ -1143,22 +1214,70 @@ function zeichneProbeklausurStart(wurzel) {
   zusatzthemenZeile.appendChild(zusatzthemenText);
   karte.appendChild(zusatzthemenZeile);
 
+  // Standard AUS: ohne diesen Schalter folgen die Knöpfe unten den normalen
+  // Presets (Standard/Original). An schaltet stattdessen auf eine
+  // Mini-Klausur um, die nur aus den im Übungsmodus-Filter aktuell
+  // ausgewählten Aufgabentypen besteht (siehe erzeugeNeueProbeklausurAusFilter).
+  let nurFilterEinbeziehen = ladeProbeklausurNurFilter();
+  const nurFilterZeile = document.createElement('label');
+  nurFilterZeile.className = 'themen-filter-zeile';
+  const nurFilterCheckbox = document.createElement('input');
+  nurFilterCheckbox.type = 'checkbox';
+  nurFilterCheckbox.id = 'probeklausur-nur-filter-schalter';
+  nurFilterCheckbox.checked = nurFilterEinbeziehen;
+  nurFilterZeile.appendChild(nurFilterCheckbox);
+  const nurFilterText = document.createElement('span');
+  nurFilterText.textContent = 'Nur Themen aus dem Übungsfilter';
+  nurFilterZeile.appendChild(nurFilterText);
+  karte.appendChild(nurFilterZeile);
+
   wurzel.appendChild(karte);
 
   const knopfReihe = document.createElement('div');
   knopfReihe.className = 'knopf-reihe';
-  for (const [name, split] of Object.entries(KONFIG.presets)) {
-    const knopf = document.createElement('button');
-    knopf.type = 'button';
-    const beschriftung = name.charAt(0).toUpperCase() + name.slice(1);
-    knopf.textContent = `${beschriftung} (${split.finanz}/${split.diff}/${split.integral}/${split.algebra})`;
-    knopf.addEventListener('click', () => {
-      const neu = erzeugeNeueProbeklausur(split, zusatzthemenEinbeziehen);
-      zeichneLaufendeKlausur(wurzel, neu);
-    });
-    knopfReihe.appendChild(knopf);
-  }
   wurzel.appendChild(knopfReihe);
+
+  function zeichneKnopfReihe() {
+    knopfReihe.innerHTML = '';
+    if (nurFilterCheckbox.checked) {
+      const gefiltert = generatorenAusUebungsfilter();
+      if (gefiltert.length === 0) {
+        const hinweis = document.createElement('p');
+        hinweis.className = 'loesung-hinweis';
+        hinweis.textContent = 'Der Übungsfilter schließt aktuell alle Aufgabentypen aus — zuerst im Übungsmodus mindestens einen Typ auswählen.';
+        knopfReihe.appendChild(hinweis);
+        return;
+      }
+      const knopf = document.createElement('button');
+      knopf.type = 'button';
+      knopf.textContent = `Mini-Klausur starten (${MINI_KLAUSUR_ZIEL_PUNKTE} P aus ${gefiltert.length} Typen)`;
+      knopf.addEventListener('click', () => {
+        const neu = erzeugeNeueProbeklausurAusFilter(zusatzthemenEinbeziehen);
+        zeichneLaufendeKlausur(wurzel, neu);
+      });
+      knopfReihe.appendChild(knopf);
+      return;
+    }
+    for (const [name, split] of Object.entries(KONFIG.presets)) {
+      const knopf = document.createElement('button');
+      knopf.type = 'button';
+      const beschriftung = name.charAt(0).toUpperCase() + name.slice(1);
+      knopf.textContent = `${beschriftung} (${split.finanz}/${split.diff}/${split.integral}/${split.algebra})`;
+      knopf.addEventListener('click', () => {
+        const neu = erzeugeNeueProbeklausur(split, zusatzthemenEinbeziehen);
+        zeichneLaufendeKlausur(wurzel, neu);
+      });
+      knopfReihe.appendChild(knopf);
+    }
+  }
+
+  nurFilterCheckbox.addEventListener('change', () => {
+    nurFilterEinbeziehen = nurFilterCheckbox.checked;
+    speichereProbeklausurNurFilter(nurFilterEinbeziehen);
+    zeichneKnopfReihe();
+  });
+
+  zeichneKnopfReihe();
 }
 
 function zeichneLaufendeKlausur(wurzel, zustand) {
@@ -1452,6 +1571,13 @@ function starteApp() {
     setzeAktivenKnopf(klausurKnopf);
     inhalt.innerHTML = '';
     zeichneProbeklausurStart(inhalt);
+  };
+  // Nur für Tests (test/layout.mjs): liefert alle Generator-IDs, damit der
+  // Layout-Test einen Übungsfilter-Zustand mit "alle Typen abgewählt"
+  // simulieren kann, ohne die Liste selbst kennen zu müssen (GENERATOREN
+  // bleibt sonst im IIFE-Scope des gebauten Bundles verborgen).
+  window.__testAlleGeneratorIds = function () {
+    return GENERATOREN.map((g) => g.id);
   };
 
   // Eine vorhandene Probeklausur hat Vorrang vor dem Übungsmodus — egal ob

@@ -449,15 +449,26 @@ async function main() {
       console.log(`${generatorId}: ${KLAUSUR_SEEDS_PRO_GENERATOR} Instanzen × 2 Ansichten in der Probeklausur geprüft, ${problemeFuerGenerator} Layout-Probleme`);
     }
 
-    // Probeklausur-Startbildschirm ("Zusatzthemen einbeziehen"-Schalter plus
-    // Preset-Knöpfe) — bisher nie besucht, weil die übrigen Probeklausur-
-    // Checks direkt über __testZeigeKlausurAufgabe in eine laufende Klausur
-    // springen und den Startbildschirm selbst nie rendern.
-    console.log('\nPrüfe Probeklausur-Startbildschirm ("Zusatzthemen einbeziehen") …');
+    // Probeklausur-Startbildschirm ("Zusatzthemen einbeziehen"- und "Nur
+    // Themen aus dem Übungsfilter"-Schalter plus Preset-/Mini-Klausur-Knöpfe)
+    // — bisher nie besucht, weil die übrigen Probeklausur-Checks direkt über
+    // __testZeigeKlausurAufgabe in eine laufende Klausur springen und den
+    // Startbildschirm selbst nie rendern. Der "Nur Filter"-Schalter ändert
+    // tatsächlich die Knopfzeile (Presets vs. Mini-Klausur-Knopf vs.
+    // Warnhinweis bei leerem Filter), darum per echtem "change"-Event
+    // umgeschaltet statt nur die checked-Eigenschaft zu setzen.
+    console.log('\nPrüfe Probeklausur-Startbildschirm ("Zusatzthemen einbeziehen" / "Nur Themen aus dem Übungsfilter") …');
     let startbildschirmFehler = 0;
+
     for (const angehakt of [false, true]) {
       await wd(`/session/${id}/execute/sync`, 'POST', {
-        script: 'window.__testZeigeProbeklausurStart(); document.querySelector("#app .themen-filter-zeile input[type=checkbox]").checked = arguments[0];',
+        script: `
+          try { window.localStorage.removeItem('mathe-trainer-uebung-filter-v1'); } catch (e) {}
+          window.__testZeigeProbeklausurStart();
+          const feld = document.querySelector('#probeklausur-zusatzthemen-schalter');
+          feld.checked = arguments[0];
+          feld.dispatchEvent(new Event('change', { bubbles: true }));
+        `,
         args: [angehakt],
       });
       const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
@@ -467,10 +478,82 @@ async function main() {
       for (const problem of ergebnis.probleme) {
         fehler += 1;
         startbildschirmFehler += 1;
-        console.error(`FEHLER (Probeklausur-Startbildschirm, Schalter=${angehakt}): ${problem}`);
+        console.error(`FEHLER (Probeklausur-Startbildschirm, Zusatzthemen=${angehakt}): ${problem}`);
       }
     }
-    console.log(`Probeklausur-Startbildschirm: 2 Schalterstellungen geprüft, ${startbildschirmFehler} Layout-Probleme`);
+
+    // "Nur Filter" an, einmal mit einem nicht-leeren Übungsfilter (Mini-
+    // Klausur-Knopf) und einmal mit komplett abgewählten Typen (Warnhinweis
+    // statt Knopf) — beide Zweige rendern unterschiedliches Markup.
+    for (const leererFilter of [false, true]) {
+      await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: `
+          try {
+            if (arguments[0]) {
+              const alleIds = window.__testAlleGeneratorIds();
+              window.localStorage.setItem('mathe-trainer-uebung-filter-v1', JSON.stringify({ teil: 'alle', ausgeschlossen: alleIds, offen: false }));
+            } else {
+              window.localStorage.removeItem('mathe-trainer-uebung-filter-v1');
+            }
+          } catch (e) {}
+          window.__testZeigeProbeklausurStart();
+          const feld = document.querySelector('#probeklausur-nur-filter-schalter');
+          feld.checked = true;
+          feld.dispatchEvent(new Event('change', { bubbles: true }));
+        `,
+        args: [leererFilter],
+      });
+      const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: LAYOUT_PRUEFSKRIPT, args: [],
+      });
+      geprueft += 1;
+      for (const problem of ergebnis.probleme) {
+        fehler += 1;
+        startbildschirmFehler += 1;
+        console.error(`FEHLER (Probeklausur-Startbildschirm, NurFilter=an, leer=${leererFilter}): ${problem}`);
+      }
+    }
+    // Die laufende Mini-Klausur selbst (eigener Punkte-Topf, eigene Dauer)
+    // einmal tatsächlich starten und auf Überlauf prüfen — nicht nur den
+    // Startbildschirm mit dem Knopf drauf.
+    await wd(`/session/${id}/execute/sync`, 'POST', {
+      script: `
+        try { window.localStorage.removeItem('mathe-trainer-uebung-filter-v1'); } catch (e) {}
+        window.__testZeigeProbeklausurStart();
+        const feld = document.querySelector('#probeklausur-nur-filter-schalter');
+        feld.checked = true;
+        feld.dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelector('#app .knopf-reihe button').click();
+      `,
+      args: [],
+    });
+    {
+      const ergebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
+        script: LAYOUT_PRUEFSKRIPT, args: [],
+      });
+      geprueft += 1;
+      for (const problem of ergebnis.probleme) {
+        fehler += 1;
+        startbildschirmFehler += 1;
+        console.error(`FEHLER (laufende Mini-Klausur aus Übungsfilter): ${problem}`);
+      }
+    }
+    console.log(`Probeklausur-Startbildschirm: 5 Schalterstellungen/Ansichten geprüft, ${startbildschirmFehler} Layout-Probleme`);
+
+    // Aufräumen: die gerade gestartete Mini-Klausur und der simulierte
+    // Übungsfilter-Zustand sollen keine späteren Checks in dieser Sitzung
+    // beeinflussen (z. B. welcher Modus beim nächsten Start gezeigt wird).
+    await wd(`/session/${id}/execute/sync`, 'POST', {
+      script: `
+        try {
+          window.localStorage.removeItem('mathe-trainer-probeklausur-v1');
+          window.localStorage.removeItem('mathe-trainer-uebung-filter-v1');
+          window.localStorage.removeItem('mathe-trainer-probeklausur-zusatzthemen-v1');
+          window.localStorage.removeItem('mathe-trainer-probeklausur-nur-filter-v1');
+        } catch (e) {}
+      `,
+      args: [],
+    });
 
     // Fokus-Stabilität: für jeden Generator ein paar Seeds durchgehen und
     // jedes Eingabefeld einzeln fokussieren (siehe FOKUS_PRUEFSKRIPT oben) —
