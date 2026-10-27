@@ -115,10 +115,29 @@ function skalarproduktLatex(a, b) {
   return a.map((w, i) => `${faktorLatex(w)} \\cdot ${faktorLatex(b[i])}`).join(' + ');
 }
 
-// Zeigt JEDEN Eintrag des Produkts a·b als eigene Zeile "c_{ij} = ... = Wert"
-// (Katalog-Vorgabe: mindestens einen Eintrag vorrechnen — hier alle, damit
-// nichts stillschweigend übersprungen wird). praefix austauschbar (z. B. "r"
-// für einen Rohstoffbedarfsvektor statt der generischen "c"); bei genau einer
+// "w1 + w2 - w3 + ..." mit korrektem Vorzeichen zwischen den Summanden,
+// nicht "+ -w" bei einem negativen Summanden — für eine Zwischensumme aus
+// bereits ausgerechneten (ggf. negativen) Werten, anders als
+// skalarproduktLatex oben, das noch unausgewertete "a · b"-Ausdrücke
+// aneinanderreiht (dort ist ein bloßes "+" davor immer richtig, weil jeder
+// Ausdruck sein eigenes Vorzeichen schon über faktorLatex trägt).
+function summeMitVorzeichenLatex(werte) {
+  return werte.map((w, i) => {
+    const text = zahlZuLatex(Math.abs(w), 0);
+    if (i === 0) return w < 0 ? `-${text}` : text;
+    return w < 0 ? `- ${text}` : `+ ${text}`;
+  }).join(' ');
+}
+
+// Zeigt JEDEN Eintrag des Produkts a·b als eigene Zeile
+// "c_{ij} = ... = Einzelprodukte = Wert" (Katalog-Vorgabe: mindestens einen
+// Eintrag vorrechnen — hier alle, damit nichts stillschweigend übersprungen
+// wird). Der Zwischenschritt mit den einzeln ausgerechneten Produkten (z. B.
+// "13·28 + 9·24 = 364 + 216 = 580") entfällt nur, wenn es ohnehin nur einen
+// einzigen Summanden gibt (dann wäre er identisch mit dem Endergebnis,
+// iPhone-Rückmeldung: R in alg.produktionsprozess sprang direkt von der
+// Multiplikation zum fertigen Wert). praefix austauschbar (z. B. "r" für
+// einen Rohstoffbedarfsvektor statt der generischen "c"); bei genau einer
 // Ergebnisspalte (Spaltenvektor) heißt der Index nur "_i" statt "_{i1}" —
 // "r_1" liest sich natürlicher als "r_11".
 function alleEintraegeLatex(a, b, ergebnis, praefix = 'c') {
@@ -128,7 +147,13 @@ function alleEintraegeLatex(a, b, ergebnis, praefix = 'c') {
     for (let k = 0; k < spaltenzahl; k++) {
       const spaltenwerte = b.map((zeile) => zeile[k]);
       const index = spaltenzahl === 1 ? `${i + 1}` : `${i + 1}${k + 1}`;
-      zeilen.push(`${praefix}_{${index}} &= ${skalarproduktLatex(a[i], spaltenwerte)} = ${zahlZuLatex(ergebnis[i][k], 0)}`);
+      const einzelprodukte = a[i].map((w, j) => w * spaltenwerte[j]);
+      // Drei eigene Zeilen statt einer langen mit zwei "=" — bei einem
+      // 3×3-Produkt (drei Summanden je Eintrag) lief die zusammengefasste
+      // Zeile bei 375px rechts ab (iPhone-Rückmeldung).
+      zeilen.push(`${praefix}_{${index}} &= ${skalarproduktLatex(a[i], spaltenwerte)}`);
+      if (einzelprodukte.length > 1) zeilen.push(`&= ${summeMitVorzeichenLatex(einzelprodukte)}`);
+      zeilen.push(`&= ${zahlZuLatex(ergebnis[i][k], 0)}`);
     }
   }
   return mehrzeiligeKette(zeilen);
@@ -737,7 +762,7 @@ export const produktionsprozess = {
             `hergestellt werden sollen.`,
         teile: [
           { label: 'a)', text: `Wie viele Einheiten der ${anzahlRohstoffe} Rohstoffe werden dafür benötigt?` },
-          { label: 'b)', text: 'Die Endprodukte werden zu Verkaufspreisen je Einheit PE verkauft, die Rohstoffe kosten je Einheit PR. Wie hoch ist der Gewinn?' },
+          { label: 'b)', textHtml: 'Die Endprodukte werden zu Verkaufspreisen je Einheit P<sub>E</sub> verkauft, die Rohstoffe kosten je Einheit P<sub>R</sub>. Wie hoch ist der Gewinn?' },
         ],
         // Jede Vorgabe auf einer eigenen Zeile statt mehrere pro Zeile
         // gebündelt — zwei oder mehr Matrizen nebeneinander liefen bei
@@ -817,7 +842,7 @@ export const produktionsprozess = {
 // r, s aus RS_POOL (±1 ausgeschlossen — ein trivialer Faktor von 1/−1 macht
 // die Multiplikation mit dem Skalar zu einer reinen Vorzeichenfrage). r+s=0
 // bleibt NUR für den Kurzweg in c) erlaubt (rA+sA=(r+s)A wird dort zur
-// Nullmatrix, Übung 21c: r=−2, s=2) — mit 25 % Wahrscheinlichkeit gezielt so
+// Nullmatrix, Übung 21c: r=−2, s=2) — mit 20 % Wahrscheinlichkeit gezielt so
 // konstruiert (s=−r), sonst wird r+s=0 zurückgewiesen, sonst wäre c) de facto
 // immer dieselbe Nullmatrix.
 // Zusatzthema (Phase 6) — in der Probeklausur standardmäßig aus.
@@ -832,7 +857,7 @@ export const matrixrechnung = {
   vorlage: 'Übung 21',
   zusatz: true,
   waehleParameter(rng) {
-    const zeigtNullmatrixFall = zufallBool(rng, 0.25);
+    const zeigtNullmatrixFall = zufallBool(rng, 0.2);
     for (let versuch = 0; versuch < 200; versuch++) {
       const A = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);
       const B = zufallsMatrix(rng, 2, 2, EINTRAG_POOL);

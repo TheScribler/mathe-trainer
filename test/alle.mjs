@@ -147,6 +147,11 @@ function sammlePlainTextFelder(aufgabe) {
   for (const teil of aufgabe.frage.teile ?? []) {
     if (teil.label) felder.push({ feld: `frage.teile[${teil.label}].label`, text: teil.label });
     if (teil.text) felder.push({ feld: `frage.teile[${teil.label}].text`, text: teil.text });
+    // textHtml (siehe baueFrageTeilBlock in app.js): per innerHTML gerendert,
+    // enthält also absichtlich HTML-Tags wie "<sub>" — die zählen nicht als
+    // LaTeX-Reste (LATEX_RESTE prüft auf "_", "^", "\x", nicht auf "<"),
+    // der Scan bleibt also sinnvoll, nur ohne diese Ausnahme nötig zu machen.
+    if (teil.textHtml) felder.push({ feld: `frage.teile[${teil.label}].textHtml`, text: teil.textHtml });
   }
 
   for (const eingabe of aufgabe.eingaben) {
@@ -1319,12 +1324,13 @@ function testeKomposer() {
   console.log(`Komposer: ${Object.keys(KONFIG.presets).length} Presets × ${KOMPOSER_SEEDS} Seeds geprüft`);
 }
 
-// alg.matrixrechnung: r+s=0 (Nullmatrix-Showcase für c)) soll bei etwa 25 %
+// alg.matrixrechnung: r+s=0 (Nullmatrix-Showcase für c)) soll bei etwa 20 %
 // der Instanzen auftreten (siehe waehleParameter), nicht bei 0 % (Showcase
-// kaputt) und nicht bei deutlich mehr (die r+s≠0-Zurückweisung für die
-// übrigen Instanzen würde dann nicht mehr greifen). Eigene, von
-// testeGenerator unabhängige Schleife, weil es hier um eine Häufigkeit über
-// viele Seeds geht, nicht um eine Eigenschaft einer einzelnen Instanz.
+// kaputt) und nicht bei deutlich mehr (sonst wäre es der Normalfall statt
+// der Ausnahme — die r+s≠0-Zurückweisung für die übrigen Instanzen würde
+// dann nicht mehr greifen). Eigene, von testeGenerator unabhängige Schleife,
+// weil es hier um eine Häufigkeit über viele Seeds geht, nicht um eine
+// Eigenschaft einer einzelnen Instanz.
 function testeMatrixrechnungNullmatrixAnteil() {
   const generator = GENERATOREN.find((g) => g.id === 'alg.matrixrechnung');
   const SEEDS = 2000;
@@ -1334,8 +1340,8 @@ function testeMatrixrechnungNullmatrixAnteil() {
     if (r + s === 0) nullmatrixFaelle += 1;
   }
   const anteil = nullmatrixFaelle / SEEDS;
-  pruefe(anteil > 0.1 && anteil < 0.4,
-    `alg.matrixrechnung: Nullmatrix-Fall (r+s=0) bei ${(anteil * 100).toFixed(1)}% von ${SEEDS} Seeds, erwartet ungefähr 25%`);
+  pruefe(anteil > 0.1 && anteil < 0.3,
+    `alg.matrixrechnung: Nullmatrix-Fall (r+s=0) bei ${(anteil * 100).toFixed(1)}% von ${SEEDS} Seeds, erwartet ungefähr 20%`);
   console.log(`alg.matrixrechnung Nullmatrix-Showcase: ${nullmatrixFaelle}/${SEEDS} Seeds (${(anteil * 100).toFixed(1)}%)`);
 }
 

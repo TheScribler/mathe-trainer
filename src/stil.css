@@ -175,11 +175,20 @@ body {
   margin: 1.5rem 0 0; padding-top: .5rem; opacity: .7;
 }
 .koeffizienten-reihe { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem; }
-.koeffizienten-teil { display: inline-flex; align-items: center; gap: .3rem; }
-/* Schmaler als ein normales Zahlenfeld (war 4,5rem) — bei int.unbestimmt
-   müssen bis zu vier Boxen (x⁴…x¹) in einer Zeile nebeneinander passen,
-   sonst bricht die Reihe nach x² um (iPhone-Rückmeldung). */
-.koeffizienten-teil input { width: 2.4rem; }
+/* flex-shrink:0 — ohne das durfte der Flex-Algorithmus die Box unter ihre
+   gesetzte Breite zusammendrücken, sobald die Reihe nicht mehr auf eine
+   Zeile passte (iPhone-Rückmeldung bei 16px-Schrift: "25" oder "−64,46"
+   wirkten beim Tippen abgeschnitten) — jetzt bricht stattdessen die ganze
+   Box samt ihrem "+" in die nächste Zeile um (siehe .koeffizienten-teil
+   input unten und die Reihenfolge [Feld, Potenz, Plus] in app.js). */
+.koeffizienten-teil { display: inline-flex; align-items: center; gap: .3rem; flex-shrink: 0; }
+/* Mindestens 6 Zeichen bei 16px Platz (z. B. "−64,46") — bricht die Reihe
+   bei zu wenig Platz um, statt den Text abzuschneiden (iPhone-Rückmeldung).
+   rem statt ch: "ch" misst nur die Breite der Ziffer "0", Komma und Minus
+   sind in -apple-system breiter — 6,5ch reichte in der Praxis nicht, 79px
+   gemessener Bedarf gegen nur 61px Boxbreite (test/layout.mjs deckte das
+   auf). 5,5rem (88px) hat spürbar Luft darüber. */
+.koeffizienten-teil input { width: 5.5rem; flex-shrink: 0; }
 .koeffizienten-potenz { font-size: .95rem; }
 .koeffizienten-plus { color: var(--gedaempft); }
 .matrix-gitter {
@@ -189,11 +198,36 @@ body {
      der .eingabe-zeile, ein zusätzlicher Margin hätte die Lücke vor der
      Knopf-Reihe nur unnötig vergrößert (iPhone-Rückmeldung). */
   margin: .2rem 0 0;
+  /* Bei vielen Spalten (fin.tilgungsplan: 5-6) reicht 375px nicht für die
+     volle Breite jeder Zelle — ohne Gegenmaßnahme drückt der verfügbare
+     Platz die "auto"-Spalten unter ihre gesetzte Breite zusammen, egal was
+     auf .matrix-zelle steht (test/layout.mjs deckte das auf: Boxen blieben
+     bei 65px statt der gesetzten ~88px, Text schnitt ab). width:max-content
+     lässt das Gitter stattdessen auf seine natürliche volle Breite wachsen;
+     max-width/overflow-x fangen den Rest als eigene Scrollbox ab, statt die
+     Seite selbst zum Überlaufen zu bringen. min-width:0 hier UND auf
+     .matrix-mit-klammern (dem Flex-Elternelement) ist dafür nötig — sonst
+     bläht die natürliche Breite stattdessen die ganzen Vorfahren bis zur
+     Karte auf, statt wirklich nur hier intern zu scrollen (derselbe
+     bekannte Flexbox-"min-width:auto"-Effekt wie bei Flex-Kindern). */
+  overflow-x: auto;
+  min-width: 0;
+  width: max-content;
+  max-width: 100%;
 }
-/* Kompakt für ~4 Zeichen (z. B. "-12,5") statt der breiteren 3,6rem von
-   früher — passt zum "sieht aus wie das Ergebnis selbst"-Design unten
-   (iPhone-Rückmeldung: Matrixeingaben wirkten unnötig breit). */
-.matrix-zelle { width: 2.75rem; text-align: center; padding-left: 4px; padding-right: 4px; }
+/* Mindestens 6 Zeichen bei 16px Platz (z. B. "−64,46"), dieselbe Begründung
+   wie bei .koeffizienten-teil input oben (rem statt ch) — die vorherigen
+   2,75rem ("kompakt für ~4 Zeichen") schnitten größere Werte ab, und auch
+   4,5rem reichte trotz des schmaleren Paddings nicht (test/layout.mjs:
+   79px gemessener Bedarf gegen nur 65px Boxbreite) — dieselben 5,5rem wie
+   bei den Koeffizientenboxen sind hier sicher. "input.matrix-zelle" statt
+   nur ".matrix-zelle": eine einzelne Klasse ist weniger spezifisch als
+   ".eingabe-zeile input" oben (width:100%) und verlor bisher IMMER gegen
+   diese Regel, unabhängig vom width-Wert — genau das ließ fin.tilgungsplan
+   trotz aller bisherigen Breitenänderungen bei 65px kleben (test/layout.mjs
+   deckte es erst jetzt auf, weil kleinere Matrixwerte den Unterschied
+   bisher nie sichtbar gemacht hatten). */
+input.matrix-zelle { width: 5.5rem; text-align: center; padding-left: 4px; padding-right: 4px; }
 .matrix-spalten-label, .matrix-zeilen-label, .matrix-kopf-leer {
   display: flex; align-items: center; justify-content: center;
   font-size: .8rem; color: var(--gedaempft); text-align: center;
@@ -206,7 +240,7 @@ body {
    bei 375px (z. B. "AᵀC − (CᵀA)ᵀ"). */
 .matrix-eingabe-zeile { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .matrix-eingabe-label { font-size: .9rem; color: var(--gedaempft); white-space: nowrap; }
-.matrix-mit-klammern { display: flex; align-items: stretch; gap: 3px; }
+.matrix-mit-klammern { display: flex; align-items: stretch; gap: 3px; min-width: 0; }
 /* Große runde Klammern aus reinem CSS statt eines Unicode-Zeichens: Rand auf
    drei Seiten plus border-radius:50% rundet die offene Seite weg zu einer
    "("/")"-Kurve, die sich per align-items:stretch automatisch auf die

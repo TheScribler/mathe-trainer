@@ -303,28 +303,14 @@ const LAYOUT_PRUEFSKRIPT = `
     }
   });
 
-  // Eine koeffizienten-Reihe (z. B. F(x) = __x⁴ + __x³ + __x² + __x + c) muss
-  // auf EINER Zeile bleiben — scrollWidth/clientWidth allein hätten einen
-  // Umbruch nicht erkannt (flex-wrap bricht um, OHNE horizontal zu
-  // überlaufen, siehe iPhone-Rückmeldung zu int.unbestimmt). offsetTop allein
-  // reicht nicht: align-items:center setzt ein niedrigeres "+"-Zeichen schon
-  // auf derselben Zeile tiefer an als die höhere Box daneben (false positive
-  // bei int.kosten-aus-grenzkosten geprüft). Ein echter Umbruch zeigt sich
-  // stattdessen daran, dass die linke Kante NICHT mehr von links nach rechts
-  // wächst — ein neues Element beginnt dann wieder am Zeilenanfang.
-  document.querySelectorAll('#app .koeffizienten-reihe').forEach((reihe) => {
-    const kinder = Array.from(reihe.children);
-    if (kinder.length < 2) return;
-    let vorherigeLinkeKante = -Infinity;
-    let umgebrochen = false;
-    for (const k of kinder) {
-      if (k.getBoundingClientRect().left < vorherigeLinkeKante) { umgebrochen = true; break; }
-      vorherigeLinkeKante = k.getBoundingClientRect().left;
-    }
-    if (umgebrochen) {
-      probleme.push('koeffizienten-reihe: Terme brechen auf mehrere Zeilen um (' + reihe.textContent.replace(/\\s+/g, ' ') + ')');
-    }
-  });
+  // Frühere Fassung verlangte, dass eine koeffizienten-Reihe (z. B.
+  // F(x) = __x⁴ + __x³ + __x² + __x + c) IMMER auf einer Zeile bleibt. Seit
+  // der 16px-Schriftgrößenkorrektur ist das bei 375px nicht mehr für jede
+  // Instanz möglich, ohne Boxen unter ihre lesbare Mindestbreite zu
+  // drücken — ein Umbruch nach einem "+" ist jetzt ausdrücklich erlaubt
+  // (jede .koeffizienten-teil-Box trägt ihr eigenes "+" am Ende, bricht
+  // also nie mitten im Zeichen um, siehe app.js). Nur echtes Abschneiden
+  // (siehe TEXTBREITE_PRUEFSKRIPT in layout.mjs) bleibt ein Fehler.
 
   return { seitenbreite, probleme };
 `;
@@ -456,6 +442,60 @@ async function main() {
         }
       }
       console.log(`${generatorId}: ${SEEDS_PRO_GENERATOR} Instanzen bei ${tatsaechlicheBreite}px geprüft, ${problemeFuerGenerator} Layout-Probleme`);
+    }
+
+    // Jedes Eingabefeld bekommt "−64,46" (6 Zeichen, Dezimalkomma, Minus) —
+    // ein Feld darf diesen Text NIE abschneiden (scrollWidth>clientWidth
+    // innerhalb des Feldes selbst), egal wie eng die Reihe ist (iPhone-
+    // Rückmeldung: Koeffizientenboxen bei 16px-Schrift zu schmal). Separat
+    // von LAYOUT_PRUEFSKRIPT, weil ein zu enges <input> den Text intern
+    // scrollen lässt, statt die Seite selbst zum Überlaufen zu bringen —
+    // LAYOUT_PRUEFSKRIPT allein hätte das nie gesehen.
+    console.log('\nPrüfe Eingabefeld-Breite ("−64,46" in jedes Feld) …');
+    const TEXTBREITE_SEEDS_PRO_GENERATOR = 10;
+    const TEXTBREITE_PRUEFSKRIPT = `
+      const probleme = [];
+      const text = '−64,46';
+      document.querySelectorAll('#app input[type="text"]').forEach((feld, i) => {
+        feld.value = text;
+        feld.dispatchEvent(new Event('input', { bubbles: true }));
+        if (feld.scrollWidth > feld.clientWidth + 1) {
+          const art = feld.closest('.matrix-zelle, .koeffizienten-teil') ? (feld.closest('.matrix-zelle') ? 'matrix' : 'koeffizienten') : 'einzeln';
+          probleme.push('Feld ' + i + ' (' + art + '): "' + text + '" abgeschnitten (scrollWidth=' + feld.scrollWidth + ' > clientWidth=' + feld.clientWidth + ')');
+        }
+      });
+      return { probleme };
+    `;
+    for (const generatorId of AKTIVE_GENERATOR_IDS) {
+      let problemeFuerGenerator = 0;
+      for (let seed = 0; seed < TEXTBREITE_SEEDS_PRO_GENERATOR; seed++) {
+        await wd(`/session/${id}/execute/sync`, 'POST', {
+          script: 'window.__testErzeugeAufgabe(arguments[0], arguments[1], false);',
+          args: [generatorId, seed],
+        });
+        const feldErgebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
+          script: TEXTBREITE_PRUEFSKRIPT, args: [],
+        });
+        geprueft += 1;
+        for (const problem of feldErgebnis.probleme) {
+          fehler += 1;
+          problemeFuerGenerator += 1;
+          console.error(`FEHLER (Eingabefeld-Breite): ${generatorId} seed=${seed}: ${problem}`);
+        }
+        // Zusätzlich die Seite selbst: breitere Boxen dürfen nie zu
+        // horizontalem Scrollen der ganzen Seite führen (muss stattdessen
+        // umbrechen, siehe .koeffizienten-reihe flex-wrap).
+        const seitenErgebnis = await wd(`/session/${id}/execute/sync`, 'POST', {
+          script: LAYOUT_PRUEFSKRIPT, args: [],
+        });
+        geprueft += 1;
+        for (const problem of seitenErgebnis.probleme) {
+          fehler += 1;
+          problemeFuerGenerator += 1;
+          console.error(`FEHLER (Eingabefeld-Breite, Seitenlayout): ${generatorId} seed=${seed}: ${problem}`);
+        }
+      }
+      console.log(`${generatorId}: ${TEXTBREITE_SEEDS_PRO_GENERATOR} Instanzen mit "−64,46" in jedem Feld geprüft, ${problemeFuerGenerator} Probleme`);
     }
 
     // Dieselben Aufgabe+Lösung-Renderpfade zusätzlich über die Probeklausur

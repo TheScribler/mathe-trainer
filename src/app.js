@@ -280,6 +280,19 @@ function baueFrageTeilBlock(teil) {
     text.textContent = teil.text;
     block.appendChild(text);
   }
+  // textHtml (optional, statt text): für die seltenen Fälle, in denen ein
+  // Variablenname mitten im Fließtext ein Subskript braucht (z. B. "P_E"),
+  // aber als ganzer Satz normal umbrechen soll — anders als eine KaTeX-
+  // Formel (die einen \text{}-Satz NICHT an Wortgrenzen umbricht, sondern
+  // als einen einzigen unteilbaren Block behandelt). Fest verdrahteter
+  // Generator-Text, kein Nutzereingabe-Risiko, darum unbedenklich per
+  // innerHTML statt textContent.
+  if (teil.textHtml) {
+    const text = document.createElement('span');
+    text.className = 'frage-teil-text';
+    text.innerHTML = teil.textHtml;
+    block.appendChild(text);
+  }
   if (teil.formel) {
     const formel = document.createElement('div');
     formel.className = 'frage-teil-formel';
@@ -354,13 +367,13 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
       // Lösung eines LGS). trenner (optional): "," statt "+" zwischen den
       // Boxen, wenn die Werte keine Summanden sind, sondern ein Tupel.
       const beschriftungen = eingabe.beschriftungen ?? eingabe.exponenten.map(potenzBeschriftung);
+      // Das "+"/Trenner-Zeichen steckt INNERHALB der eigenen .koeffizienten-
+      // teil-Box (am Ende, nicht als eigenes Element davor) — sonst könnte
+      // der Flex-Umbruch die Box von ihrem vorangehenden "+" trennen und das
+      // Zeichen allein am Ende einer Zeile zurücklassen. So bricht bei
+      // fehlendem Platz immer die GANZE Box "Feld + Potenz + Zeichen"
+      // zusammen um, nie mitten im Zeichen (iPhone-Rückmeldung).
       beschriftungen.forEach((beschriftungText, i) => {
-        if (i > 0) {
-          const plus = document.createElement('span');
-          plus.className = 'koeffizienten-plus';
-          plus.textContent = eingabe.trenner ?? '+';
-          reihe.appendChild(plus);
-        }
         const teilZeile = document.createElement('span');
         teilZeile.className = 'koeffizienten-teil';
         const feld = baueZahlenfeld(teilZeile, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
@@ -368,6 +381,12 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
         potenzLabel.className = 'koeffizienten-potenz';
         potenzLabel.textContent = beschriftungText;
         teilZeile.appendChild(potenzLabel);
+        if (i < beschriftungen.length - 1) {
+          const plus = document.createElement('span');
+          plus.className = 'koeffizienten-plus';
+          plus.textContent = eingabe.trenner ?? '+';
+          teilZeile.appendChild(plus);
+        }
         reihe.appendChild(teilZeile);
         teilfelder.push(feld);
       });
