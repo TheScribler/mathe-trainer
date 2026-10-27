@@ -249,6 +249,18 @@ input.matrix-zelle { width: 5.5rem; text-align: center; padding-left: 4px; paddi
 .matrix-klammer { flex: 0 0 auto; width: 7px; border-top: 2px solid var(--fg); border-bottom: 2px solid var(--fg); border-radius: 50%; }
 .matrix-klammer-links { border-left: 2px solid var(--fg); border-radius: 50% 0 0 50%; }
 .matrix-klammer-rechts { border-right: 2px solid var(--fg); border-radius: 0 50% 50% 0; }
+/* Tilgungsplan (siehe jahresraster in app.js/finanz.js): ein Block je Jahr
+   statt eines durchgehenden n×4-Gitters, das bei großen Beträgen nicht
+   mehr auf 375px passte (iPhone-Rückmeldung). Jeder Block ist ein 2×2-
+   Raster (S/Z oben, T/A unten, Reihenfolge aus feldBeschriftungen), jede
+   Zelle mit eigener kleiner Beschriftung über dem Feld statt eines
+   gemeinsamen Spalten-/Zeilenkopfs. */
+.jahresbloecke { display: flex; flex-direction: column; gap: 12px; margin: .2rem 0 0; }
+.jahresblock { border: 1px solid var(--rand); border-radius: 8px; padding: 8px 10px; }
+.jahresblock-titel { font-weight: 700; font-size: .9rem; margin-bottom: 6px; }
+.jahresblock-raster { display: grid; grid-template-columns: repeat(2, auto); gap: 8px; }
+.jahresblock-feld { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.jahresblock-feld-label { font-size: .8rem; color: var(--gedaempft); }
 .eingabe-zeile select {
   /* Derselbe Grund wie bei .eingabe-zeile input oben: 16px statt des
      geerbten .9rem, sonst zoomt iOS beim Öffnen des Dropdowns hinein. */

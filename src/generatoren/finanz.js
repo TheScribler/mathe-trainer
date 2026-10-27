@@ -783,15 +783,18 @@ export const tilgungsplan = {
       const tilgungLatex = zahlZuLatex(z.tilgung, geldNachkommastellen(z.tilgung));
       const sEnde = zahlZuLatex(z.restschuldEnde, geldNachkommastellen(z.restschuldEnde));
       const dritteZeile = art === 'raten'
-        ? `A_{${z.jahr}} = ${zinsenLatex} + ${tilgungLatex} = ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))}`
-        : `T_{${z.jahr}} = ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))} - ${zinsenLatex} = ${tilgungLatex}`;
+        ? `A_{${z.jahr}} &= ${zinsenLatex} + ${tilgungLatex} = ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))}`
+        : `T_{${z.jahr}} &= ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))} - ${zinsenLatex} = ${tilgungLatex}`;
       const istAngepassteLetzteAnnuitaet = art === 'annuitaet' && z.jahr === n && letzteAnnuitaetAngepasst;
       return {
         titel: 'Einsetzen',
+        // "&=" nur vor dem ersten "=" (dem Namen) — richtet Z/A/T/S
+        // trotz unterschiedlich langer rechter Seiten aus (iPhone-
+        // Rückmeldung).
         latex: mehrzeiligeKette([
-          `Z_{${z.jahr}} = ${sStart} \\cdot ${iLatex} = ${zinsenLatex}`,
+          `Z_{${z.jahr}} &= ${sStart} \\cdot ${iLatex} = ${zinsenLatex}`,
           dritteZeile,
-          `S_{${z.jahr}} = ${sStart} - ${tilgungLatex} = ${sEnde}`,
+          `S_{${z.jahr}} &= ${sStart} - ${tilgungLatex} = ${sEnde}`,
         ]),
         hinweis: `Jahr ${z.jahr} (Restschuld zu Jahresbeginn: ${formatDeZahl(z.restschuldStart, geldNachkommastellen(z.restschuldStart))} €).` +
           (istAngepassteLetzteAnnuitaet ? ' Letzte Annuität um Rundungsdifferenz angepasst.' : ''),
@@ -810,8 +813,15 @@ export const tilgungsplan = {
           id: 'plan', label: `Tilgungsplan, Jahre 1–${n}`,
           typ: 'matrix', zeilen: n, spalten: 4, punkte: 4, loesung: matrixLoesung,
           toleranz: KONFIG.toleranz.tilgungszelle,
-          spaltenLabels: ['S', 'Z', 'T', 'A'],
-          zeilenLabels: zeilen.map((z) => String(z.jahr)),
+          // Ein Block je Jahr (2×2: S/Z oben, T/A unten) statt eines
+          // durchgehenden n×4-Gitters — bei großen Beträgen passten nicht
+          // genug Spalten nebeneinander auf 375px (iPhone-Rückmeldung).
+          // loesung bleibt dieselbe n×4-Form, nur die Darstellung ändert
+          // sich (siehe istJahresraster in app.js).
+          jahresraster: {
+            titel: zeilen.map((z) => `Jahr ${z.jahr}`),
+            feldBeschriftungen: ['S', 'Z', 'T', 'A'],
+          },
         },
       ],
       loesung: {

@@ -350,12 +350,16 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
   // Kein Doppelpunkt nach einem Fragezeichen ("Ist das Produkt
   // definiert?" statt "...definiert?:", iPhone-Rückmeldung).
   beschriftung.textContent = eingabe.label + (eingabe.label.trim().endsWith('?') ? ' ' : ': ');
+  // jahresraster (Tilgungsplan): ein Block je Jahr mit eigener "Jahr n"-
+  // Überschrift statt eines durchgehenden Gitters — die generische Zeile
+  // darüber wäre dort nur redundant.
+  const istJahresraster = eingabe.typ === 'matrix' && !!eingabe.jahresraster;
   // Eine "einfache" Matrix (kein Tilgungsplan mit eigenen Spalten-/
-  // Zeilenbeschriftungen) bekommt ihr Label stattdessen als "<Name> ="
-  // links neben dem geklammerten Gitter (siehe unten) — die generische,
-  // mit ": " endende Beschriftungszeile darüber entfällt dafür.
-  const istEinfacheMatrix = eingabe.typ === 'matrix' && !eingabe.spaltenLabels && !eingabe.zeilenLabels;
-  if (!istEinfacheMatrix) zeile.appendChild(beschriftung);
+  // Zeilenbeschriftungen oder Jahresraster) bekommt ihr Label stattdessen
+  // als "<Name> =" links neben dem geklammerten Gitter (siehe unten) — die
+  // generische, mit ": " endende Beschriftungszeile darüber entfällt dafür.
+  const istEinfacheMatrix = eingabe.typ === 'matrix' && !eingabe.spaltenLabels && !eingabe.zeilenLabels && !istJahresraster;
+  if (!istEinfacheMatrix && !istJahresraster) zeile.appendChild(beschriftung);
 
   if (eingabe.typ === 'koeffizienten') {
       const reihe = document.createElement('span');
@@ -447,78 +451,118 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
 
       felder[eingabe.id] = teilfelder;
     } else if (eingabe.typ === 'matrix') {
-      const gitter = document.createElement('div');
-      gitter.className = 'matrix-gitter';
-      // Optionale Spalten-/Zeilen-Beschriftungen (z. B. Tilgungsplan: "S, Z,
-      // T, A" über den Spalten, Jahreszahlen links neben den Zeilen) — ohne
-      // sie war nicht erkennbar, welche Spalte welche Größe ist (iPhone-
-      // Rückmeldung). Rein additiv: ohne spaltenLabels/zeilenLabels verhält
-      // sich das Gitter exakt wie zuvor (alg.matrixprodukt u. a.).
-      const spaltenLabels = eingabe.spaltenLabels ?? null;
-      const zeilenLabels = eingabe.zeilenLabels ?? null;
-      gitter.style.gridTemplateColumns = (zeilenLabels ? 'auto ' : '') + `repeat(${eingabe.spalten}, auto)`;
+      let zellen;
+      if (istJahresraster) {
+        // Tilgungsplan: ein eigener Block je Jahr statt eines durchgehenden
+        // n×4-Gitters — bei großen Beträgen ("−64,46"-lange Werte) passten
+        // nicht genug Spalten nebeneinander auf 375px (iPhone-Rückmeldung).
+        // Jeder Block zeigt seine vier Werte als eigenständig beschriftete
+        // 2×2-Zellen (S/Z oben, T/A unten laut feldBeschriftungen-Reihen-
+        // folge) statt als Tabellenzeile.
+        const { titel, feldBeschriftungen } = eingabe.jahresraster;
+        const bloecke = document.createElement('div');
+        bloecke.className = 'jahresbloecke';
+        zellen = [];
+        for (let i = 0; i < eingabe.zeilen; i++) {
+          const block = document.createElement('div');
+          block.className = 'jahresblock';
+          const ueberschrift = document.createElement('div');
+          ueberschrift.className = 'jahresblock-titel';
+          ueberschrift.textContent = titel[i];
+          block.appendChild(ueberschrift);
 
-      if (spaltenLabels) {
-        if (zeilenLabels) {
-          const leer = document.createElement('span');
-          leer.className = 'matrix-kopf-leer';
-          gitter.appendChild(leer);
+          const raster = document.createElement('div');
+          raster.className = 'jahresblock-raster';
+          const zeilenFelder = [];
+          for (let j = 0; j < eingabe.spalten; j++) {
+            const feldZelle = document.createElement('label');
+            feldZelle.className = 'jahresblock-feld';
+            const feldLabel = document.createElement('span');
+            feldLabel.className = 'jahresblock-feld-label';
+            feldLabel.textContent = feldBeschriftungen[j];
+            feldZelle.appendChild(feldLabel);
+            const feld = baueZahlenfeld(feldZelle, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
+            feld.classList.add('matrix-zelle');
+            raster.appendChild(feldZelle);
+            zeilenFelder.push(feld);
+          }
+          zellen.push(zeilenFelder);
+          block.appendChild(raster);
+          bloecke.appendChild(block);
         }
-        spaltenLabels.forEach((text) => {
-          const kopf = document.createElement('span');
-          kopf.className = 'matrix-spalten-label';
-          kopf.textContent = text;
-          gitter.appendChild(kopf);
-        });
-      }
-
-      const zellen = [];
-      for (let i = 0; i < eingabe.zeilen; i++) {
-        if (zeilenLabels) {
-          const zeilenLabel = document.createElement('span');
-          zeilenLabel.className = 'matrix-zeilen-label';
-          zeilenLabel.textContent = zeilenLabels[i];
-          gitter.appendChild(zeilenLabel);
-        }
-        const zeilenFelder = [];
-        for (let j = 0; j < eingabe.spalten; j++) {
-          const feld = baueZahlenfeld(gitter, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
-          feld.classList.add('matrix-zelle');
-          zeilenFelder.push(feld);
-        }
-        zellen.push(zeilenFelder);
-      }
-
-      // Einfache Matrix (siehe istEinfacheMatrix oben): Name + "=" links,
-      // große runde Klammern um das Gitter — sieht dadurch wie das Ergebnis
-      // selbst aus ("A · B ="), nicht wie eine separat beschriftete Box
-      // darüber. Die Klammern sind reine CSS-Elemente, die sich per
-      // align-self:stretch in .matrix-mit-klammern automatisch auf die
-      // Gitterhöhe strecken (1 bis 3 Zeilen), ohne die Höhe in JS messen zu
-      // müssen. Tilgungsplan (spaltenLabels/zeilenLabels gesetzt) bleibt
-      // unverändert beim einfachen Gitter ohne Klammern.
-      if (istEinfacheMatrix) {
-        const matrixZeile = document.createElement('div');
-        matrixZeile.className = 'matrix-eingabe-zeile';
-        const matrixLabel = document.createElement('span');
-        matrixLabel.className = 'matrix-eingabe-label';
-        matrixLabel.textContent = eingabe.label + ' =';
-        matrixZeile.appendChild(matrixLabel);
-
-        const mitKlammern = document.createElement('div');
-        mitKlammern.className = 'matrix-mit-klammern';
-        const klammerLinks = document.createElement('span');
-        klammerLinks.className = 'matrix-klammer matrix-klammer-links';
-        const klammerRechts = document.createElement('span');
-        klammerRechts.className = 'matrix-klammer matrix-klammer-rechts';
-        mitKlammern.appendChild(klammerLinks);
-        mitKlammern.appendChild(gitter);
-        mitKlammern.appendChild(klammerRechts);
-        matrixZeile.appendChild(mitKlammern);
-
-        zeile.appendChild(matrixZeile);
+        zeile.appendChild(bloecke);
       } else {
-        zeile.appendChild(gitter);
+        const gitter = document.createElement('div');
+        gitter.className = 'matrix-gitter';
+        // Optionale Spalten-/Zeilen-Beschriftungen — ohne sie war nicht
+        // erkennbar, welche Spalte welche Größe ist (iPhone-Rückmeldung).
+        // Rein additiv: ohne spaltenLabels/zeilenLabels verhält sich das
+        // Gitter exakt wie zuvor (alg.matrixprodukt u. a.).
+        const spaltenLabels = eingabe.spaltenLabels ?? null;
+        const zeilenLabels = eingabe.zeilenLabels ?? null;
+        gitter.style.gridTemplateColumns = (zeilenLabels ? 'auto ' : '') + `repeat(${eingabe.spalten}, auto)`;
+
+        if (spaltenLabels) {
+          if (zeilenLabels) {
+            const leer = document.createElement('span');
+            leer.className = 'matrix-kopf-leer';
+            gitter.appendChild(leer);
+          }
+          spaltenLabels.forEach((text) => {
+            const kopf = document.createElement('span');
+            kopf.className = 'matrix-spalten-label';
+            kopf.textContent = text;
+            gitter.appendChild(kopf);
+          });
+        }
+
+        zellen = [];
+        for (let i = 0; i < eingabe.zeilen; i++) {
+          if (zeilenLabels) {
+            const zeilenLabel = document.createElement('span');
+            zeilenLabel.className = 'matrix-zeilen-label';
+            zeilenLabel.textContent = zeilenLabels[i];
+            gitter.appendChild(zeilenLabel);
+          }
+          const zeilenFelder = [];
+          for (let j = 0; j < eingabe.spalten; j++) {
+            const feld = baueZahlenfeld(gitter, { mitEigenerHinweis: false, mitEigenenKnopfen: false });
+            feld.classList.add('matrix-zelle');
+            zeilenFelder.push(feld);
+          }
+          zellen.push(zeilenFelder);
+        }
+
+        // Einfache Matrix (siehe istEinfacheMatrix oben): Name + "=" links,
+        // große runde Klammern um das Gitter — sieht dadurch wie das Ergebnis
+        // selbst aus ("A · B ="), nicht wie eine separat beschriftete Box
+        // darüber. Die Klammern sind reine CSS-Elemente, die sich per
+        // align-self:stretch in .matrix-mit-klammern automatisch auf die
+        // Gitterhöhe strecken (1 bis 3 Zeilen), ohne die Höhe in JS messen zu
+        // müssen.
+        if (istEinfacheMatrix) {
+          const matrixZeile = document.createElement('div');
+          matrixZeile.className = 'matrix-eingabe-zeile';
+          const matrixLabel = document.createElement('span');
+          matrixLabel.className = 'matrix-eingabe-label';
+          matrixLabel.textContent = eingabe.label + ' =';
+          matrixZeile.appendChild(matrixLabel);
+
+          const mitKlammern = document.createElement('div');
+          mitKlammern.className = 'matrix-mit-klammern';
+          const klammerLinks = document.createElement('span');
+          klammerLinks.className = 'matrix-klammer matrix-klammer-links';
+          const klammerRechts = document.createElement('span');
+          klammerRechts.className = 'matrix-klammer matrix-klammer-rechts';
+          mitKlammern.appendChild(klammerLinks);
+          mitKlammern.appendChild(gitter);
+          mitKlammern.appendChild(klammerRechts);
+          matrixZeile.appendChild(mitKlammern);
+
+          zeile.appendChild(matrixZeile);
+        } else {
+          zeile.appendChild(gitter);
+        }
       }
 
       // Ein einziges Knopfpaar für die ganze Matrix statt je Zelle eins, als

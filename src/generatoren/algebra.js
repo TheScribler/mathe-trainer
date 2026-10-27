@@ -343,7 +343,7 @@ export const matrixprodukt = {
       // als unbenannte Klammerausdrücke mit einem bloßen "\cdot" am Anfang
       // der zweiten Zeile (iPhone-Rückmeldung: sah wie ein abgeschnittener
       // Rechenschritt aus, nicht wie eine Multiplikation zweier Faktoren).
-      formelZeilenA = [`v = ${matrixLatexFormatiert([v])}`, `M = ${matrixLatexFormatiert(M)}`];
+      formelZeilenA = [`v &= ${matrixLatexFormatiert([v])}`, `M &= ${matrixLatexFormatiert(M)}`];
       teilAText = 'Berechnen Sie v · M.';
       eingabeLabelA = 'v · M';
       eingaben.push({
@@ -442,7 +442,7 @@ export const matrixprodukt = {
       titel = 'Außenprodukt zweier Vektoren';
       teilAText = 'Berechnen Sie D · Fᵀ.';
       eingabeLabelA = 'D · Fᵀ';
-      formelZeilenA = [`D = ${matrixLatexFormatiert(D.map((w) => [w]))}`, `F^T = ${matrixLatexFormatiert([F])}`];
+      formelZeilenA = [`D &= ${matrixLatexFormatiert(D.map((w) => [w]))}`, `F^T &= ${matrixLatexFormatiert([F])}`];
       eingaben.push({
         id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 3, spalten: 3,
         punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
@@ -467,7 +467,7 @@ export const matrixprodukt = {
       titel = 'Skalarprodukt als 1×1-Matrix';
       teilAText = 'Berechnen Sie Dᵀ · F.';
       eingabeLabelA = 'Dᵀ · F';
-      formelZeilenA = [`D^T = ${matrixLatexFormatiert([D])}`, `F = ${matrixLatexFormatiert(F.map((w) => [w]))}`];
+      formelZeilenA = [`D^T &= ${matrixLatexFormatiert([D])}`, `F &= ${matrixLatexFormatiert(F.map((w) => [w]))}`];
       eingaben.push({
         id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 1, spalten: 1,
         punkte: 2, loesung: ergebnis, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
@@ -490,7 +490,7 @@ export const matrixprodukt = {
       istEchtesProduktA = false;
       teilAText = 'Zeigen Sie AᵀC − (CᵀA)ᵀ = 0.';
       eingabeLabelA = 'AᵀC − (CᵀA)ᵀ';
-      formelZeilenA = [`A = ${matrixLatexFormatiert(Amat)}`, `C = ${matrixLatexFormatiert(C)}`];
+      formelZeilenA = [`A &= ${matrixLatexFormatiert(Amat)}`, `C &= ${matrixLatexFormatiert(C)}`];
       eingaben.push({
         id: 'a', label: eingabeLabelA, typ: 'matrix', zeilen: 2, spalten: 2,
         punkte: 2, loesung: [[0, 0], [0, 0]], toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)',
@@ -503,10 +503,13 @@ export const matrixprodukt = {
         },
         {
           titel: 'Einsetzen',
+          // "&=" richtet die drei unterschiedlich langen linken Seiten
+          // (A^TC, C^TA, (C^TA)^T) auf eine gemeinsame "="-Spalte aus
+          // (iPhone-Rückmeldung).
           latex: mehrzeiligeKette([
-            `A^TC = ${matrixLatexFormatiert(AtC)}`,
-            `C^TA = ${matrixLatexFormatiert(CtA)}`,
-            `(C^TA)^T = ${matrixLatexFormatiert(CtAt)}`,
+            `A^TC &= ${matrixLatexFormatiert(AtC)}`,
+            `C^TA &= ${matrixLatexFormatiert(CtA)}`,
+            `(C^TA)^T &= ${matrixLatexFormatiert(CtAt)}`,
           ]),
         },
         {
@@ -525,7 +528,7 @@ export const matrixprodukt = {
       const { C, D } = teilA;
       const p = C.length; const q = C[0].length; const r = D.length; const s = D[0].length;
       teilAText = 'Prüfen Sie, ob C · D definiert ist.';
-      formelZeilenA = [`C = ${matrixLatexFormatiert(C)}`, `D = ${matrixLatexFormatiert(D)}`];
+      formelZeilenA = [`C &= ${matrixLatexFormatiert(C)}`, `D &= ${matrixLatexFormatiert(D)}`];
       eingaben.push({
         id: 'a', label: 'Ist C · D definiert?', typ: 'auswahl',
         optionen: ['Definiert', 'Nicht definiert'], punkte: 2, loesung: 'Nicht definiert', teilLabel: 'a)',
@@ -552,7 +555,7 @@ export const matrixprodukt = {
       id: 'b', label: 'X · Y', typ: 'matrix', zeilen: 3, spalten: 3,
       punkte: 2, loesung: ergebnisB, toleranz: KONFIG.toleranz.exakt, teilLabel: 'b)',
     });
-    const formelZeilenB = [`X = ${matrixLatexFormatiert(X)}`, `Y = ${matrixLatexFormatiert(Y)}`];
+    const formelZeilenB = [`X &= ${matrixLatexFormatiert(X)}`, `Y &= ${matrixLatexFormatiert(Y)}`];
 
     return {
       titel,
@@ -768,12 +771,15 @@ export const produktionsprozess = {
         // gebündelt — zwei oder mehr Matrizen nebeneinander liefen bei
         // 375px ab dem Bildschirmrand (iPhone-Rückmeldung: E und P_R
         // waren abgeschnitten), eine einzelne Matrix passt dagegen immer.
+        // "&=" statt "=": richtet alle Gleichheitszeichen in derselben
+        // Spalte aus, statt dass jede Zeile bei einer anderen x-Position
+        // beginnt (iPhone-Rückmeldung).
         formel: mehrzeiligeKette([
-          `A = ${matrixLatexFormatiert(A)}`,
-          ...(einstufig ? [] : [`B = ${matrixLatexFormatiert(B)}`]),
-          `E = ${matrixLatexFormatiert(E)}`,
-          `P_E = ${matrixLatexFormatiert(peSpalte)}`,
-          `P_R = ${matrixLatexFormatiert(prSpalte)}`,
+          `A &= ${matrixLatexFormatiert(A)}`,
+          ...(einstufig ? [] : [`B &= ${matrixLatexFormatiert(B)}`]),
+          `E &= ${matrixLatexFormatiert(E)}`,
+          `P_E &= ${matrixLatexFormatiert(peSpalte)}`,
+          `P_R &= ${matrixLatexFormatiert(prSpalte)}`,
         ]),
       },
       eingaben: [
@@ -902,12 +908,15 @@ export const matrixrechnung = {
         // Jede Matrix auf einer eigenen Zeile statt mehrere nebeneinander —
         // drei 2×2-Matrizen in einer Zeile liefen bei 375px ab dem
         // Bildschirmrand (iPhone-Rückmeldung, dasselbe Muster wie bei
-        // alg.produktionsprozess).
+        // alg.produktionsprozess). "&=" statt "=": richtet alle Gleichheits-
+        // zeichen in derselben Spalte aus (iPhone-Rückmeldung); r und s
+        // deshalb auch auf eigenen Zeilen statt mit "\quad" nebeneinander.
         formel: mehrzeiligeKette([
-          `A = ${matrixLatexFormatiert(A)}`,
-          `B = ${matrixLatexFormatiert(B)}`,
-          `C = ${matrixLatexFormatiert(C)}`,
-          `r = ${zahlZuLatex(r, 0)}, \\quad s = ${zahlZuLatex(s, 0)}`,
+          `A &= ${matrixLatexFormatiert(A)}`,
+          `B &= ${matrixLatexFormatiert(B)}`,
+          `C &= ${matrixLatexFormatiert(C)}`,
+          `r &= ${zahlZuLatex(r, 0)}`,
+          `s &= ${zahlZuLatex(s, 0)}`,
         ]),
         teile: [
           { label: 'a)', text: 'Bilden Sie r·(A−C).' },
@@ -942,10 +951,14 @@ export const matrixrechnung = {
           },
           {
             titel: 'Einsetzen',
+            // "&=" nur vor dem ERSTEN "=" (dem Namen) — richtet rA/sB/rC
+            // untereinander aus, das zweite "=" je Zeile (vor dem fertigen
+            // Ergebnis) bleibt unausgerichtet, wie es in einer aligned-
+            // Umgebung mit nur einer "&"-Spalte pro Zeile üblich ist.
             latex: mehrzeiligeKette([
-              `rA = ${skalarMalMatrix(r, matrixLatexFormatiert(A))} = ${matrixLatexFormatiert(rA)}`,
-              `sB = ${skalarMalMatrix(s, matrixLatexFormatiert(B))} = ${matrixLatexFormatiert(sB)}`,
-              `rC = ${skalarMalMatrix(r, matrixLatexFormatiert(C))} = ${matrixLatexFormatiert(rC)}`,
+              `rA &= ${skalarMalMatrix(r, matrixLatexFormatiert(A))} = ${matrixLatexFormatiert(rA)}`,
+              `sB &= ${skalarMalMatrix(s, matrixLatexFormatiert(B))} = ${matrixLatexFormatiert(sB)}`,
+              `rC &= ${skalarMalMatrix(r, matrixLatexFormatiert(C))} = ${matrixLatexFormatiert(rC)}`,
             ]),
             hinweis: 'Jede der drei Matrizen zuerst für sich mit ihrem Skalar multiplizieren.',
           },
@@ -1348,10 +1361,13 @@ export const lgs = {
           },
           {
             titel: 'Einsetzen',
+            // "&=" nur vor dem ersten "=" (dem Namen) — richtet x₃/x₂/x₁
+            // trotz unterschiedlich langer rechter Seiten auf eine
+            // gemeinsame "="-Spalte aus (iPhone-Rückmeldung).
             latex: mehrzeiligeKette([
-              `x_3 = ${bruchTeilungLatex(bruchLatex(rhs[2]), rhs[2], M[2][2], x[2])}`,
-              `x_2 = ${bruchTeilungLatex(`${bruchLatex(rhs[1])} - ${bruchFaktorLatex(M[1][2])} \\cdot ${faktorLatex(x[2])}`, zaehler2, M[1][1], x[1])}`,
-              `x_1 = ${bruchTeilungLatex(`${bruchLatex(rhs[0])} - ${bruchFaktorLatex(M[0][1])} \\cdot ${faktorLatex(x[1])} - ${bruchFaktorLatex(M[0][2])} \\cdot ${faktorLatex(x[2])}`, zaehler1, M[0][0], x[0])}`,
+              `x_3 &= ${bruchTeilungLatex(bruchLatex(rhs[2]), rhs[2], M[2][2], x[2])}`,
+              `x_2 &= ${bruchTeilungLatex(`${bruchLatex(rhs[1])} - ${bruchFaktorLatex(M[1][2])} \\cdot ${faktorLatex(x[2])}`, zaehler2, M[1][1], x[1])}`,
+              `x_1 &= ${bruchTeilungLatex(`${bruchLatex(rhs[0])} - ${bruchFaktorLatex(M[0][1])} \\cdot ${faktorLatex(x[1])} - ${bruchFaktorLatex(M[0][2])} \\cdot ${faktorLatex(x[2])}`, zaehler1, M[0][0], x[0])}`,
             ]),
             hinweis: 'Von unten nach oben rückwärts einsetzen (dritte Zeile hat nur noch x₃, zweite nur noch x₂ und x₃, usw.).',
           },
@@ -1368,9 +1384,9 @@ export const lgs = {
           {
             titel: 'Ergebnis',
             latex: mehrzeiligeKette([
-              `x_1 = \\dfrac{D_1}{D} = ${zahlZuLatex(D1, 0)} / ${faktorLatex(D)} = ${zahlZuLatex(x[0], 0)}`,
-              `x_2 = \\dfrac{D_2}{D} = ${zahlZuLatex(D2, 0)} / ${faktorLatex(D)} = ${zahlZuLatex(x[1], 0)}`,
-              `x_3 = \\dfrac{D_3}{D} = ${zahlZuLatex(D3, 0)} / ${faktorLatex(D)} = ${zahlZuLatex(x[2], 0)}`,
+              `x_1 &= \\dfrac{D_1}{D} = ${zahlZuLatex(D1, 0)} / ${faktorLatex(D)} = ${zahlZuLatex(x[0], 0)}`,
+              `x_2 &= \\dfrac{D_2}{D} = ${zahlZuLatex(D2, 0)} / ${faktorLatex(D)} = ${zahlZuLatex(x[1], 0)}`,
+              `x_3 &= \\dfrac{D_3}{D} = ${zahlZuLatex(D3, 0)} / ${faktorLatex(D)} = ${zahlZuLatex(x[2], 0)}`,
             ]),
           },
         ],

@@ -166,6 +166,57 @@ const LAYOUT_PRUEFSKRIPT = `
     });
   });
 
+  // Gegebene Matrizen/Vektoren und mehrere gestapelte Definitionen in der
+  // Lösung (z. B. "A &= …", "B &= …", "P_E &= …" in algebra.js) sollen ihre
+  // "="-Zeichen exakt untereinander ausrichten. Erkennungsmerkmal für
+  // "hier wurde tatsächlich mit '&' vor einem NAMEN ausgerichtet" (per
+  // direktem KaTeX-Render-Test ermittelt, da das '&' selbst im DOM nicht
+  // mehr auftaucht): die ÄUSSERSTE .mtable eines Blocks hat sowohl eine
+  // direkte .col-align-r- als auch eine .col-align-l-Kindspalte, UND die
+  // .col-align-r-Spalte hat tatsächlich Textinhalt. Eine einzelne Matrix
+  // (z. B. eine \pmatrix ohne äußeres aligned) hat dagegen nur
+  // .col-align-c-Spalten; gleichungsKette() (siehe latex.js) erzeugt zwar
+  // auch eine .col-align-r/-l-Struktur (jede Zeile beginnt mit bloßem "&"),
+  // aber die .col-align-r-Spalte bleibt dabei für jede Zeile leer — kein
+  // Name, der ausgerichtet werden soll, sondern nur ein linksbündiger
+  // Gleichungs-Fließtext. Alle drei Fälle werden hier korrekt übersprungen,
+  // nicht fälschlich geprüft.
+  document.querySelectorAll('#app .frage-formel, #app .frage-teil-formel, #app .loesung-formel').forEach((container) => {
+    const aeusseresMtable = container.querySelector('.mtable');
+    if (!aeusseresMtable) return;
+    const hatRechtsSpalte = aeusseresMtable.querySelector(':scope > .col-align-r');
+    const hatLinksSpalte = aeusseresMtable.querySelector(':scope > .col-align-l');
+    if (!hatRechtsSpalte || !hatLinksSpalte) return;
+    // KaTeX füllt eine "leere" Spalte intern mit einem Zero-Width-Space
+    // (U+200B) statt echtem Leerraum — .trim() allein entfernt das NICHT
+    // (U+200B hat keine Unicode-White_Space-Eigenschaft), darum zusätzlich
+    // explizit herausfiltern.
+    const rechtsSpalteOhneZeroWidth = hatRechtsSpalte.textContent.replace(/[\s​]/g, '');
+    if (rechtsSpalteOhneZeroWidth === '') return;
+
+    const gleichheitszeichen = Array.from(container.querySelectorAll('.mrel'))
+      .filter((el) => el.textContent === '=')
+      .map((el) => el.getBoundingClientRect())
+      .sort((a, b) => a.top - b.top);
+    if (gleichheitszeichen.length < 2) return;
+    const linkeKantenProZeile = [gleichheitszeichen[0].left];
+    let zeilenEnde = gleichheitszeichen[0].top;
+    for (let i = 1; i < gleichheitszeichen.length; i++) {
+      if (gleichheitszeichen[i].top - zeilenEnde > 5) {
+        linkeKantenProZeile.push(gleichheitszeichen[i].left);
+      }
+      zeilenEnde = gleichheitszeichen[i].top;
+    }
+    if (linkeKantenProZeile.length < 2) return;
+    const minLinks = Math.min(...linkeKantenProZeile);
+    const maxLinks = Math.max(...linkeKantenProZeile);
+    if (maxLinks - minLinks > 2) {
+      probleme.push('Ausrichtung: "=" -Zeichen in ' + (container.className || container.tagName) +
+        ' weichen um ' + (maxLinks - minLinks).toFixed(1) + 'px voneinander ab (max. 2px erlaubt): ' +
+        container.textContent.slice(0, 60));
+    }
+  });
+
   // KaTeX rendert mit throwOnError:false (siehe src/loesung.js) — ein
   // kaputtes LaTeX-Fragment wirft also nie eine JS-Exception, sondern
   // erscheint nur als rot markiertes .katex-error im DOM. Ohne diesen
