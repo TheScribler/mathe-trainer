@@ -1,5 +1,6 @@
-// Erzeugt von build.mjs am 2026-11-11 17:53 — nicht von Hand bearbeiten.
-const CACHE = 'mathe-trainer-202611111753';
+// Erzeugt von build.mjs am 2026-11-11 18:02 — nicht von Hand bearbeiten.
+const VERSION = '202611111802';
+const CACHE = 'mathe-trainer-' + VERSION;
 const ASSETS = [
   './',
   './index.html',
@@ -27,38 +28,55 @@ self.addEventListener('activate', (ev) => {
 
 const NETZ_ZEITLIMIT_MS = 3000;
 
+// Die Seite fragt beim Start und bei jeder Rückkehr in die App nach der
+// Version des aktiven Service Workers. Ist er neuer als die angezeigte
+// Seite, erscheint der Hinweis "Neue Version verfügbar – neu laden".
+self.addEventListener('message', (ev) => {
+  if (ev.data === 'version' && ev.source) ev.source.postMessage({ typ: 'version', version: VERSION });
+});
+
 self.addEventListener('fetch', (ev) => {
   if (ev.request.method !== 'GET') return;
-  // Netz zuerst: wer online ist, bekommt immer den neuesten Stand (wichtig
-  // während der Entwicklung — ein Cache-First-Ansatz hätte sonst nach jedem
-  // Build eine veraltete Version weiter ausgeliefert). Bei einer schwachen
-  // Zugverbindung kann das Netz aber erreichbar sein und trotzdem minuten-
-  // lang hängen, statt sauber zu scheitern — deshalb ein Zeitlimit: wartet
-  // das Netz länger als 3 Sekunden, greift sofort der zuletzt erfolgreich
-  // geladene Cache, genau wie bei einem echten Fehlschlag (Flugmodus).
+  if (new URL(ev.request.url).origin !== self.location.origin) return;
+  // Netz zuerst: wer online ist, bekommt immer den neuesten Stand. Bei einer
+  // schwachen Zugverbindung kann das Netz aber erreichbar sein und trotzdem
+  // minutenlang hängen, statt sauber zu scheitern — deshalb ein Zeitlimit:
+  // wartet das Netz länger als 3 Sekunden, greift der zuletzt erfolgreich
+  // geladene Cache (gibt es dort nichts, wird weiter auf das Netz gewartet).
   ev.respondWith(
     new Promise((resolve) => {
       let entschieden = false;
       const zeitlimit = setTimeout(() => {
-        if (entschieden) return;
-        entschieden = true;
-        caches.match(ev.request).then(resolve);
+        caches.match(ev.request).then((treffer) => {
+          if (entschieden || !treffer) return;
+          entschieden = true;
+          resolve(treffer);
+        });
       }, NETZ_ZEITLIMIT_MS);
 
-      fetch(ev.request)
+      // cache: 'no-cache' — am HTTP-Cache des Browsers vorbei beim Server
+      // nachfragen (per ETag, meist nur ein kurzes "304 unverändert").
+      // GitHub Pages schickt "Cache-Control: max-age=600"; ohne das bekam
+      // die Home-Bildschirm-App nach einem Push noch bis zu 10 Minuten die
+      // alte index.html aus dem HTTP-Cache, obwohl "Netz zuerst" galt.
+      fetch(ev.request.url, { cache: 'no-cache', credentials: 'same-origin' })
         .then((antwort) => {
-          const kopie = antwort.clone();
-          caches.open(CACHE).then((c) => c.put(ev.request, kopie));
+          if (antwort.ok) {
+            const kopie = antwort.clone();
+            caches.open(CACHE).then((c) => c.put(ev.request, kopie));
+          }
           if (entschieden) return; // Zeitlimit ist schon mit dem Cache beantwortet worden
           entschieden = true;
           clearTimeout(zeitlimit);
           resolve(antwort);
         })
         .catch(() => {
-          if (entschieden) return;
-          entschieden = true;
           clearTimeout(zeitlimit);
-          caches.match(ev.request).then(resolve);
+          caches.match(ev.request).then((treffer) => {
+            if (entschieden) return;
+            entschieden = true;
+            resolve(treffer || Response.error());
+          });
         });
     })
   );
