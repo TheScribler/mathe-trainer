@@ -43,6 +43,8 @@ const GENERATOR_IDS = [
   'diff.ableitungen',
   'diff.elastizitaet',
   'diff.partielle-ableitungen',
+  'diff.betriebsoptimum',
+  'diff.differenzenquotient',
   'int.unbestimmt',
   'int.bestimmt',
   'int.konsumentenrente',
@@ -51,6 +53,7 @@ const GENERATOR_IDS = [
   'alg.produktionsprozess',
   'alg.matrixrechnung',
   'alg.lgs',
+  'alg.determinante-inverse',
 ];
 // Für gezielte Diagnose eines einzelnen Generators ohne den vollen (mehrere
 // Minuten dauernden) Durchlauf: GENERATOR_FILTER=alg.lgs node test/layout.mjs

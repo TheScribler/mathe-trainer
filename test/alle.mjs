@@ -983,6 +983,104 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
     return;
   }
 
+  if (generator.id === 'diff.betriebsoptimum') {
+    // Unabhängig: alles numerisch aus den Rohkoeffizienten — Nullstelle per
+    // Rasterscan + Bisektion statt Mitternachtsformel, Maximum/Minimum per
+    // ternärer Suche statt Ableitung null setzen.
+    const monopol = p.markt === 'monopol';
+    const K = (x) => p.c * x * x + p.d * x + p.e;
+    const preis = (x) => (monopol ? p.a - p.b * x : p.p);
+    const G = (x) => preis(x) * x - K(x);
+    const DK = (x) => K(x) / x;
+    const ternaer = (f, lo, hi, maximum) => {
+      for (let i = 0; i < 300; i++) {
+        const m1 = lo + (hi - lo) / 3;
+        const m2 = hi - (hi - lo) / 3;
+        if ((f(m1) < f(m2)) === maximum) lo = m1; else hi = m2;
+      }
+      return (lo + hi) / 2;
+    };
+    // Break-Even: erste Stelle, an der G von ≤ 0 auf > 0 wechselt.
+    let xBE = NaN;
+    for (let x = 0; x < 500; x += 0.05) {
+      if (G(x) <= 0 && G(x + 0.05) > 0) {
+        let lo = x; let hi = x + 0.05;
+        for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (G(m) <= 0) lo = m; else hi = m; }
+        xBE = (lo + hi) / 2;
+        break;
+      }
+    }
+    pruefe(nahBei(xBE, wertVon(aufgabe, 'xbe'), 0.01), `${kennzeichnung}: Break-Even numerisch ${xBE}, erwartet ${wertVon(aufgabe, 'xbe')}`);
+    const xMax = ternaer(G, 0, 1000, true);
+    pruefe(nahBei(xMax, wertVon(aufgabe, 'xmax'), 0.01), `${kennzeichnung}: x_max numerisch ${xMax}, erwartet ${wertVon(aufgabe, 'xmax')}`);
+    pruefe(nahBei(G(xMax), wertVon(aufgabe, 'gmax'), 0.01), `${kennzeichnung}: G_max numerisch ${G(xMax)}, erwartet ${wertVon(aufgabe, 'gmax')}`);
+    if (monopol) {
+      pruefe(nahBei(preis(xMax), wertVon(aufgabe, 'pmax'), 0.01), `${kennzeichnung}: p_max numerisch ${preis(xMax)}, erwartet ${wertVon(aufgabe, 'pmax')}`);
+      pruefe(nahBei(DK(xMax), wertVon(aufgabe, 'dkmax'), 0.01), `${kennzeichnung}: DK(x_max) numerisch ${DK(xMax)}, erwartet ${wertVon(aufgabe, 'dkmax')}`);
+      pruefe(preis(xMax) > 0, `${kennzeichnung}: Preis im Gewinnmaximum muss positiv sein, ist ${preis(xMax)}`);
+    }
+    const xBO = ternaer(DK, 0.001, 1000, false);
+    pruefe(nahBei(xBO, wertVon(aufgabe, 'xbo'), 0.01), `${kennzeichnung}: Betriebsoptimum numerisch ${xBO}, erwartet ${wertVon(aufgabe, 'xbo')}`);
+    // Plausibilität: echtes Gewinnmaximum, Kosten überall positiv, ganze
+    // (bzw. halbe) Mengen.
+    pruefe(G(xMax) > 0, `${kennzeichnung}: maximaler Gewinn muss positiv sein, ist ${G(xMax)}`);
+    pruefe(xBE > 0 && xBE < xMax, `${kennzeichnung}: Break-Even ${xBE} muss zwischen 0 und x_max ${xMax} liegen`);
+    for (let x = 0; x <= 100; x += 0.5) {
+      if (K(x) <= 0) { pruefe(false, `${kennzeichnung}: K(${x}) = ${K(x)} ist nicht positiv`); break; }
+    }
+    pruefe(Number.isInteger(wertVon(aufgabe, 'xbo')), `${kennzeichnung}: Betriebsoptimum ${wertVon(aufgabe, 'xbo')} ist nicht ganzzahlig`);
+    pruefe(Number.isInteger(wertVon(aufgabe, 'xbe')), `${kennzeichnung}: Break-Even ${wertVon(aufgabe, 'xbe')} ist nicht ganzzahlig`);
+    return;
+  }
+
+  if (generator.id === 'diff.differenzenquotient') {
+    // Unabhängig: eigenes Horner-Schema statt polynomEingesetztLatex, die
+    // Tangentensteigung per zentralem Differenzenquotienten statt der
+    // symbolischen Ableitung.
+    const [a3, a2, a1, a0] = p.koeff;
+    const f = (x) => ((a3 * x + a2) * x + a1) * x + a0;
+    const sekante = (f(p.x0 + p.dx) - f(p.x0)) / p.dx;
+    pruefe(nahBei(sekante, wertVon(aufgabe, 'sekante'), 1e-6),
+      `${kennzeichnung}: Δy/Δx nachgerechnet ${sekante}, erwartet ${wertVon(aufgabe, 'sekante')}`);
+    const tangente = ableitungNumerisch(f, p.x0);
+    pruefe(nahBei(tangente, wertVon(aufgabe, 'tangente'), 1e-4),
+      `${kennzeichnung}: f'(x₀) numerisch ${tangente}, erwartet ${wertVon(aufgabe, 'tangente')}`);
+    pruefe(a3 !== 0 || a2 !== 0, `${kennzeichnung}: f ist linear — Sekante und Tangente fielen trivial zusammen`);
+    return;
+  }
+
+  if (generator.id === 'alg.determinante-inverse') {
+    // Unabhängig: Determinante über die Zeilenstufenform (Gauß-Schritt statt
+    // Kreuzprodukt-Formel), Inverse über die separate Dreifachschleife
+    // A·A⁻¹ = E und A⁻¹·A = E.
+    const [[a, b], [c, d]] = p.A;
+    let detGauss;
+    if (a !== 0) detGauss = a * (d - (c / a) * b);
+    else if (c !== 0) detGauss = -c * (b - (a / c) * d); // Zeilentausch kehrt das Vorzeichen um
+    else detGauss = 0;
+    pruefe(nahBei(detGauss, wertVon(aufgabe, 'det'), 1e-9),
+      `${kennzeichnung}: |A| per Gauß ${detGauss}, erwartet ${wertVon(aufgabe, 'det')}`);
+    const regulaer = Math.abs(detGauss) > 1e-9;
+    pruefe((wertVon(aufgabe, 'invertierbar').startsWith('Ja')) === regulaer,
+      `${kennzeichnung}: Auswahl "${wertVon(aufgabe, 'invertierbar')}" passt nicht zu |A| = ${detGauss}`);
+    if (regulaer) {
+      const inv = wertVon(aufgabe, 'inv');
+      for (const [name, produkt] of [['A·A⁻¹', matrixMalUnabhaengig(p.A, inv)], ['A⁻¹·A', matrixMalUnabhaengig(inv, p.A)]]) {
+        for (let i = 0; i < 2; i++) {
+          for (let j = 0; j < 2; j++) {
+            pruefe(nahBei(produkt[i][j], i === j ? 1 : 0, 1e-9),
+              `${kennzeichnung}: ${name}[${i}][${j}] = ${produkt[i][j]}, erwartet ${i === j ? 1 : 0}`);
+          }
+        }
+      }
+    } else {
+      pruefe(!aufgabe.eingaben.some((e) => e.id === 'inv'), `${kennzeichnung}: singuläre Matrix darf kein Inversen-Eingabefeld haben`);
+    }
+    pruefe(!p.A.some((zeile) => zeile.every((w) => w === 0)), `${kennzeichnung}: A hat eine Nullzeile: ${JSON.stringify(p.A)}`);
+    pruefe(!p.A[0].some((_, j) => p.A.every((zeile) => zeile[j] === 0)), `${kennzeichnung}: A hat eine Nullspalte: ${JSON.stringify(p.A)}`);
+    return;
+  }
+
   throw new Error(`Kein unabhängiger Prüfweg für Generator "${generator.id}" hinterlegt.`);
 }
 

@@ -1693,6 +1693,361 @@ export const partielleAbleitungen = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// diff.betriebsoptimum — Folien 98–104, Übung 12 (ohne Marktmacht) und
+// Übung 13 / Folie 102–103 (mit Marktmacht).
+// Neu gegenüber diff.gewinn-breakeven: das Betriebsoptimum, also das Minimum
+// der Durchschnittskosten DK(x) = K(x)/x = cx + d + e/x. Aus
+// DK'(x) = c − e/x² = 0 folgt x_BO = √(e/c) (die negative Wurzel ist
+// ökonomisch irrelevant), DK''(x) = 2e/x³ > 0 bestätigt das Minimum.
+//
+// Params sind direkt die Funktionskoeffizienten (damit die Fixtures die
+// Übungszahlen einspeisen können):
+//   ohne Marktmacht: { markt: 'polypol', p, c, d, e }  — p fest
+//   mit Marktmacht:  { markt: 'monopol', a, b, c, d, e } — p(x) = a − bx
+// K(x) = cx² + dx + e in beiden Fällen.
+//
+// Rückwärts konstruiert: G(x) = −A(x − x₁)(x − x₂) mit ganzen Nullstellen
+// x₁ < x₂ und e/c als Quadratzahl, damit x_BO ganz ist.
+//   Polypol: A = c, e = c·x₁x₂ ⇒ x_BO = √(x₁x₂) — Paare mit x₁x₂ quadratisch.
+//   Monopol: x_BO zuerst, e = c·x_BO² = A·x₁x₂ ⇒ c = A·x₁x₂/x_BO², b = A − c.
+// Zusatzthema — in der Probeklausur standardmäßig aus.
+// ---------------------------------------------------------------------------
+const BO_PAARE_QUADRATISCH = [
+  [1, 4], [1, 9], [1, 16], [1, 25], [2, 8], [2, 18], [3, 12], [4, 9],
+  [4, 16], [4, 25], [5, 20], [6, 24], [8, 18], [9, 16], [3, 27], [9, 25],
+];
+
+function zahlL(z) {
+  return zahlZuLatex(z, minimaleNachkommastellen(z));
+}
+
+// K(x) > 0 für alle x ≥ 0 (sonst wären die Kosten an manchen Stellen
+// negativ — ökonomisch unsinnig): bei d ≥ 0 automatisch, bei d < 0 muss
+// das Minimum der Parabel über null liegen (d² < 4ce).
+function kostenUeberallPositiv(c, d, e) {
+  return e > 0 && (d >= 0 || d * d < 4 * c * e);
+}
+
+export const betriebsoptimum = {
+  id: 'diff.betriebsoptimum',
+  teil: 'diff',
+  name: 'Gewinnmaximum und Betriebsoptimum (Durchschnittskosten)',
+  punkte: 6,
+  vorlage: 'Übung 12 / Übung 13, Folien 98–104',
+  zusatz: true,
+  waehleParameter(rng) {
+    if (zufallBool(rng, 0.5)) {
+      for (let versuch = 0; versuch < 2000; versuch++) {
+        const [x1, x2] = zufallAus(rng, BO_PAARE_QUADRATISCH);
+        const c = zufallAus(rng, [0.25, 0.5, 1, 1.5, 2]);
+        const p = zufallInt(rng, 3, 60);
+        const d = runde(p - c * (x1 + x2), 4);
+        const e = runde(c * x1 * x2, 4);
+        const gMax = c * ((x2 - x1) / 2) ** 2;
+        if (minimaleNachkommastellen(d) > 2 || minimaleNachkommastellen(gMax) > 2) continue;
+        if (Math.abs(d) > 60 || e > 1000) continue;
+        if (!kostenUeberallPositiv(c, d, e)) continue;
+        return { markt: 'polypol', p, c, d, e };
+      }
+      return { markt: 'polypol', p: 5, c: 1, d: -5, e: 9 }; // Rückfall: Übung 12a (nur Zahlen)
+    }
+    for (let versuch = 0; versuch < 4000; versuch++) {
+      const xBO = zufallInt(rng, 3, 15);
+      const x1 = zufallInt(rng, 1, 8);
+      const x2 = x1 + zufallInt(rng, 2, 10);
+      const A = zufallAus(rng, [1, 1.5, 2, 2.5, 3, 4, 5, 6]);
+      const c = runde((A * x1 * x2) / (xBO * xBO), 6);
+      const b = runde(A - c, 6);
+      if (minimaleNachkommastellen(c, 6) > 2 || c < 0.2 || b < 0.5 || minimaleNachkommastellen(b, 6) > 2) continue;
+      const d = zufallInt(rng, 2, 30);
+      const a = runde(d + A * (x1 + x2), 4);
+      const e = runde(c * xBO * xBO, 4);
+      if (!Number.isInteger(a) || a - b * x2 <= 0) continue;
+      const xMax = (x1 + x2) / 2;
+      const gMax = A * ((x2 - x1) / 2) ** 2;
+      const kBeiXMax = c * xMax * xMax + d * xMax + e;
+      const dkBeiXMax = kBeiXMax / xMax;
+      if (minimaleNachkommastellen(gMax, 6) > 2 || minimaleNachkommastellen(dkBeiXMax, 6) > 2) continue;
+      return { markt: 'monopol', a, b, c, d, e };
+    }
+    return { markt: 'monopol', a: 30, b: 1, c: 0.5, d: 18, e: 18 }; // Rückfall: Folie 102/103 (nur Zahlen)
+  },
+  baue(params) {
+    const { markt, c, d, e } = params;
+    const monopol = markt === 'monopol';
+    const a = monopol ? params.a : params.p;
+    const b = monopol ? params.b : 0;
+    const kKoeff = [c, d, e];
+    const eKoeff = [-b, a, 0];
+    const gKoeff = [runde(-(b + c), 6), runde(a - d, 6), -e];
+
+    // Nullstellen von G über die Mitternachtsformel (wie diff.gewinn-
+    // breakeven, Vorlesungsnotizen).
+    const [mfA, mfB, mfC] = gKoeff;
+    const diskriminante = runde(mfB * mfB - 4 * mfA * mfC, 4);
+    const wurzelD = runde(Math.sqrt(diskriminante), 4);
+    const x1 = runde((-mfB + wurzelD) / (2 * mfA), 2);
+    const x2 = runde((-mfB - wurzelD) / (2 * mfA), 2);
+    const minusMfBLatex = mfB < 0 ? `-(${zahlL(mfB)})` : `-${zahlL(mfB)}`;
+
+    const xMax = runde(-mfB / (2 * mfA), 2);
+    const gBeiXMax = polynomEingesetztLatex(gKoeff, [2, 1, 0], xMax);
+    const gMax = runde(gBeiXMax.summe, 2);
+    const pMax = runde(a - b * xMax, 2);
+    const kBeiXMax = polynomEingesetztLatex(kKoeff, [2, 1, 0], xMax);
+    const dkMax = runde(kBeiXMax.summe / xMax, 2);
+
+    const eDurchC = runde(e / c, 4);
+    const xBO = runde(Math.sqrt(e / c), 2);
+    const dkMin = runde(c * xBO + d + e / xBO, 2);
+
+    const kLatex = `K(x) = ${polynomLatex(kKoeff, [2, 1, 0])}`;
+    const dkTermLatex = `${polynomLatex([c, d], [1, 0])} + \\dfrac{${zahlL(e)}}{x}`;
+
+    const frage = monopol
+      ? {
+        text: 'Ein Unternehmen mit Marktmacht (Monopolist) sieht sich der folgenden Preisabsatzfunktion p(x) und Kostenfunktion K(x) gegenüber.',
+        formel: mehrzeiligeKette([`p(x) = ${polynomLatex([a, -b], [0, 1])}`, kLatex]),
+        teile: [
+          { label: 'a)', text: 'Ab welcher Menge macht das Unternehmen Gewinn (Break-Even)?' },
+          { label: 'b)', text: 'Bestimmen Sie für das Gewinnmaximum die Menge, den Preis, den Gewinn und die Durchschnittskosten.' },
+          { label: 'c)', text: 'Bei welcher Menge liegt das Betriebsoptimum, also das Minimum der Durchschnittskosten?' },
+        ],
+      }
+      : {
+        text: 'Ein Unternehmen ohne Marktmacht (vollständige Konkurrenz) verkauft zum festen Marktpreis p. Die Kosten werden durch K(x) beschrieben.',
+        formel: mehrzeiligeKette([`p = ${zahlL(a)}`, kLatex]),
+        teile: [
+          { label: 'a)', text: 'Ab welcher Menge macht das Unternehmen Gewinn (Break-Even)?' },
+          { label: 'b)', text: 'Bestimmen Sie die gewinnmaximale Menge und den maximalen Gewinn.' },
+          { label: 'c)', text: 'Bei welcher Menge liegt das Betriebsoptimum, also das Minimum der Durchschnittskosten?' },
+        ],
+      };
+
+    const eingaben = monopol
+      ? [
+        { id: 'xbe', label: 'Break-Even-Menge', typ: 'zahl', punkte: 1, loesung: x1, toleranz: KONFIG.toleranz.jahre, teilLabel: 'a)' },
+        { id: 'xmax', label: 'Gewinnmaximale Menge', typ: 'zahl', punkte: 1, loesung: xMax, toleranz: KONFIG.toleranz.jahre, teilLabel: 'b)' },
+        { id: 'pmax', label: 'Preis im Gewinnmaximum', typ: 'zahl', punkte: 1, loesung: pMax, toleranz: KONFIG.toleranz.geld, teilLabel: 'b)' },
+        { id: 'gmax', label: 'Maximaler Gewinn', typ: 'zahl', punkte: 1, loesung: gMax, toleranz: KONFIG.toleranz.geld, teilLabel: 'b)' },
+        { id: 'dkmax', label: 'Durchschnittskosten im Gewinnmaximum', typ: 'zahl', punkte: 1, loesung: dkMax, toleranz: KONFIG.toleranz.geld, teilLabel: 'b)' },
+        { id: 'xbo', label: 'Betriebsoptimum (Menge)', typ: 'zahl', punkte: 1, loesung: xBO, toleranz: KONFIG.toleranz.jahre, teilLabel: 'c)' },
+      ]
+      : [
+        { id: 'xbe', label: 'Break-Even-Menge', typ: 'zahl', punkte: 1, loesung: x1, toleranz: KONFIG.toleranz.jahre, teilLabel: 'a)' },
+        { id: 'xmax', label: 'Gewinnmaximale Menge', typ: 'zahl', punkte: 1, loesung: xMax, toleranz: KONFIG.toleranz.jahre, teilLabel: 'b)' },
+        { id: 'gmax', label: 'Maximaler Gewinn', typ: 'zahl', punkte: 2, loesung: gMax, toleranz: KONFIG.toleranz.geld, teilLabel: 'b)' },
+        { id: 'xbo', label: 'Betriebsoptimum (Menge)', typ: 'zahl', punkte: 2, loesung: xBO, toleranz: KONFIG.toleranz.jahre, teilLabel: 'c)' },
+      ];
+
+    const schritte = [
+      {
+        titel: 'Formel',
+        latex: monopol ? `E(x) = p(x) \\cdot x, \\quad G(x) = E(x) - K(x)` : `E(x) = p \\cdot x, \\quad G(x) = E(x) - K(x)`,
+        hinweis: monopol
+          ? 'Mit Marktmacht hängt der Preis von der Menge ab — der Erlös wird darum quadratisch.'
+          : 'Ohne Marktmacht ist der Preis fest — der Erlös ist eine Gerade durch den Ursprung.',
+      },
+      {
+        titel: 'Einsetzen',
+        latex: mehrzeiligeGleichung('G(x)', [
+          `${polynomLatex(eKoeff, [2, 1, 0])} - \\left(${polynomLatex(kKoeff, [2, 1, 0])}\\right)`,
+          polynomLatex(gKoeff, [2, 1, 0]),
+        ]),
+      },
+      {
+        titel: 'Formel',
+        latex: `x_{1,2} = \\dfrac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}`,
+        hinweis: 'Break-Even: G(x) = 0 setzen und mit der Mitternachtsformel lösen. Die kleinere Nullstelle ist die Gewinnschwelle, die größere die Gewinngrenze.',
+      },
+      {
+        titel: 'Einsetzen',
+        latex: mehrzeiligeKette([
+          `b^2 - 4ac &= ${klammerWennNegativ(mfB, minimaleNachkommastellen(mfB))}^2 - 4 \\cdot ${klammerWennNegativ(mfA, minimaleNachkommastellen(mfA))} \\cdot ${klammerWennNegativ(mfC, minimaleNachkommastellen(mfC))}`,
+          `&= ${zahlL(diskriminante)}`,
+          `x_1 &= \\dfrac{${minusMfBLatex} + ${zahlL(wurzelD)}}{${zahlL(2 * mfA)}} = ${zahlL(x1)}`,
+          `x_2 &= \\dfrac{${minusMfBLatex} - ${zahlL(wurzelD)}}{${zahlL(2 * mfA)}} = ${zahlL(x2)}`,
+        ]),
+      },
+      { titel: 'Ergebnis', latex: `x_{BE} = ${zahlL(x1)}` },
+      {
+        titel: 'Umstellen',
+        latex: `G'(x) = ${polynomLatex([runde(2 * mfA, 6), mfB], [1, 0])} = 0 \\;\\Rightarrow\\; x_{max} = ${zahlL(xMax)}`,
+        hinweis: `Hinreichende Bedingung: G''(x) = ${prosaZahlDezimal(2 * mfA, minimaleNachkommastellen(2 * mfA))} < 0, also Maximum.`,
+      },
+      {
+        titel: 'Einsetzen',
+        latex: mehrzeiligeGleichung(`G(${zahlL(xMax)})`, ohneDuplikatZeile(gBeiXMax.eingesetzt, gBeiXMax.werte, zahlL(gMax))),
+      },
+    ];
+    if (monopol) {
+      const pBeiXMax = polynomEingesetztLatex([a, -b], [0, 1], xMax);
+      schritte.push(
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeGleichung(`p(${zahlL(xMax)})`, ohneDuplikatZeile(pBeiXMax.eingesetzt, pBeiXMax.werte, zahlL(pMax))),
+        },
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeKette([
+            `K(${zahlL(xMax)}) &= ${ohneDuplikatZeile(kBeiXMax.eingesetzt, kBeiXMax.werte, zahlL(runde(kBeiXMax.summe, 2))).join(' = ')}`,
+            `DK(${zahlL(xMax)}) &= \\dfrac{K(${zahlL(xMax)})}{${zahlL(xMax)}} = ${zahlL(runde(kBeiXMax.summe, 2))} : ${zahlL(xMax)} = ${zahlL(dkMax)}`,
+          ]),
+          hinweis: 'Durchschnittskosten = Gesamtkosten geteilt durch die Menge.',
+        },
+      );
+    }
+    schritte.push(
+      {
+        titel: 'Ergebnis',
+        latex: monopol
+          ? `x_{max} = ${zahlL(xMax)}, \\quad p_{max} = ${zahlL(pMax)}, \\quad G_{max} = ${zahlL(gMax)}, \\quad DK = ${zahlL(dkMax)}`
+          : `x_{max} = ${zahlL(xMax)}, \\quad G_{max} = ${zahlL(gMax)}`,
+      },
+      {
+        titel: 'Formel',
+        latex: `DK(x) = \\dfrac{K(x)}{x} = ${dkTermLatex}`,
+        hinweis: 'Betriebsoptimum = Minimum der Durchschnittskosten (Stückkosten). Jeden Summanden von K(x) durch x teilen.',
+      },
+      {
+        titel: 'Umstellen',
+        latex: gleichungsKette([
+          `DK'(x) = ${zahlL(c)} - \\dfrac{${zahlL(e)}}{x^{2}} = 0`,
+          `x^{2} = ${zahlL(e)} : ${zahlL(c)} = ${zahlL(eDurchC)}`,
+          `x = \\sqrt{${zahlL(eDurchC)}} = ${zahlL(xBO)}`,
+        ]),
+        hinweis: 'Die negative Wurzel ist ökonomisch irrelevant (keine negative Menge). Hinreichende Bedingung: DK\'\'(x) = 2·e/x³ ist für x > 0 positiv, also Minimum.',
+      },
+      {
+        titel: 'Ergebnis',
+        latex: `x_{BO} = ${zahlL(xBO)}, \\quad DK(${zahlL(xBO)}) = ${zahlL(dkMin)}`,
+      },
+    );
+
+    const ergebnisse = [
+      { label: 'Break-Even', latex: `x_{BE} = ${zahlL(x1)}` },
+      { label: 'Gewinnmaximum', latex: monopol
+        ? `x = ${zahlL(xMax)},\\ p = ${zahlL(pMax)},\\ G = ${zahlL(gMax)},\\ DK = ${zahlL(dkMax)}`
+        : `x = ${zahlL(xMax)},\\ G = ${zahlL(gMax)}` },
+      { label: 'Betriebsoptimum', latex: `x_{BO} = ${zahlL(xBO)}` },
+    ];
+
+    return { frage, eingaben, loesung: { schritte, ergebnisse }, params };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// diff.differenzenquotient — Folien 66–73
+// a) Durchschnittliche Steigung (Sekante) Δy/Δx = [f(x₀+Δx) − f(x₀)]/Δx,
+// b) Steigung im Punkt (Tangente) f'(x₀) zum Vergleich.
+// f ist ein Polynom 2. oder 3. Grades mit kleinen ganzen Koeffizienten;
+// x₀ ganz, Δx aus {0,5; 1; 2; 3}. Ergebnisse mit höchstens 2 Nachkomma-
+// stellen (sonst neu ziehen). Params: { koeff: [a₃, a₂, a₁, a₀], x0, dx }.
+// Zusatzthema — in der Probeklausur standardmäßig aus.
+// ---------------------------------------------------------------------------
+const DQ_EXPONENTEN = [3, 2, 1, 0];
+
+function dqWert(koeff, x) {
+  return koeff.reduce((s, k, i) => s + k * Math.pow(x, DQ_EXPONENTEN[i]), 0);
+}
+
+export const differenzenquotient = {
+  id: 'diff.differenzenquotient',
+  teil: 'diff',
+  name: 'Differenzen- und Differentialquotient',
+  punkte: 2,
+  vorlage: 'Folien 66–73',
+  zusatz: true,
+  waehleParameter(rng) {
+    for (let versuch = 0; versuch < 2000; versuch++) {
+      const kubisch = zufallBool(rng, 0.4);
+      const koeff = [
+        kubisch ? zufallAus(rng, [-1, 1, 2]) : 0,
+        zufallAus(rng, kubisch ? [-3, -2, -1, 0, 1, 2, 3] : [-3, -2, -1, 1, 2, 3, 4]),
+        zufallInt(rng, -6, 8),
+        zufallInt(rng, -10, 20),
+      ];
+      const x0 = zufallInt(rng, -3, 5);
+      const dx = zufallAus(rng, [0.5, 1, 1, 2, 2, 3]);
+      const sekante = (dqWert(koeff, x0 + dx) - dqWert(koeff, x0)) / dx;
+      if (minimaleNachkommastellen(sekante, 6) > 2) continue;
+      if (Math.abs(sekante) > 200) continue;
+      return { koeff, x0, dx };
+    }
+    return { koeff: [0, 1, 0, 0], x0: 1, dx: 1 }; // Rückfall: f(x) = x² (Folie 72)
+  },
+  baue(params) {
+    const { koeff, x0, dx } = params;
+    const x1 = runde(x0 + dx, 4);
+    const f0 = polynomEingesetztLatex(koeff, DQ_EXPONENTEN, x0);
+    const f1 = polynomEingesetztLatex(koeff, DQ_EXPONENTEN, x1);
+    const y0 = runde(f0.summe, 4);
+    const y1 = runde(f1.summe, 4);
+    const dy = runde(y1 - y0, 4);
+    const sekante = runde(dy / dx, 2);
+    const ableitungKoeff = [3 * koeff[0], 2 * koeff[1], koeff[2]];
+    const ableitungExp = [2, 1, 0];
+    const fStrich = polynomEingesetztLatex(ableitungKoeff, ableitungExp, x0);
+    const tangente = runde(fStrich.summe, 2);
+    const fLatex = polynomLatex(koeff, DQ_EXPONENTEN);
+
+    return {
+      frage: {
+        text: 'Gegeben ist die folgende Funktion f.',
+        formel: `f(x) = ${fLatex}`,
+        teile: [
+          { label: 'a)', text: `Berechnen Sie die durchschnittliche Steigung von f zwischen x = ${prosaLabelZahl(x0)} und x = ${prosaZahlDezimal(x1, minimaleNachkommastellen(x1))} (Differenzenquotient).` },
+          { label: 'b)', text: `Bestimmen Sie zum Vergleich die Steigung von f im Punkt x = ${prosaLabelZahl(x0)} (Differentialquotient).` },
+        ],
+      },
+      eingaben: [
+        { id: 'sekante', label: 'Differenzenquotient Δy/Δx', typ: 'zahl', punkte: 1, loesung: sekante, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
+        { id: 'tangente', label: `f'(${prosaLabelZahl(x0)})`, typ: 'zahl', punkte: 1, loesung: tangente, toleranz: KONFIG.toleranz.exakt, teilLabel: 'b)' },
+      ],
+      loesung: {
+        schritte: [
+          {
+            titel: 'Formel',
+            latex: `\\dfrac{\\Delta y}{\\Delta x} = \\dfrac{f(x_0 + \\Delta x) - f(x_0)}{\\Delta x}`,
+            hinweis: 'Der Differenzenquotient ist die Steigung der Sekante durch die beiden Kurvenpunkte.',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeKette([
+              `f(${zahlL(x1)}) &= ${ohneDuplikatZeile(f1.eingesetzt, f1.werte, zahlL(y1)).join(' = ')}`,
+              `f(${zahlL(x0)}) &= ${ohneDuplikatZeile(f0.eingesetzt, f0.werte, zahlL(y0)).join(' = ')}`,
+            ]),
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeGleichung('\\dfrac{\\Delta y}{\\Delta x}', [
+              `\\dfrac{${zahlL(y1)} - ${klammerWennNegativ(y0, minimaleNachkommastellen(y0))}}{${zahlL(dx)}}`,
+              `${zahlL(dy)} : ${zahlL(dx)}`,
+              zahlL(sekante),
+            ]),
+          },
+          {
+            titel: 'Formel',
+            latex: `f'(x) = \\lim_{\\Delta x \\to 0} \\dfrac{f(x + \\Delta x) - f(x)}{\\Delta x} = ${polynomLatex(ableitungKoeff, ableitungExp)}`,
+            hinweis: 'Der Differentialquotient ist der Grenzwert des Differenzenquotienten für Δx → 0, also die erste Ableitung (Steigung der Tangente).',
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeGleichung(`f'(${zahlL(x0)})`, ohneDuplikatZeile(fStrich.eingesetzt, fStrich.werte, zahlL(tangente))),
+          },
+          { titel: 'Ergebnis', latex: `\\dfrac{\\Delta y}{\\Delta x} = ${zahlL(sekante)}, \\quad f'(${zahlL(x0)}) = ${zahlL(tangente)}` },
+        ],
+        ergebnisse: [
+          { label: 'Differenzenquotient', latex: zahlL(sekante) },
+          { label: `Steigung f'(${prosaLabelZahl(x0)})`, latex: zahlL(tangente) },
+        ],
+      },
+      params,
+    };
+  },
+};
+
 export const DIFF_GENERATOREN = [
   gewinnBreakeven,
   extremwerteZweiVariablenKubisch,
@@ -1700,4 +2055,4 @@ export const DIFF_GENERATOREN = [
   nutzenmaximum,
   ableitungen,
 ];
-export const DIFF_ZUSATZ_GENERATOREN = [elastizitaet, partielleAbleitungen];
+export const DIFF_ZUSATZ_GENERATOREN = [elastizitaet, partielleAbleitungen, betriebsoptimum, differenzenquotient];

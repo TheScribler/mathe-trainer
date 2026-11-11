@@ -21,13 +21,15 @@ import {
   nutzenmaximum,
   ableitungen,
   elastizitaet,
+  betriebsoptimum,
+  differenzenquotient,
 } from '../src/generatoren/diff.js';
 import {
   integralUnbestimmt,
   integralBestimmt,
   integralKonsumentenrente,
 } from '../src/generatoren/integral.js';
-import { matrixprodukt, produktionsprozess, matrixrechnung, lgs } from '../src/generatoren/algebra.js';
+import { matrixprodukt, produktionsprozess, matrixrechnung, lgs, determinanteInverse } from '../src/generatoren/algebra.js';
 
 export function testeFixtures() {
   let fehler = 0;
@@ -490,6 +492,72 @@ export function testeFixtures() {
     const werte = Object.fromEntries(a.eingaben.map((e) => [e.id, e.loesung]));
     pruefe(nahBei(werte.eps, -0.25, 1e-9), `Übung 17e: ε=${werte.eps}, erwartet -0,25`);
     faelle.push('Übung 17e');
+  }
+
+  // Übung 12a–f (ohne Marktmacht): p, K = cx² + dx + e -> x_BE, x_max, G_max, x_BO.
+  for (const [name, p, c, d, e, xbe, xmax, gmax, xbo] of [
+    ['Übung 12a', 5, 1, -5, 9, 1, 5, 16, 3],
+    ['Übung 12b', 24, 0.5, 19, 8, 2, 5, 4.5, 4],
+    ['Übung 12c', 16, 2, 6, 8, 1, 2.5, 4.5, 2],
+    ['Übung 12d', 12, 1, 7, 4, 1, 2.5, 2.25, 2],
+    ['Übung 12e', 10, 0.25, 7.5, 4, 2, 5, 2.25, 4],
+    ['Übung 12f', 4, 1, -22, 144, 8, 13, 25, 12],
+  ]) {
+    const a = betriebsoptimum.baue({ markt: 'polypol', p, c, d, e });
+    const w = Object.fromEntries(a.eingaben.map((x) => [x.id, x.loesung]));
+    pruefe(nahBei(w.xbe, xbe, 1e-9) && nahBei(w.xmax, xmax, 1e-9) && nahBei(w.gmax, gmax, 1e-9) && nahBei(w.xbo, xbo, 1e-9),
+      `${name}: ${JSON.stringify(w)}, erwartet x_BE=${xbe}, x_max=${xmax}, G_max=${gmax}, x_BO=${xbo}`);
+    faelle.push(name);
+  }
+
+  // Übung 13a–c (mit Marktmacht): x_BE, x_max, p_max, G_max, DK(x_max).
+  for (const [name, a0, b, c, d, e, xbe, xmax, pmax, gmax, dk] of [
+    ['Übung 13a', 50, 3, 1, 18, 60, 3, 4, 38, 4, 37],
+    ['Übung 13b', 90, 3, 7.5, -36, 210, 2, 6, 72, 168, 44],
+    ['Übung 13c', 25, 2, 0.4, -11, 120, 5, 7.5, 10, 15, 8],
+  ]) {
+    const a = betriebsoptimum.baue({ markt: 'monopol', a: a0, b, c, d, e });
+    const w = Object.fromEntries(a.eingaben.map((x) => [x.id, x.loesung]));
+    pruefe(nahBei(w.xbe, xbe, 1e-9) && nahBei(w.xmax, xmax, 1e-9) && nahBei(w.pmax, pmax, 1e-9) && nahBei(w.gmax, gmax, 1e-9) && nahBei(w.dkmax, dk, 1e-9),
+      `${name}: ${JSON.stringify(w)}, erwartet x_BE=${xbe}, x_max=${xmax}, p=${pmax}, G=${gmax}, DK=${dk}`);
+    faelle.push(name);
+  }
+
+  // Folie 102/103 (p = 30 − x, K = 0,5x² + 18x + 18): x_max=4, p=26, G=6, x_BE=2, x_BO=6.
+  {
+    const a = betriebsoptimum.baue({ markt: 'monopol', a: 30, b: 1, c: 0.5, d: 18, e: 18 });
+    const w = Object.fromEntries(a.eingaben.map((x) => [x.id, x.loesung]));
+    pruefe(nahBei(w.xmax, 4, 1e-9) && nahBei(w.pmax, 26, 1e-9) && nahBei(w.gmax, 6, 1e-9) && nahBei(w.xbe, 2, 1e-9) && nahBei(w.xbo, 6, 1e-9),
+      `Folie 103: ${JSON.stringify(w)}, erwartet x_max=4, p=26, G=6, x_BE=2, x_BO=6`);
+    faelle.push('Folie 103');
+  }
+
+  // Folie 72/73 (f = x²): f'(x) = 2x -> Steigungen −4, −2, 0, 2, 4 an x = −2…2.
+  // Differenzenquotient zwischen 1 und 2: (4 − 1)/1 = 3 (von Hand nachgerechnet).
+  {
+    const steigungen = [-2, -1, 0, 1, 2].map((x0) =>
+      differenzenquotient.baue({ koeff: [0, 1, 0, 0], x0, dx: 1 }).eingaben.find((e) => e.id === 'tangente').loesung);
+    pruefe(JSON.stringify(steigungen) === JSON.stringify([-4, -2, 0, 2, 4]), `Folie 73: Steigungen ${steigungen}, erwartet −4, −2, 0, 2, 4`);
+    const sek = differenzenquotient.baue({ koeff: [0, 1, 0, 0], x0: 1, dx: 1 }).eingaben.find((e) => e.id === 'sekante').loesung;
+    pruefe(nahBei(sek, 3, 1e-9), `Folie 72 (Sekante 1…2): ${sek}, erwartet 3`);
+    faelle.push('Folie 72/73');
+  }
+
+  // Folie 190: A = (5 −15; 3 −9) -> |A| = 0, singulär.
+  {
+    const a = determinanteInverse.baue({ A: [[5, -15], [3, -9]] });
+    const w = Object.fromEntries(a.eingaben.map((x) => [x.id, x.loesung]));
+    pruefe(w.det === 0 && w.invertierbar.startsWith('Nein') && !('inv' in w), `Folie 190: ${JSON.stringify(w)}, erwartet |A|=0, singulär`);
+    faelle.push('Folie 190');
+  }
+
+  // Von Hand nachgerechnet: A = (4 7; 2 4) -> |A| = 2, A⁻¹ = (2 −3,5; −1 2).
+  {
+    const a = determinanteInverse.baue({ A: [[4, 7], [2, 4]] });
+    const w = Object.fromEntries(a.eingaben.map((x) => [x.id, x.loesung]));
+    pruefe(w.det === 2 && JSON.stringify(w.inv) === JSON.stringify([[2, -3.5], [-1, 2]]),
+      `Inverse 2×2 (Handrechnung): ${JSON.stringify(w)}, erwartet |A|=2, A⁻¹=[[2,−3,5],[−1,2]]`);
+    faelle.push('Inverse 2×2');
   }
 
   console.log(`Fixtures: ${faelle.length} geprüft (${faelle.join(', ')})`);

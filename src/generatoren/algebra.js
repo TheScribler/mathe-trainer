@@ -6,7 +6,7 @@
 // "4 Lineare Algebra").
 
 import { zufallAus, zufallBool } from '../rng.js';
-import { minimaleNachkommastellen } from '../zahl.js';
+import { minimaleNachkommastellen, runde } from '../zahl.js';
 import { zahlZuLatex, matrixLatex, mehrzeiligeGleichung, mehrzeiligeKette, bruchGekuerzt } from '../latex.js';
 import { KONFIG } from '../konfig.js';
 
@@ -1399,5 +1399,144 @@ export const lgs = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// alg.determinante-inverse — Folien 189–191
+// Determinante 2. Ordnung |A| = a₁₁a₂₂ − a₂₁a₁₂, regulär vs. singulär, und
+// — nur für reguläre Matrizen — die Inverse A⁻¹ mit A · A⁻¹ = E.
+// Rückwärts: bei regulären Matrizen |A| ∈ {±1; ±2; ±4; ±5}, damit jeder
+// Eintrag von A⁻¹ höchstens 2 Nachkommastellen hat; singuläre Matrizen
+// entstehen, indem eine Zeile bzw. Spalte ein Vielfaches der anderen ist.
+// Params: { A } (2×2). Zusatzthema — in der Probeklausur standardmäßig aus.
+// ---------------------------------------------------------------------------
+const DET_EINTRAG_POOL = [-4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
+const DET_ERLAUBT = [-5, -4, -2, -1, 1, 2, 4, 5];
+const INVERTIERBAR_OPTIONEN = ['Ja, A ist regulär', 'Nein, A ist singulär'];
+
+function klammerLatex(w) {
+  return w < 0 ? `(${zahlZuLatex(w, minimaleNachkommastellen(w))})` : zahlZuLatex(w, minimaleNachkommastellen(w));
+}
+
+export const determinanteInverse = {
+  id: 'alg.determinante-inverse',
+  teil: 'algebra',
+  name: 'Determinante und inverse Matrix (2×2)',
+  punkte: 4,
+  vorlage: 'Folien 189–191',
+  zusatz: true,
+  waehleParameter(rng) {
+    if (zufallBool(rng, 0.2)) {
+      for (let versuch = 0; versuch < 500; versuch++) {
+        const p = zufallAus(rng, DET_EINTRAG_POOL.filter((w) => w !== 0));
+        const q = zufallAus(rng, DET_EINTRAG_POOL.filter((w) => w !== 0));
+        const k = zufallAus(rng, [-3, -2, 2, 3]);
+        const A = zufallBool(rng, 0.5) ? [[p, q], [k * p, k * q]] : [[p, k * p], [q, k * q]];
+        if (A.flat().some((w) => Math.abs(w) > 15)) continue;
+        return { A: zufallBool(rng, 0.5) ? A : [A[1], A[0]] };
+      }
+      return { A: [[5, -15], [3, -9]] }; // Rückfall: Folie 190 (nur Zahlen)
+    }
+    for (let versuch = 0; versuch < 5000; versuch++) {
+      const A = [
+        [zufallAus(rng, DET_EINTRAG_POOL), zufallAus(rng, DET_EINTRAG_POOL)],
+        [zufallAus(rng, DET_EINTRAG_POOL), zufallAus(rng, DET_EINTRAG_POOL)],
+      ];
+      const det = A[0][0] * A[1][1] - A[1][0] * A[0][1];
+      if (!DET_ERLAUBT.includes(det)) continue;
+      const flach = A.flat();
+      if (flach.filter((w) => w === 0).length > 1) continue;
+      if (flach.filter((w) => Math.abs(w) > 1).length < 2) continue;
+      return { A };
+    }
+    return { A: [[4, 7], [2, 4]] };
+  },
+  baue(params) {
+    const { A } = params;
+    const [[a11, a12], [a21, a22]] = A;
+    const hauptprodukt = a11 * a22;
+    const nebenprodukt = a21 * a12;
+    const det = hauptprodukt - nebenprodukt;
+    const regulaer = det !== 0;
+
+    const schritte = [
+      {
+        titel: 'Formel',
+        latex: `|A| = \\begin{vmatrix} a_{11} & a_{12} \\\\ a_{21} & a_{22} \\end{vmatrix} = a_{11} \\cdot a_{22} - a_{21} \\cdot a_{12}`,
+        hinweis: 'Determinante 2. Ordnung: Produkt der Hauptdiagonale minus Produkt der Nebendiagonale.',
+      },
+      {
+        titel: 'Einsetzen',
+        latex: mehrzeiligeGleichung('|A|', [
+          `${klammerLatex(a11)} \\cdot ${klammerLatex(a22)} - ${klammerLatex(a21)} \\cdot ${klammerLatex(a12)}`,
+          `${zahlZuLatex(hauptprodukt, 0)} - ${klammerLatex(nebenprodukt)}`,
+          zahlZuLatex(det, 0),
+        ]),
+      },
+    ];
+    const eingaben = [];
+    const ergebnisse = [{ label: 'Determinante', latex: `|A| = ${zahlZuLatex(det, 0)}` }];
+
+    if (regulaer) {
+      const adj = [[a22, -a12], [-a21, a11]];
+      const inv = adj.map((zeile) => zeile.map((w) => runde(w / det, 4) + 0));
+      const vorfaktor = det === 1 ? '' : det === -1 ? '-' : det < 0 ? `-\\dfrac{1}{${-det}} \\cdot ` : `\\dfrac{1}{${det}} \\cdot `;
+      eingaben.push(
+        { id: 'det', label: '|A|', typ: 'zahl', punkte: 1, loesung: det, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
+        { id: 'invertierbar', label: 'Existiert A⁻¹?', typ: 'auswahl', optionen: INVERTIERBAR_OPTIONEN, punkte: 1, loesung: INVERTIERBAR_OPTIONEN[0], teilLabel: 'b)' },
+        { id: 'inv', label: 'A⁻¹', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: inv, toleranz: KONFIG.toleranz.exakt, teilLabel: 'b)' },
+      );
+      schritte.push(
+        {
+          titel: 'Ergebnis',
+          latex: `|A| = ${zahlZuLatex(det, 0)} \\neq 0 \\;\\Rightarrow\\; A \\text{ ist regulär, } A^{-1} \\text{ existiert}`,
+        },
+        {
+          titel: 'Formel',
+          latex: `A^{-1} = \\dfrac{1}{|A|} \\cdot \\begin{pmatrix} a_{22} & -a_{12} \\\\ -a_{21} & a_{11} \\end{pmatrix}`,
+          hinweis: 'Hauptdiagonale tauschen, bei der Nebendiagonale das Vorzeichen wechseln, dann durch die Determinante teilen.',
+        },
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeGleichung('A^{-1}', [
+            `${vorfaktor}${matrixLatexFormatiert(adj)}`,
+            matrixLatexFormatiert(inv),
+          ]),
+        },
+        {
+          titel: 'Einsetzen',
+          latex: `A \\cdot A^{-1} = ${matrixLatexFormatiert(A)} \\cdot ${matrixLatexFormatiert(inv)} = ${matrixLatexFormatiert([[1, 0], [0, 1]])} = E`,
+          hinweis: 'Probe: Das Produkt aus Matrix und Inverser muss die Einheitsmatrix ergeben.',
+        },
+        { titel: 'Ergebnis', latex: `A^{-1} = ${matrixLatexFormatiert(inv)}` },
+      );
+      ergebnisse.push({ label: 'Inverse', latex: `A^{-1} = ${matrixLatexFormatiert(inv)}` });
+    } else {
+      eingaben.push(
+        { id: 'det', label: '|A|', typ: 'zahl', punkte: 2, loesung: det, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
+        { id: 'invertierbar', label: 'Existiert A⁻¹?', typ: 'auswahl', optionen: INVERTIERBAR_OPTIONEN, punkte: 2, loesung: INVERTIERBAR_OPTIONEN[1], teilLabel: 'b)' },
+      );
+      schritte.push({
+        titel: 'Ergebnis',
+        latex: `|A| = 0 \\;\\Rightarrow\\; A \\text{ ist singulär, } A^{-1} \\text{ existiert nicht}`,
+        hinweis: 'Eine Matrix mit Determinante 0 heißt singulär. Nur reguläre Matrizen (Determinante ungleich 0) haben eine Inverse.',
+      });
+      ergebnisse.push({ label: 'Inverse', latex: '\\text{existiert nicht (singulär)}' });
+    }
+
+    return {
+      frage: {
+        text: 'Gegeben ist die folgende quadratische Matrix A.',
+        formel: `A = ${matrixLatexFormatiert(A)}`,
+        teile: [
+          { label: 'a)', text: 'Berechnen Sie die Determinante von A.' },
+          { label: 'b)', text: 'Ist A regulär oder singulär? Bestimmen Sie, falls möglich, die inverse Matrix.' },
+        ],
+      },
+      eingaben,
+      loesung: { schritte, ergebnisse },
+      params,
+    };
+  },
+};
+
 export const ALGEBRA_GENERATOREN = [matrixprodukt, produktionsprozess];
-export const ALGEBRA_ZUSATZ_GENERATOREN = [matrixrechnung, lgs];
+export const ALGEBRA_ZUSATZ_GENERATOREN = [matrixrechnung, lgs, determinanteInverse];

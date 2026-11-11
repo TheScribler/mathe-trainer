@@ -132,6 +132,9 @@ Mögliche 24-Punkte-Kombinationen: 12+12, 12+8+4, 8+4+12. Musterklausur-Original
 | `fin.tilgungsplan` | Ratentilgung / Annuitätentilgung | 4 | Kapitel 1.3 | `K₀` durch `n` teilbar; Annuität `A = K₀·qⁿi/(qⁿ−1)`; Plan-Tabelle für 3–4 Perioden |
 | `diff.elastizitaet` | Preiselastizität der Nachfrage | 3 | Übung 17 | `ε = f'(x)·x/f(x)`; Zahlen so, dass `ε` ganz ist (Übung 17: −1, −3, −4) |
 | `alg.lgs` | Lineares Gleichungssystem, Gauß und Cramer | 6 | Übung 25 | Lösungsvektor ganz wählen, Koeffizientenmatrix mit `det ≠ 0` und kleinen Einträgen, rechte Seite daraus; Lösungsanzeige mit Zeilenschritten |
+| `diff.betriebsoptimum` | Gewinnmaximum und Betriebsoptimum (Durchschnittskosten) | 6 | Übung 12/13, Folien 98–104 | Ohne Marktmacht (`p` fest) oder mit (`p = a − bx`); `G = −A(x−x₁)(x−x₂)` rückwärts, `e/c` Quadratzahl → `x_BO = √(e/c)` ganz; Monopol fragt zusätzlich `p_max` und `DK(x_max)` |
+| `diff.differenzenquotient` | Differenzen- und Differentialquotient | 2 | Folien 66–73 | Polynom 2./3. Grades, `x₀` ganz, `Δx` ∈ {0,5; 1; 2; 3}; Sekantensteigung ≤ 2 Dezimalen, dazu `f'(x₀)` zum Vergleich |
+| `alg.determinante-inverse` | Determinante und inverse Matrix (2×2) | 4 | Folien 189–191 | 80 % regulär mit `det` ∈ {±1; ±2; ±4; ±5} (Inverse ≤ 2 Dezimalen), 20 % singulär (Zeile/Spalte als Vielfaches) → „existiert nicht“ |
 
 ---
 
