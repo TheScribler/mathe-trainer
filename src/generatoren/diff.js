@@ -1889,10 +1889,18 @@ export const betriebsoptimum = {
           latex: mehrzeiligeGleichung(`p(${zahlL(xMax)})`, ohneDuplikatZeile(pBeiXMax.eingesetzt, pBeiXMax.werte, zahlL(pMax))),
         },
         {
+          // Jedes "=" auf eine eigene Zeile — einzeilig liefen K(x_max) und
+          // DK(x_max) bei 375px über den Rand (test/layout.mjs).
           titel: 'Einsetzen',
-          latex: mehrzeiligeKette([
-            `K(${zahlL(xMax)}) &= ${ohneDuplikatZeile(kBeiXMax.eingesetzt, kBeiXMax.werte, zahlL(runde(kBeiXMax.summe, 2))).join(' = ')}`,
-            `DK(${zahlL(xMax)}) &= \\dfrac{K(${zahlL(xMax)})}{${zahlL(xMax)}} = ${zahlL(runde(kBeiXMax.summe, 2))} : ${zahlL(xMax)} = ${zahlL(dkMax)}`,
+          latex: mehrzeiligeGleichung(`K(${zahlL(xMax)})`,
+            ohneDuplikatZeile(kBeiXMax.eingesetzt, kBeiXMax.werte, zahlL(runde(kBeiXMax.summe, 2)))),
+        },
+        {
+          titel: 'Einsetzen',
+          latex: mehrzeiligeGleichung(`DK(${zahlL(xMax)})`, [
+            `\\dfrac{K(${zahlL(xMax)})}{${zahlL(xMax)}}`,
+            `${zahlL(runde(kBeiXMax.summe, 2))} : ${zahlL(xMax)}`,
+            zahlL(dkMax),
           ]),
           hinweis: 'Durchschnittskosten = Gesamtkosten geteilt durch die Menge.',
         },
@@ -1902,7 +1910,10 @@ export const betriebsoptimum = {
       {
         titel: 'Ergebnis',
         latex: monopol
-          ? `x_{max} = ${zahlL(xMax)}, \\quad p_{max} = ${zahlL(pMax)}, \\quad G_{max} = ${zahlL(gMax)}, \\quad DK = ${zahlL(dkMax)}`
+          ? mehrzeiligeKette([
+            `x_{max} = ${zahlL(xMax)}, \\quad p_{max} = ${zahlL(pMax)}`,
+            `G_{max} = ${zahlL(gMax)}, \\quad DK = ${zahlL(dkMax)}`,
+          ])
           : `x_{max} = ${zahlL(xMax)}, \\quad G_{max} = ${zahlL(gMax)}`,
       },
       {
@@ -2013,11 +2024,15 @@ export const differenzenquotient = {
             hinweis: 'Der Differenzenquotient ist die Steigung der Sekante durch die beiden Kurvenpunkte.',
           },
           {
+            // Jeder Funktionswert als eigener Schritt, jedes "=" auf eigener
+            // Zeile — einzeilig lief das bei 375px über den Rand
+            // (test/layout.mjs).
             titel: 'Einsetzen',
-            latex: mehrzeiligeKette([
-              `f(${zahlL(x1)}) &= ${ohneDuplikatZeile(f1.eingesetzt, f1.werte, zahlL(y1)).join(' = ')}`,
-              `f(${zahlL(x0)}) &= ${ohneDuplikatZeile(f0.eingesetzt, f0.werte, zahlL(y0)).join(' = ')}`,
-            ]),
+            latex: mehrzeiligeGleichung(`f(${zahlL(x1)})`, ohneDuplikatZeile(f1.eingesetzt, f1.werte, zahlL(y1))),
+          },
+          {
+            titel: 'Einsetzen',
+            latex: mehrzeiligeGleichung(`f(${zahlL(x0)})`, ohneDuplikatZeile(f0.eingesetzt, f0.werte, zahlL(y0))),
           },
           {
             titel: 'Einsetzen',

@@ -1503,7 +1503,10 @@ export const determinanteInverse = {
         },
         {
           titel: 'Einsetzen',
-          latex: `A \\cdot A^{-1} = ${matrixLatexFormatiert(A)} \\cdot ${matrixLatexFormatiert(inv)} = ${matrixLatexFormatiert([[1, 0], [0, 1]])} = E`,
+          latex: mehrzeiligeGleichung('A \\cdot A^{-1}', [
+            `${matrixLatexFormatiert(A)} \\cdot ${matrixLatexFormatiert(inv)}`,
+            `${matrixLatexFormatiert([[1, 0], [0, 1]])} = E`,
+          ]),
           hinweis: 'Probe: Das Produkt aus Matrix und Inverser muss die Einheitsmatrix ergeben.',
         },
         { titel: 'Ergebnis', latex: `A^{-1} = ${matrixLatexFormatiert(inv)}` },
