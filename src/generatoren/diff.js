@@ -389,7 +389,10 @@ export const extremwerteZweiVariablenKubisch = {
     for (let versuch = 0; versuch < 50; versuch++) {
       const c = zufallAus(rng, [-2, -1, 1, 2]);
       const m = zufallAus(rng, [-3, -2, -1, 1, 2, 3]);
-      const x2 = zufallAus(rng, [-3, -2, -1, 1, 2, 3]);
+      // Nur gerade x₂: b = (2m²c − 3x₂)/2 ist sonst halbzahlig (z. B.
+      // "10,5x²"), MK 4 hat durchgehend ganze Koeffizienten. ±4 statt ±1/±3,
+      // damit die Vielfalt erhalten bleibt (96 statt 48 gültige Kombinationen).
+      const x2 = zufallAus(rng, [-4, -2, 2, 4]);
       const a = 2 * m * c;
       const b = (2 * m * m * c - 3 * x2) / 2;
       const y2 = -m * x2;

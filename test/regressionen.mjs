@@ -180,6 +180,22 @@ export function testeReviewRegressionen() {
     geprueft.push('Befund 9 (Punkte in beliebiger Reihenfolge)');
   }
 
+  // Befund 9, zweiter Teil: nur ganzzahlige Koeffizienten (Seed 3 hatte
+  // "10,5x²"), damit auch Funktionswert und Hesse-Einträge ganz bleiben.
+  {
+    for (let seed = 1; seed <= SWEEP; seed++) {
+      const a = instanz('diff.extremwerte-2var', seed);
+      const { a: ka, b, c, x2, y2 } = a.params;
+      const dezimal = Object.entries({ a: ka, b, c, x2, y2 }).filter(([, w]) => !Number.isInteger(w));
+      const wert = a.eingaben.find((e) => e.id === 'p2wert').loesung;
+      if (seed === 3 || dezimal.length > 0 || !Number.isInteger(wert) || /\{,\}/.test(a.frage.formel)) {
+        pruefe(dezimal.length === 0 && Number.isInteger(wert) && !/\{,\}/.test(a.frage.formel),
+          `Befund 9b, diff.extremwerte-2var seed=${seed}: Dezimalzahl in ${a.frage.formel} (f(P₂) = ${wert})`);
+      }
+    }
+    geprueft.push('Befund 9b (ganze Koeffizienten)');
+  }
+
   // Befund 5: vollständiger Lagrange-Weg (I: L_x1, II: L_x2, III: L_λ,
   // Elimination wie in der Musterlösung) — Seed 3; dazu P2 = 1 ohne "/1".
   {
