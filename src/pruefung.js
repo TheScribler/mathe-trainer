@@ -13,6 +13,66 @@ function geparst(wert) {
   return typeof wert === 'number' ? wert : parseDeZahl(wert);
 }
 
+// Zinssatz-Ergebnis: die Vorlesung schreibt Zinssätze als Dezimalzahl mit 4
+// Nachkommastellen (0,1236 = 12,36 %), das Eingabefeld erwartet die
+// Prozentzahl. Beide Schreibweisen gelten als richtig — die Dezimalform wird
+// dafür mit 100 multipliziert und mit derselben Prozentpunkt-Toleranz
+// verglichen. Alle Zinssatz-Ergebnisse im Trainer liegen bei mindestens 1 %,
+// eine Verwechslung der beiden Lesarten ist dadurch ausgeschlossen.
+export function pruefeZinssatz(eingabeText, erwartetProzent, toleranzProzentpunkte) {
+  const wert = parseDeZahl(eingabeText);
+  if (!isFinite(wert)) return { korrekt: false, wert: NaN };
+  const korrekt = nahBei(wert, erwartetProzent, toleranzProzentpunkte) ||
+    nahBei(wert * 100, erwartetProzent, toleranzProzentpunkte);
+  return { korrekt, wert };
+}
+
+// Eine 'zahl'-Eingabe gegen ihre Lösung prüfen — mit der Sonderregel für
+// Zinssätze (eingabe.zinssatz, siehe pruefeZinssatz).
+export function pruefeZahlEingabe(eingabe, eingabeText) {
+  if (eingabe.zinssatz) return pruefeZinssatz(eingabeText, eingabe.loesung, eingabe.toleranz);
+  return pruefeZahl(eingabeText, eingabe.loesung, eingabe.toleranz);
+}
+
+// Aufgaben mit zwei gleichwertigen Ergebnisgruppen (z. B. zwei stationäre
+// Punkte, aufgabe.vertauschbar = [[ids Punkt 1], [ids Punkt 2]]): die
+// Reihenfolge, in der die Punkte eingetragen werden, ist beliebig. Liefert
+// die Eingaben so, wie sie bewertet werden sollen — unverändert oder mit den
+// Lösungen der beiden Gruppen vertauscht, je nachdem, welche Zuordnung mehr
+// ausgefüllte Felder trifft. werte: Rohtext je Eingabe-ID ('zahl'/'auswahl').
+export function eingabenMitZuordnung(aufgabe, werte) {
+  if (!aufgabe.vertauschbar) return aufgabe.eingaben;
+  const [gruppe1, gruppe2] = aufgabe.vertauschbar;
+  const nachId = Object.fromEntries(aufgabe.eingaben.map((e) => [e.id, e]));
+  const trifft = (eingabe, wert) => {
+    if (wert === undefined || wert === null || String(wert).trim() === '') return 0;
+    if (eingabe.typ === 'auswahl') return wert === eingabe.loesung ? 1 : 0;
+    return pruefeZahlEingabe(eingabe, wert).korrekt ? 1 : 0;
+  };
+  let gerade = 0;
+  let getauscht = 0;
+  const tausch = {};
+  gruppe1.forEach((id1, k) => {
+    const id2 = gruppe2[k];
+    gerade += trifft(nachId[id1], werte[id1]) + trifft(nachId[id2], werte[id2]);
+    getauscht += trifft(nachId[id2], werte[id1]) + trifft(nachId[id1], werte[id2]);
+    tausch[id1] = id2;
+    tausch[id2] = id1;
+  });
+  if (getauscht <= gerade) return aufgabe.eingaben;
+  return aufgabe.eingaben.map((e) => (tausch[e.id]
+    ? { ...e, loesung: nachId[tausch[e.id]].loesung, toleranz: nachId[tausch[e.id]].toleranz }
+    : e));
+}
+
+// Matrix-Eingabe, bei der "leer lassen" die richtige Antwort ist (z. B. die
+// Inverse einer singulären Matrix): richtig genau dann, wenn keine Zelle
+// ausgefüllt ist. So verrät das Formular nicht schon vorab, ob eine Inverse
+// existiert.
+export function bewerteLeerErwartet(werteZeilen) {
+  return { korrekt: werteZeilen.every((zeile) => zeile.every((text) => text.trim() === '')) };
+}
+
 export function pruefeKoeffizienten(eingabeFelder, erwarteteFelder, toleranz = 1e-9) {
   if (eingabeFelder.length !== erwarteteFelder.length) return { korrekt: false };
   for (let i = 0; i < eingabeFelder.length; i++) {
@@ -65,15 +125,19 @@ export function pruefeMatrix(eingabeMatrix, erwarteteMatrix, toleranz = 1e-9) {
 // leer (nicht als eingegebene 0) — ein Matrixeintrag hat keinen impliziten
 // "Nullterm, den man weglässt" wie ein Polynom-Summand ohne Konstante; eine
 // leere Zelle bei einer Lösung von 0 soll also nicht automatisch grün werden.
-export function bewerteMatrix(werteZeilen, erwarteteZeilen, toleranz = 1e-9) {
+// alternativen: weitere, ebenso richtige Lösungsmatrizen (z. B. der
+// Tilgungsplan einmal zeilenweise auf Cent gerundet, einmal ungerundet wie
+// in der Vorlesung) — eine Zelle ist richtig, wenn sie zu einer davon passt.
+export function bewerteMatrix(werteZeilen, erwarteteZeilen, toleranz = 1e-9, alternativen = []) {
   let leer = 0;
+  const loesungen = [erwarteteZeilen, ...alternativen];
   const proZelle = werteZeilen.map((zeile, i) => zeile.map((text, j) => {
     if (text.trim() === '') {
       leer += 1;
       return { bewertet: false, korrekt: false };
     }
-    const ergebnis = pruefeZahl(text, erwarteteZeilen[i][j], toleranz);
-    return { bewertet: true, korrekt: ergebnis.korrekt };
+    const korrekt = loesungen.some((l) => pruefeZahl(text, l[i][j], toleranz).korrekt);
+    return { bewertet: true, korrekt };
   }));
   return { leer, proZelle };
 }

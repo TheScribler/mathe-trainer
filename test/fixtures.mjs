@@ -436,16 +436,17 @@ export function testeFixtures() {
     faelle.push('Übung 7b');
   }
 
-  // Übung 8: K0=500.000, i=7 %, n=5, Ratentilgung -> Tabelle wie im Skript.
+  // Übung 8: K0=500.000, i=7 %, n=5, Ratentilgung -> Tabelle wie im Skript,
+  // Spalten wie Folie 61: K_{t−1} (Restschuld zu Jahresbeginn), Z_t, T_t, A_t.
   {
     const a = tilgungsplan.baue({ art: 'raten', K0: 500000, iProzent: 7, n: 5 });
     const plan = a.eingaben[0].loesung;
     const erwartet = [
-      [400000, 35000, 100000, 135000],
-      [300000, 28000, 100000, 128000],
-      [200000, 21000, 100000, 121000],
-      [100000, 14000, 100000, 114000],
-      [0, 7000, 100000, 107000],
+      [500000, 35000, 100000, 135000],
+      [400000, 28000, 100000, 128000],
+      [300000, 21000, 100000, 121000],
+      [200000, 14000, 100000, 114000],
+      [100000, 7000, 100000, 107000],
     ];
     pruefe(plan.length === erwartet.length && plan.every((zeile, i) => zeile.every((w, j) => nahBei(w, erwartet[i][j], 0.01))),
       `Übung 8: Tilgungsplan=${JSON.stringify(plan)}, erwartet ${JSON.stringify(erwartet)}`);
@@ -547,7 +548,7 @@ export function testeFixtures() {
   {
     const a = determinanteInverse.baue({ A: [[5, -15], [3, -9]] });
     const w = Object.fromEntries(a.eingaben.map((x) => [x.id, x.loesung]));
-    pruefe(w.det === 0 && w.invertierbar.startsWith('Nein') && !('inv' in w), `Folie 190: ${JSON.stringify(w)}, erwartet |A|=0, singulär`);
+    pruefe(w.det === 0 && w.invertierbar.startsWith('Nein') && w.inv === null, `Folie 190: ${JSON.stringify(w)}, erwartet |A|=0, singulär`);
     faelle.push('Folie 190');
   }
 

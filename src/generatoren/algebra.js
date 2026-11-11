@@ -1411,6 +1411,7 @@ export const lgs = {
 const DET_EINTRAG_POOL = [-4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
 const DET_ERLAUBT = [-5, -4, -2, -1, 1, 2, 4, 5];
 const INVERTIERBAR_OPTIONEN = ['Ja, A ist regulär', 'Nein, A ist singulär'];
+const INVERSE_LABEL = 'A⁻¹';
 
 function klammerLatex(w) {
   return w < 0 ? `(${zahlZuLatex(w, minimaleNachkommastellen(w))})` : zahlZuLatex(w, minimaleNachkommastellen(w));
@@ -1482,7 +1483,7 @@ export const determinanteInverse = {
       eingaben.push(
         { id: 'det', label: '|A|', typ: 'zahl', punkte: 1, loesung: det, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
         { id: 'invertierbar', label: 'Existiert A⁻¹?', typ: 'auswahl', optionen: INVERTIERBAR_OPTIONEN, punkte: 1, loesung: INVERTIERBAR_OPTIONEN[0], teilLabel: 'b)' },
-        { id: 'inv', label: 'A⁻¹', typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: inv, toleranz: KONFIG.toleranz.exakt, teilLabel: 'b)' },
+        { id: 'inv', label: INVERSE_LABEL, typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: inv, toleranz: KONFIG.toleranz.exakt, teilLabel: 'b)' },
       );
       schritte.push(
         {
@@ -1514,8 +1515,12 @@ export const determinanteInverse = {
       ergebnisse.push({ label: 'Inverse', latex: `A^{-1} = ${matrixLatexFormatiert(inv)}` });
     } else {
       eingaben.push(
-        { id: 'det', label: '|A|', typ: 'zahl', punkte: 2, loesung: det, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
-        { id: 'invertierbar', label: 'Existiert A⁻¹?', typ: 'auswahl', optionen: INVERTIERBAR_OPTIONEN, punkte: 2, loesung: INVERTIERBAR_OPTIONEN[1], teilLabel: 'b)' },
+        { id: 'det', label: '|A|', typ: 'zahl', punkte: 1, loesung: det, toleranz: KONFIG.toleranz.exakt, teilLabel: 'a)' },
+        { id: 'invertierbar', label: 'Existiert A⁻¹?', typ: 'auswahl', optionen: INVERTIERBAR_OPTIONEN, punkte: 1, loesung: INVERTIERBAR_OPTIONEN[1], teilLabel: 'b)' },
+        // Dasselbe Eingabefeld wie bei einer regulären Matrix — sonst verriete
+        // schon das Formular, dass es keine Inverse gibt. Richtig ist hier:
+        // leer lassen (siehe bewerteLeerErwartet in pruefung.js).
+        { id: 'inv', label: INVERSE_LABEL, typ: 'matrix', zeilen: 2, spalten: 2, punkte: 2, loesung: null, leerErwartet: true, teilLabel: 'b)' },
       );
       schritte.push({
         titel: 'Ergebnis',
@@ -1531,7 +1536,7 @@ export const determinanteInverse = {
         formel: `A = ${matrixLatexFormatiert(A)}`,
         teile: [
           { label: 'a)', text: 'Berechnen Sie die Determinante von A.' },
-          { label: 'b)', text: 'Ist A regulär oder singulär? Bestimmen Sie, falls möglich, die inverse Matrix.' },
+          { label: 'b)', text: 'Ist A regulär oder singulär? Bestimmen Sie, falls möglich, die inverse Matrix (sonst A⁻¹ leer lassen).' },
         ],
       },
       eingaben,

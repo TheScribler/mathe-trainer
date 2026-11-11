@@ -474,7 +474,10 @@ function baueEingabeZeile(eingabe, felder, { zeigeTeilLabel = true } = {}) {
           spaltenLabels.forEach((text) => {
             const kopfZelle = document.createElement('span');
             kopfZelle.className = 'tilgungstabelle-spaltenlabel';
-            kopfZelle.textContent = text;
+            // Spaltenköpfe mit Subskript (Kₜ₋₁ wie auf den Folien) als fest
+            // verdrahtetes Generator-HTML, kein Nutzereingabe-Risiko.
+            if (eingabe.spaltenLabelsHtml) kopfZelle.innerHTML = text;
+            else kopfZelle.textContent = text;
             kopf.appendChild(kopfZelle);
           });
           tabelle.appendChild(kopf);
@@ -764,7 +767,15 @@ function bewerteAlleEingaben(aufgabe, felder) {
   let maxPunkteAutomatisch = 0;
   const proEingabe = [];
 
+  // Vertauschbare Ergebnisgruppen (aufgabe.vertauschbar, z. B. zwei
+  // stationäre Punkte): Reihenfolge beliebig, siehe eingabenMitZuordnung.
+  const rohwerte = {};
   for (const eingabe of aufgabe.eingaben) {
+    if ((eingabe.typ === 'zahl' || eingabe.typ === 'auswahl') && felder[eingabe.id]) rohwerte[eingabe.id] = felder[eingabe.id].value;
+  }
+  const zuBewerten = eingabenMitZuordnung(aufgabe, rohwerte);
+
+  for (const eingabe of zuBewerten) {
     if (eingabe.typ === 'term') {
       proEingabe.push({ id: eingabe.id, typ: 'term', punkte: eingabe.punkte });
       continue; // nicht automatisch geprüft — Selbstbewertung (Probeklausur-Auswertung)
@@ -799,7 +810,19 @@ function bewerteAlleEingaben(aufgabe, felder) {
       const anzahl = zellen.reduce((s, zeile) => s + zeile.length, 0);
       gesamt += anzahl;
       const werte = zellen.map((zeile) => zeile.map((f) => f.value));
-      const bewertung = bewerteMatrix(werte, eingabe.loesung, eingabe.toleranz);
+      if (eingabe.leerErwartet) {
+        // Richtig ist hier "leer lassen" (z. B. keine Inverse bei einer
+        // singulären Matrix) — siehe bewerteLeerErwartet.
+        gesamt += 1;
+        const { korrekt } = bewerteLeerErwartet(werte);
+        zellen.forEach((zeile) => zeile.forEach((f) => { if (f.value.trim() !== '' || korrekt) f.classList.add(korrekt ? 'gut' : 'schlecht'); }));
+        if (korrekt) richtig += 1;
+        const punkteEingabe = korrekt ? eingabe.punkte : 0;
+        erreichtePunkte += punkteEingabe;
+        proEingabe.push({ id: eingabe.id, typ: eingabe.typ, punkte: eingabe.punkte, erreichtePunkte: punkteEingabe, leer: false });
+        continue;
+      }
+      const bewertung = bewerteMatrix(werte, eingabe.loesung, eingabe.toleranz, eingabe.alternativLoesungen ?? []);
       leer += bewertung.leer;
       let teilRichtig = 0;
       bewertung.proZelle.forEach((zeile, i) => zeile.forEach((zelle, j) => {
@@ -833,7 +856,7 @@ function bewerteAlleEingaben(aufgabe, felder) {
         proEingabe.push({ id: eingabe.id, typ: eingabe.typ, punkte: eingabe.punkte, erreichtePunkte: 0, leer: true });
         continue;
       }
-      const ergebnis = pruefeZahl(feldOderFelder.value, eingabe.loesung, eingabe.toleranz);
+      const ergebnis = pruefeZahlEingabe(eingabe, feldOderFelder.value);
       feldOderFelder.classList.add(ergebnis.korrekt ? 'gut' : 'schlecht');
       if (ergebnis.korrekt) richtig += 1;
       const punkteEingabe = ergebnis.korrekt ? eingabe.punkte : 0;

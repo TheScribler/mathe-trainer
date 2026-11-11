@@ -11,12 +11,12 @@ export const KONFIG = {
   },
   toleranz: {
     geld: 0.05,
-    // Enger als die normale Geld-Toleranz: in einem Tilgungsplan wird jede
-    // Zeile aus der vorherigen berechnet, kleine Cent-Rundungen pro Zeile
-    // sind laut Vorlesungsnotizen zulässig und akkumulieren sich über
-    // mehrere Perioden — aber nicht beliebig, sonst würde am Ende eine
-    // ganz andere Zahl noch als "richtig" durchgehen.
-    tilgungszelle: 0.01,
+    // Tilgungsplan: jede Zeile wird aus der vorherigen berechnet. Wer wie
+    // die Vorlesung (Folie 62) ungerundet mit konstanter Annuität rechnet,
+    // weicht von der zeilenweise auf Cent gerundeten Tabelle um wenige Cent
+    // ab — laut Vorlesungsnotizen zulässig. Beide Rechenwege sind zusätzlich
+    // als eigene Lösungen hinterlegt (alternativLoesungen in fin.tilgungsplan).
+    tilgungszelle: 0.05,
     // Muss strikt kleiner sein als der 2-Dezimalstellen-Rundungsschritt
     // (0,01 pp), sonst wird die nächste Rundungsstufe fälschlich akzeptiert
     // (z. B. 3,05 bei einer Antwort von 3,04). Die Rundung auf 2 Dezimal-

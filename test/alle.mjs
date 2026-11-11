@@ -5,6 +5,7 @@
 import { mulberry32 } from '../src/rng.js';
 import { parseDeZahl, nahBei, ggT, minimaleNachkommastellen } from '../src/zahl.js';
 import { pruefeZahl, bewerteKoeffizientenZeile, bewerteMatrix, rundePunkteAbwaerts } from '../src/pruefung.js';
+import { testeReviewRegressionen } from './regressionen.mjs';
 import { GENERATOREN, GENERATOREN_NACH_TEIL } from '../src/generatoren/index.js';
 import { effektivzins } from '../src/generatoren/finanz.js';
 import { komponiereKlausur, waehleKombinationMitWiederholung } from '../src/komposer.js';
@@ -502,9 +503,10 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
       const zinsen = restschuld * i;
       const tilgung = p.art === 'raten' ? tilgungKonstant : annuitaet - zinsen;
       const jahresAnnuitaet = p.art === 'raten' ? zinsen + tilgung : annuitaet;
-      restschuld -= tilgung;
       const zeile = plan[jahr - 1];
-      pruefe(nahBei(zeile[0], restschuld, 0.5), `${kennzeichnung}: Jahr ${jahr} Restschuld nachgerechnet ${restschuld.toFixed(2)}, erwartet ${zeile[0]}`);
+      // Spalte 1 ist K_{t−1}, die Restschuld zu Jahresbeginn (Folie 61).
+      pruefe(nahBei(zeile[0], restschuld, 0.5), `${kennzeichnung}: Jahr ${jahr} Restschuld (Jahresbeginn) nachgerechnet ${restschuld.toFixed(2)}, erwartet ${zeile[0]}`);
+      restschuld -= tilgung;
       pruefe(nahBei(zeile[1], zinsen, 0.5), `${kennzeichnung}: Jahr ${jahr} Zinsen nachgerechnet ${zinsen.toFixed(2)}, erwartet ${zeile[1]}`);
       pruefe(nahBei(zeile[2], tilgung, 0.5), `${kennzeichnung}: Jahr ${jahr} Tilgung nachgerechnet ${tilgung.toFixed(2)}, erwartet ${zeile[2]}`);
       pruefe(nahBei(zeile[3], jahresAnnuitaet, 0.5), `${kennzeichnung}: Jahr ${jahr} Annuität nachgerechnet ${jahresAnnuitaet.toFixed(2)}, erwartet ${zeile[3]}`);
@@ -1074,7 +1076,9 @@ function pruefeInstanzUnabhaengig(generator, params, aufgabe, seed) {
         }
       }
     } else {
-      pruefe(!aufgabe.eingaben.some((e) => e.id === 'inv'), `${kennzeichnung}: singuläre Matrix darf kein Inversen-Eingabefeld haben`);
+      // Das Inversen-Feld ist immer da (sonst verriete das Formular die Antwort), richtig ist hier "leer lassen".
+      const invFeld = aufgabe.eingaben.find((e) => e.id === 'inv');
+      pruefe(invFeld && invFeld.leerErwartet === true, `${kennzeichnung}: singuläre Matrix braucht ein Inversen-Feld mit leerErwartet`);
     }
     pruefe(!p.A.some((zeile) => zeile.every((w) => w === 0)), `${kennzeichnung}: A hat eine Nullzeile: ${JSON.stringify(p.A)}`);
     pruefe(!p.A[0].some((_, j) => p.A.every((zeile) => zeile[j] === 0)), `${kennzeichnung}: A hat eine Nullspalte: ${JSON.stringify(p.A)}`);
@@ -1116,7 +1120,7 @@ function testeGenerator(generator) {
       let werte = [];
       if (eingabe.typ === 'zahl') werte = [eingabe.loesung];
       else if (eingabe.typ === 'koeffizienten') werte = eingabe.loesung;
-      else if (eingabe.typ === 'matrix') werte = eingabe.loesung.flat();
+      else if (eingabe.typ === 'matrix') werte = (eingabe.loesung ?? []).flat();
       for (const wert of werte) {
         pruefe(
           minimaleNachkommastellen(wert) <= 2,
@@ -1498,6 +1502,7 @@ testeKomposer();
 testeKombinationMitWiederholung();
 testeMatrixrechnungNullmatrixAnteil();
 fehler += testeFixtures();
+fehler += testeReviewRegressionen();
 for (const generator of GENERATOREN) {
   testeGenerator(generator);
 }

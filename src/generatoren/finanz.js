@@ -174,6 +174,15 @@ export const renteVeraenderlich = {
     // Rechenschritt wird gezeigt" gilt auch für die Einzelwerte selbst
     // (iPhone-Rückmeldung).
     const werteTeile = terme.map((x) => zahlZuLatex(runde(x, 2), minimaleNachkommastellen(runde(x, 2))));
+    // Die angezeigten Einzelwerte sind auf Cent gerundet, R₀ ist mit den
+    // ungerundeten Werten gerechnet — weicht die Summe der gerundeten Werte
+    // davon ab, wird das ausdrücklich erklärt (sonst sieht die Addition wie
+    // ein Rechenfehler aus).
+    const summeGerundeterWerte = runde(terme.reduce((s, x) => s + runde(x, 2), 0), 2);
+    const rundungsHinweis = Math.abs(summeGerundeterWerte - R0) > 1e-9
+      ? ` Die gerundeten Einzelwerte ergeben zusammen ${formatDeZahl(summeGerundeterWerte, 2)}; das Ergebnis ist mit den ` +
+        `ungerundeten Werten gerechnet (Rundungsdifferenz, beide Werte gelten als richtig).`
+      : '';
     const werteGruppen = [];
     for (let k = 0; k < werteTeile.length; k += 2) werteGruppen.push(werteTeile.slice(k, k + 2));
     const werteLatex = mehrzeiligeKette(
@@ -200,7 +209,7 @@ export const renteVeraenderlich = {
               'gilt hier nicht, weil die Zahlungen unterschiedlich hoch sind.',
           },
           { titel: 'Einsetzen', latex: einsetzenLatex },
-          { titel: 'Einsetzen', latex: werteLatex, hinweis: 'Jede Zahlung einzeln abgezinst.' },
+          { titel: 'Einsetzen', latex: werteLatex, hinweis: `Jede Zahlung einzeln abgezinst.${rundungsHinweis}` },
           { titel: 'Ergebnis', latex: `R_0 = ${zahlZuLatex(R0, minimaleNachkommastellen(R0))}` },
         ],
         ergebnisse: [{ label: 'Rentenbarwert R₀', latex: zahlZuLatex(R0, minimaleNachkommastellen(R0)) }],
@@ -354,8 +363,8 @@ export const effektivzins = {
         },
         eingaben: [
           {
-            id: 'iEff', label: 'Effektivzins (%)', typ: 'zahl', punkte: 3,
-            loesung: iEffAntwortProzent, toleranz: KONFIG.toleranz.prozentpunkte,
+            id: 'iEff', label: 'Effektivzins (in % oder als Dezimalzahl)', typ: 'zahl', punkte: 3,
+            loesung: iEffAntwortProzent, toleranz: KONFIG.toleranz.prozentpunkte, zinssatz: true,
           },
         ],
         loesung: {
@@ -385,8 +394,8 @@ export const effektivzins = {
       },
       eingaben: [
         {
-          id: 'iNom', label: 'Nominalzins (%)', typ: 'zahl', punkte: 3,
-          loesung: iNomProzent, toleranz: KONFIG.toleranz.prozentpunkte,
+          id: 'iNom', label: 'Nominalzins (in % oder als Dezimalzahl)', typ: 'zahl', punkte: 3,
+          loesung: iNomProzent, toleranz: KONFIG.toleranz.prozentpunkte, zinssatz: true,
         },
       ],
       loesung: {
@@ -742,6 +751,26 @@ function baueTilgungstabelle(art, K0, i, n) {
   return { zeilen, letzteAnnuitaetAngepasst };
 }
 
+// Rechenweg der Vorlesung (Folie 62): alle Zwischenwerte ungerundet weiter-
+// rechnen, die Annuität bleibt auch im letzten Jahr konstant, gerundet wird
+// erst für die Anzeige. Liefert die Tabelle in derselben Spaltenform wie die
+// Eingabe (Kₜ₋₁, Zₜ, Tₜ, Aₜ) — als zweite, ebenso richtige Lösung.
+function tilgungsplanVorlesungsweg(art, K0, i, n) {
+  const q = 1 + i;
+  const annuitaet = art === 'annuitaet' ? (K0 * Math.pow(q, n) * i) / (Math.pow(q, n) - 1) : null;
+  const tilgungKonstant = art === 'raten' ? K0 / n : null;
+  const zeilen = [];
+  let restschuld = K0;
+  for (let jahr = 1; jahr <= n; jahr++) {
+    const zinsen = restschuld * i;
+    const tilgung = art === 'raten' ? tilgungKonstant : annuitaet - zinsen;
+    const jahresAnnuitaet = art === 'raten' ? zinsen + tilgung : annuitaet;
+    zeilen.push([restschuld, zinsen, tilgung, jahresAnnuitaet].map((w) => runde(w, 2) + 0));
+    restschuld -= tilgung;
+  }
+  return zeilen;
+}
+
 export const tilgungsplan = {
   id: 'fin.tilgungsplan',
   teil: 'finanz',
@@ -770,7 +799,10 @@ export const tilgungsplan = {
     const qLatex = anteilLatexOhneNullen(q);
     const { zeilen, letzteAnnuitaetAngepasst } = baueTilgungstabelle(art, K0, i, n);
 
-    const matrixLoesung = zeilen.map((z) => [z.restschuldEnde, z.zinsen, z.tilgung, z.annuitaet]);
+    // Spalten wie auf Folie 61: Kₜ₋₁ (Restschuld zu Jahresbeginn), Zₜ, Tₜ, Aₜ.
+    const matrixLoesung = zeilen.map((z) => [z.restschuldStart, z.zinsen, z.tilgung, z.annuitaet]);
+    const vorlesungsweg = tilgungsplanVorlesungsweg(art, K0, i, n);
+    const vorlesungswegWeichtAb = vorlesungsweg.some((zeile, t) => zeile.some((w, k) => Math.abs(w - matrixLoesung[t][k]) > 1e-9));
     const konstante = art === 'raten' ? zeilen[0].tilgung : zeilen[0].annuitaet;
 
     // Je Jahr ein eigener, kompakter Block (Z, T bzw. A, S) statt nur Jahr 1
@@ -781,7 +813,7 @@ export const tilgungsplan = {
       const sStart = zahlZuLatex(z.restschuldStart, geldNachkommastellen(z.restschuldStart));
       const zinsenLatex = zahlZuLatex(z.zinsen, geldNachkommastellen(z.zinsen));
       const tilgungLatex = zahlZuLatex(z.tilgung, geldNachkommastellen(z.tilgung));
-      const sEnde = zahlZuLatex(z.restschuldEnde, geldNachkommastellen(z.restschuldEnde));
+      const kEnde = zahlZuLatex(z.restschuldEnde, geldNachkommastellen(z.restschuldEnde));
       const dritteZeile = art === 'raten'
         ? `A_{${z.jahr}} &= ${zinsenLatex} + ${tilgungLatex} = ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))}`
         : `T_{${z.jahr}} &= ${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))} - ${zinsenLatex} = ${tilgungLatex}`;
@@ -794,9 +826,9 @@ export const tilgungsplan = {
         latex: mehrzeiligeKette([
           `Z_{${z.jahr}} &= ${sStart} \\cdot ${iLatex} = ${zinsenLatex}`,
           dritteZeile,
-          `S_{${z.jahr}} &= ${sStart} - ${tilgungLatex} = ${sEnde}`,
+          `K_{${z.jahr}} &= ${sStart} - ${tilgungLatex} = ${kEnde}`,
         ]),
-        hinweis: `Jahr ${z.jahr} (Restschuld zu Jahresbeginn: ${formatDeZahl(z.restschuldStart, geldNachkommastellen(z.restschuldStart))} €).` +
+        hinweis: `Jahr ${z.jahr} (Restschuld zu Jahresbeginn Kₜ₋₁ = ${formatDeZahl(z.restschuldStart, geldNachkommastellen(z.restschuldStart))} €).` +
           (istAngepassteLetzteAnnuitaet ? ' Letzte Annuität um Rundungsdifferenz angepasst.' : ''),
       };
     });
@@ -807,13 +839,25 @@ export const tilgungsplan = {
         text: `Ein Kredit über ${formatDeZahl(K0, 0)} € wird über ${n} Jahre bei einem Zinssatz von ` +
           `${formatDeZahl(iProzent, iProzent % 1 === 0 ? 0 : 2)} % p.a. per ${art === 'raten' ? 'Ratentilgung (konstante Tilgung)' : 'Annuitätentilgung (konstante Annuität)'} ` +
           `getilgt. Stellen Sie den Tilgungsplan für die Jahre 1 bis ${n} auf.`,
+        teile: [
+          {
+            label: 'Spalten',
+            textHtml: 'K<sub>t−1</sub> = Restschuld zu Beginn von Jahr t, Z<sub>t</sub> = Zinsen, ' +
+              'T<sub>t</sub> = Tilgung, A<sub>t</sub> = Annuität (Zinsen + Tilgung).',
+          },
+        ],
       },
       eingaben: [
         {
           id: 'plan', label: `Tilgungsplan, Jahre 1–${n}`,
           typ: 'matrix', zeilen: n, spalten: 4, punkte: 4, loesung: matrixLoesung,
+          // Zweiter, ebenso richtiger Rechenweg (Folie 62, ungerundet mit
+          // konstanter Annuität) — nur hinterlegt, wenn er sich überhaupt
+          // von der zeilenweise gerundeten Tabelle unterscheidet.
+          ...(vorlesungswegWeichtAb ? { alternativLoesungen: [vorlesungsweg] } : {}),
           toleranz: KONFIG.toleranz.tilgungszelle,
-          spaltenLabels: ['S', 'Z', 'T', 'A'],
+          spaltenLabels: ['K<sub>t−1</sub>', 'Z<sub>t</sub>', 'T<sub>t</sub>', 'A<sub>t</sub>'],
+          spaltenLabelsHtml: true,
           zeilenLabels: zeilen.map((z) => String(z.jahr)),
         },
       ],
@@ -824,15 +868,16 @@ export const tilgungsplan = {
             latex: art === 'raten'
               ? mehrzeiligeKette([
                 `T = ${bruch('K_0', 'n')} \\quad (\\text{jedes Jahr gleich})`,
-                `Z_t = S_{t-1} \\cdot i, \\quad A_t = Z_t + T, \\quad S_t = S_{t-1} - T`,
+                `Z_t = K_{t-1} \\cdot i, \\quad A_t = Z_t + T, \\quad K_t = K_{t-1} - T`,
               ])
               : mehrzeiligeKette([
                 `A = K_0 \\cdot ${bruch('q^n \\cdot i', 'q^n - 1')} \\quad (\\text{jedes Jahr gleich})`,
-                `Z_t = S_{t-1} \\cdot i, \\quad T_t = A - Z_t, \\quad S_t = S_{t-1} - T_t`,
+                `Z_t = K_{t-1} \\cdot i, \\quad T_t = A - Z_t, \\quad K_t = K_{t-1} - T_t`,
               ]),
             hinweis: art === 'raten'
-              ? 'Bei der Ratentilgung ist die Tilgung T jedes Jahr gleich hoch — Zinsen und damit Annuität sinken, weil die Restschuld S sinkt.'
-              : 'Bei der Annuitätentilgung ist die gesamte jährliche Zahlung A gleich hoch — der Tilgungsanteil steigt, weil der Zinsanteil mit sinkender Restschuld fällt.',
+              ? 'Bei der Ratentilgung ist die Tilgung T jedes Jahr gleich hoch — Zinsen und damit Annuität sinken, weil die Restschuld K sinkt.'
+              : 'Bei der Annuitätentilgung ist die gesamte jährliche Zahlung A gleich hoch — der Tilgungsanteil steigt, weil der Zinsanteil mit sinkender Restschuld fällt. ' +
+                'Hier wird jede Zeile auf Cent gerundet weitergerechnet. Wer wie in der Vorlesung ungerundet mit konstanter Annuität rechnet, weicht um wenige Cent ab — beide Rechenwege gelten als richtig.',
           },
           {
             titel: 'Einsetzen',
@@ -852,17 +897,17 @@ export const tilgungsplan = {
             titel: 'Ergebnis',
             latex: mehrzeiligeKette(
               zeilen.flatMap((z) => [
-                `\\text{Jahr } ${z.jahr}:\\ S=${zahlZuLatex(z.restschuldEnde, geldNachkommastellen(z.restschuldEnde))},\\ Z=${zahlZuLatex(z.zinsen, geldNachkommastellen(z.zinsen))}`,
+                `\\text{Jahr } ${z.jahr}:\\ K_{${z.jahr - 1}}=${zahlZuLatex(z.restschuldStart, geldNachkommastellen(z.restschuldStart))},\\ Z=${zahlZuLatex(z.zinsen, geldNachkommastellen(z.zinsen))}`,
                 `\\qquad T=${zahlZuLatex(z.tilgung, geldNachkommastellen(z.tilgung))},\\ A=${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))}`,
               ])
             ),
-            hinweis: 'Kleine Cent-Abweichungen durch Rundung je Zeile sind laut Vorlesung zulässig (Toleranz ±0,01 € je Tabellenzelle).',
+            hinweis: `Kleine Cent-Abweichungen durch Rundung sind laut Vorlesung zulässig (Toleranz ±${formatDeZahl(KONFIG.toleranz.tilgungszelle, 2)} € je Tabellenzelle).`,
           },
         ],
         ergebnisse: zeilen.map((z) => ({
           label: `Jahr ${z.jahr}`,
           latex: mehrzeiligeKette([
-            `S=${zahlZuLatex(z.restschuldEnde, geldNachkommastellen(z.restschuldEnde))},\\ Z=${zahlZuLatex(z.zinsen, geldNachkommastellen(z.zinsen))}`,
+            `K_{${z.jahr - 1}}=${zahlZuLatex(z.restschuldStart, geldNachkommastellen(z.restschuldStart))},\\ Z=${zahlZuLatex(z.zinsen, geldNachkommastellen(z.zinsen))}`,
             `T=${zahlZuLatex(z.tilgung, geldNachkommastellen(z.tilgung))},\\ A=${zahlZuLatex(z.annuitaet, geldNachkommastellen(z.annuitaet))}`,
           ]),
         })),

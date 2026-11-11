@@ -435,10 +435,15 @@ export const extremwerteZweiVariablenKubisch = {
 
     return {
       frage: {
-        text: 'Bestimmen Sie alle Extremwerte und Sattelpunkte der folgenden Funktion.',
+        text: 'Bestimmen Sie alle Extremwerte und Sattelpunkte der folgenden Funktion. ' +
+          'Die Reihenfolge der beiden Punkte ist beliebig.',
         formel: fLatex,
         teile: [{ label: 'Punkt 1' }, { label: 'Punkt 2' }],
       },
+      // Beide stationären Punkte sind gleichwertig — wer sie in der anderen
+      // Reihenfolge einträgt, wird trotzdem richtig bewertet (siehe
+      // eingabenMitZuordnung in pruefung.js).
+      vertauschbar: [['p1x', 'p1y', 'p1typ', 'p1wert'], ['p2x', 'p2y', 'p2typ', 'p2wert']],
       eingaben: [
         { id: 'p1x', label: 'x', typ: 'zahl', punkte: 1, loesung: 0, toleranz: KONFIG.toleranz.exakt, teilLabel: 'Punkt 1' },
         { id: 'p1y', label: 'y', typ: 'zahl', punkte: 1, loesung: 0, toleranz: KONFIG.toleranz.exakt, teilLabel: 'Punkt 1' },
@@ -662,6 +667,90 @@ export const extremwerteZweiVariablenQuadratisch = {
   },
 };
 
+// Betrag eines exakten Bruchs {zaehler, nenner} als LaTeX — ganze Zahl oder
+// "\dfrac{z}{n}" (bereits gekürzt, siehe bruchGekuerzt).
+function bruchBetragLatex({ zaehler, nenner }) {
+  const z = Math.abs(zaehler);
+  return nenner === 1 ? zahlZuLatex(z, 0) : bruch(z, nenner);
+}
+
+// "konst + koeff·variable" mit exakten Brüchen: Nullterme entfallen,
+// Koeffizient 1 wird weggelassen, Vorzeichen werden verschmolzen.
+function linearBruchLatex(konst, koeff, variable) {
+  const teile = [];
+  if (konst.zaehler !== 0) teile.push({ negativ: konst.zaehler < 0, text: bruchBetragLatex(konst) });
+  if (koeff.zaehler !== 0) {
+    const eins = Math.abs(koeff.zaehler) === 1 && koeff.nenner === 1;
+    teile.push({ negativ: koeff.zaehler < 0, text: `${eins ? '' : bruchBetragLatex(koeff)}${variable}` });
+  }
+  if (teile.length === 0) return '0';
+  return teile.map((t, k) => (k === 0 ? `${t.negativ ? '-' : ''}${t.text}` : `${t.negativ ? '-' : '+'} ${t.text}`)).join(' ');
+}
+
+// Lagrange-Weg wie in der Musterlösung (Übung 16, MK 5):
+// L = U + λ(P1·x1 + P2·x2 − Y)
+//   I.   L_x1 = α + γx2 + P1·λ = 0  ⇒  λ = −α/P1 − (γ/P1)·x2
+//   II.  L_x2 = β + γx1 + P2·λ = 0, I in II  ⇒  x1 = k + m·x2
+//        mit k = (P2·α − P1·β)/(P1·γ), m = P2/P1
+//   III. L_λ = P1·x1 + P2·x2 − Y = 0, x1 einsetzen  ⇒  2·P2·x2 = Y − P1·k
+// Alle Koeffizienten als exakte Brüche (P1 = 3 ergibt z. B. Drittel, wie in
+// Übung 16c), nie als gerundete Dezimalzahl.
+function lagrangeSchritte({ x1Stern, x2Stern, P1, P2, gamma, alpha, beta, Y }) {
+  const a0 = bruchGekuerzt(-alpha, P1);
+  const a1 = bruchGekuerzt(-gamma, P1);
+  const k = bruchGekuerzt(P2 * alpha - P1 * beta, P1 * gamma);
+  const m = bruchGekuerzt(P2, P1);
+  const lambdaVonX2 = linearBruchLatex(a0, a1, 'x_2');
+  const x1VonX2 = linearBruchLatex(k, m, 'x_2');
+  const P1k = bruchGekuerzt(P2 * alpha - P1 * beta, gamma);
+  const kText = k.zaehler === 0 ? '' : `${k.zaehler < 0 ? '-' : ''}${bruchBetragLatex(k)} + `;
+  const mEins = m.zaehler === 1 && m.nenner === 1;
+  const x1Eingesetzt = `${kText}${mEins ? zahlZuLatex(x2Stern, 0) : `${bruchBetragLatex(m)} \\cdot ${zahlZuLatex(x2Stern, 0)}`}`;
+  const lambdaBruch = bruchAnzeige(-(alpha + gamma * x2Stern), P1);
+  // III nach dem Ausmultiplizieren: P1·k + 2·P2·x2 − Y = 0. Die rechte Seite
+  // Y − P1·k ist immer ganz (= 2·P2·x2*), darum ohne Bruch angezeigt.
+  const rechteSeite = 2 * P2 * x2Stern;
+  return {
+    P1k,
+    schritte: [
+      {
+        titel: 'Einsetzen',
+        latex: mehrzeiligeKette([
+          `\\text{I: } L_{x_1} = ${zahlZuLatex(alpha, 0)} + ${koeffVariable(gamma, 'x_2')} + ${koeffVariable(P1, '\\lambda')} = 0`,
+          `\\Rightarrow\\; \\lambda = ${lambdaVonX2}`,
+        ]),
+        hinweis: 'Nach x₁ ableiten, null setzen und nach λ umstellen.',
+      },
+      {
+        titel: 'Einsetzen',
+        latex: mehrzeiligeKette([
+          `\\text{II: } L_{x_2} = ${zahlZuLatex(beta, 0)} + ${koeffVariable(gamma, 'x_1')} + ${koeffVariable(P2, '\\lambda')} = 0`,
+          `\\text{I in II: } ${zahlZuLatex(beta, 0)} + ${koeffVariable(gamma, 'x_1')} + ${cdotWennNicht1(P2, `\\left(${lambdaVonX2}\\right)`)} = 0`,
+          `\\Rightarrow\\; x_1 = ${x1VonX2}`,
+        ]),
+        hinweis: 'Nach x₂ ableiten, null setzen, λ aus I einsetzen und nach x₁ umstellen.',
+      },
+      {
+        titel: 'Einsetzen',
+        latex: mehrzeiligeKette([
+          `\\text{III: } L_{\\lambda} = ${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} - ${zahlZuLatex(Y, 0)} = 0`,
+          `x_1\\text{ einsetzen: } ${cdotWennNicht1(P1, `\\left(${x1VonX2}\\right)`)} + ${koeffVariable(P2, 'x_2')} - ${zahlZuLatex(Y, 0)} = 0`,
+          `\\Rightarrow\\; ${koeffVariable(2 * P2, 'x_2')} = ${zahlZuLatex(rechteSeite, 0)} \\;\\Rightarrow\\; x_2 = ${zahlZuLatex(x2Stern, 0)}`,
+        ]),
+        hinweis: 'Nach λ ableiten (das ist wieder die Budgetgerade), x₁ aus II einsetzen und nach x₂ auflösen.',
+      },
+      {
+        titel: 'Ergebnis',
+        latex: mehrzeiligeKette([
+          `x_1 = ${x1Eingesetzt} = ${zahlZuLatex(x1Stern, 0)}`,
+          `\\lambda = ${lambdaBruch}`,
+        ]),
+        hinweis: 'x₂ in II (nach x₁ umgestellt) und in I einsetzen — dasselbe Güterbündel wie mit der Einsetzungsmethode.',
+      },
+    ],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // diff.nutzenmaximum — MK 5 / Übung 16
 // U(x1,x2) = αx1 + βx2 + γx1x2 + δ  u.d.N.  P1x1 + P2x2 = Y
@@ -707,7 +796,7 @@ export const nutzenmaximum = {
   baue(params) {
     const { x1Stern, x2Stern, P1, P2, gamma, alpha, beta, delta } = params;
     const Y = P1 * x1Stern + P2 * x2Stern;
-    const lambda = runde(-(alpha + gamma * x2Stern) / P1, 4);
+    const lagrange = lagrangeSchritte({ x1Stern, x2Stern, P1, P2, gamma, alpha, beta, Y });
     const uOptimum = runde(alpha * x1Stern + beta * x2Stern + gamma * x1Stern * x2Stern + delta, 2);
 
     // U(x1) = A1 x1² + B1 x1 + C1 nach Einsetzen von x2=(Y-P1x1)/P2 und
@@ -768,7 +857,10 @@ export const nutzenmaximum = {
           },
           {
             titel: 'Umstellen',
-            latex: `x_2 = ${bruch(`${zahlZuLatex(Y, 0)} - ${koeffVariable(P1, 'x_1')}`, zahlZuLatex(P2, 0))}`,
+            // Bei P2 = 1 gibt es nichts zu teilen — kein Bruch mit Nenner 1.
+            latex: P2 === 1
+              ? `x_2 = ${zahlZuLatex(Y, 0)} - ${koeffVariable(P1, 'x_1')}`
+              : `x_2 = ${bruch(`${zahlZuLatex(Y, 0)} - ${koeffVariable(P1, 'x_1')}`, zahlZuLatex(P2, 0))}`,
             hinweis: 'Nebenbedingung nach x₂ umstellen, dann in U einsetzen (Einsetzungsmethode).',
           },
           {
@@ -794,25 +886,26 @@ export const nutzenmaximum = {
             // ausgerechnet, dann das Ergebnis — nicht direkt von der
             // Substitution zum fertigen x₂ springen (iPhone-Rückmeldung).
             titel: 'Einsetzen',
-            latex: `x_2 = \\dfrac{${zahlZuLatex(Y, 0)} - ${cdotWennNicht1(P1, zahlZuLatex(x1Stern, 0))}}{${zahlZuLatex(P2, 0)}} = ${zahlZuLatex(Y - P1 * x1Stern, 0)} / ${zahlZuLatex(P2, 0)} = ${zahlZuLatex(x2Stern, 0)}`,
+            latex: P2 === 1
+              ? `x_2 = ${zahlZuLatex(Y, 0)} - ${cdotWennNicht1(P1, zahlZuLatex(x1Stern, 0))} = ${zahlZuLatex(x2Stern, 0)}`
+              : `x_2 = \\dfrac{${zahlZuLatex(Y, 0)} - ${cdotWennNicht1(P1, zahlZuLatex(x1Stern, 0))}}{${zahlZuLatex(P2, 0)}} = ${zahlZuLatex(Y - P1 * x1Stern, 0)} / ${zahlZuLatex(P2, 0)} = ${zahlZuLatex(x2Stern, 0)}`,
           },
           { titel: 'Ergebnis', latex: `(x_1;x_2) = (${zahlZuLatex(x1Stern, 0)};${zahlZuLatex(x2Stern, 0)})` },
           {
             titel: 'Formel',
-            latex: `L(x_1,x_2,\\lambda) = U(x_1,x_2) + \\lambda(${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} - ${zahlZuLatex(Y, 0)})`,
-            hinweis: 'Kontrolle mit der Lagrange-Methode: L nach x₁, x₂ und λ ableiten und null setzen.',
+            latex: mehrzeiligeKette([
+              `L(x_1,x_2,\\lambda) = U(x_1,x_2)`,
+              `\\quad + \\lambda(${koeffVariable(P1, 'x_1')} + ${koeffVariable(P2, 'x_2')} - ${zahlZuLatex(Y, 0)})`,
+            ]),
+            hinweis: 'Zweiter Lösungsweg mit der Lagrange-Methode: Nebenbedingung nach null umformen, mit λ anhängen, ' +
+              'dann L nach x₁, x₂ und λ ableiten, null setzen und das Gleichungssystem lösen.',
           },
-          {
-            titel: 'Einsetzen',
-            latex: `L_{x_1} = ${zahlZuLatex(alpha, 0)} + ${koeffVariable(gamma, 'x_2')} + ${koeffVariable(P1, '\\lambda')} = 0, \\quad ` +
-              `L_{x_2} = ${zahlZuLatex(beta, 0)} + ${koeffVariable(gamma, 'x_1')} + ${koeffVariable(P2, '\\lambda')} = 0`,
-          },
-          { titel: 'Ergebnis', latex: `\\lambda = ${zahlZuLatex(lambda, minimaleNachkommastellen(lambda))}\\text{ (aus beiden Gleichungen identisch)}` },
+          ...lagrange.schritte,
         ],
         ergebnisse: [
           { label: 'Nutzenmaximales Güterbündel', latex: `(x_1;x_2) = (${zahlZuLatex(x1Stern, 0)};${zahlZuLatex(x2Stern, 0)})` },
           { label: 'Nutzen im Optimum', latex: `U = ${zahlZuLatex(uOptimum, minimaleNachkommastellen(uOptimum))}` },
-          { label: 'Lagrange-Multiplikator', latex: `\\lambda = ${zahlZuLatex(lambda, minimaleNachkommastellen(lambda))}` },
+          { label: 'Lagrange-Multiplikator', latex: `\\lambda = ${bruchAnzeige(-(alpha + gamma * x2Stern), P1)}` },
         ],
       },
       params,
@@ -836,6 +929,9 @@ export const nutzenmaximum = {
 // auf) und bleibt unverändert, damit nichts an der geprüften Musterklausur-
 // Aufgabe reißt.
 const ABLEITUNGEN_LOG_BASEN = [2, 3, 10];
+// Mindestbetrag eines Zahlencheck-Werts f'(x₀): 10-mal die Geld-Toleranz,
+// damit weder 0 noch ein Vorzeichenfehler als richtig durchgehen.
+const ABLEITUNGEN_MIN_CHECKWERT = 0.5;
 
 export const ableitungen = {
   id: 'diff.ableitungen',
@@ -843,7 +939,22 @@ export const ableitungen = {
   name: 'Ableitungen bilden',
   punkte: 4,
   vorlage: 'Musterklausur 6 / Übung 9-11',
+  // Neu ziehen, solange eine der beiden Teilaufgaben trivial wäre: ein
+  // Quotient (mx+n)/(px+q), der sich zu einer Konstante kürzt (f' = 0), oder
+  // ein Zahlencheck, dessen Wert so nah an 0 liegt, dass schon die Eingabe 0
+  // (oder ein Vorzeichenfehler) innerhalb der Toleranz läge.
   waehleParameter(rng) {
+    for (let versuch = 0; versuch < 200; versuch++) {
+      const params = this.zieheParameter(rng);
+      if (params.variante === 1 && params.m * params.q - params.n * params.p === 0) continue;
+      const aufgabe = this.baue(params);
+      const checks = aufgabe.eingaben.filter((e) => e.typ === 'zahl');
+      if (checks.some((e) => Math.abs(e.loesung) < ABLEITUNGEN_MIN_CHECKWERT)) continue;
+      return params;
+    }
+    return { variante: 0, a: -3, x0a: 1, b: 1, c: 1, x0b: 3 }; // Rückfall: MK6-Funktionen
+  },
+  zieheParameter(rng) {
     const variante = zufallAus(rng, [0, 0, 1, 2, 3]); // 0 doppelt gewichtet: bleibt der primäre Klausurstil
 
     if (variante === 1) {
@@ -1374,7 +1485,8 @@ export const elastizitaet = {
       const epsZiel = zufallAus(rng, ELASTIZITAET_EPS_POOL_F_GEGEBEN);
       const a = b * x0 * (1 - epsZiel);
       if (!Number.isInteger(a) || a < 10 || a > 2000) continue;
-      return { variante, a, b, x0 };
+      // Wie Übung 17a–c: mal ist die Menge x₀ gegeben, mal der Preis p₁.
+      return { variante, a, b, x0, gegeben: zufallBool(rng, 0.5) ? 'p' : 'x' };
     }
     return { variante: 0, a: 10, b: 0.1, x0: 50 }; // Rückfall: Übung 17a (nur Zahlen, kein Aufgabentext)
   },
@@ -1384,57 +1496,92 @@ export const elastizitaet = {
   },
 };
 
+// Quotient z/n als LaTeX: exakter, gekürzter Bruch bei ganzen Zahlen,
+// sonst (z. B. b = 0,1 aus Übung 17a) der Dezimalwert.
+function quotientLatex(z, n) {
+  if (Number.isInteger(z) && Number.isInteger(n)) return bruchAnzeige(z, n);
+  return zahlL(runde(z / n, 4));
+}
+
+// Variante 0 (Übung 17a–c, Folie 144): die Preis-Absatz-Funktion p(x) = a − b·x
+// ist gegeben, gesucht ist die Preiselastizität der Nachfrage ε_{x,p}. Gegeben
+// ist entweder die Menge x₀ oder der Preis p₁ (dann zuerst x₁ aus p(x) = p₁).
+// Gezeigt werden beide Wege der Vorlesung: Weg 1 über die Umkehrfunktion x(p)
+// (laut Dozent der einfachere), Weg 2 als Kehrwert 1/(p'(x)·x/p).
 function baueElastizitaetPreisGegeben(params) {
   const { a, b, x0 } = params;
-  const f0 = runde(a - b * x0, 4);
-  const fStrich = -b;
-  const nennerWert = runde(fStrich * x0, 4);
-  const epsExakt = runde(f0 / nennerWert, 4);
-  const aLatex = zahlZuLatex(a, minimaleNachkommastellen(a));
-  const bLatex = zahlZuLatex(b, minimaleNachkommastellen(b));
-  const x0Latex = zahlZuLatex(x0, minimaleNachkommastellen(x0));
+  const gegebenPreis = params.gegeben === 'p';
+  const p1 = runde(a - b * x0, 4);
+  const epsExakt = runde(p1 / (-b * x0), 4);
   const aProse = formatDeZahl(a, minimaleNachkommastellen(a));
-  const bProse = Math.abs(b) === 1 ? '' : formatDeZahl(Math.abs(b), minimaleNachkommastellen(b));
+  const bProse = b === 1 ? '' : formatDeZahl(b, minimaleNachkommastellen(b));
+  const pVonX = polynomLatex([a, -b], [0, 1]);
+  const x0L = zahlL(x0);
+  const p1L = zahlL(p1);
+  const epsL = zahlL(epsExakt);
+  const einsDurchB = quotientLatex(1, b);
+  const xVonP = b === 1 ? `${zahlL(a)} - p` : `${quotientLatex(a, b)} - ${einsDurchB}p`;
+  const xStrichLatex = b === 1 ? '-1' : `-${einsDurchB}`;
 
+  const schritte = [];
+  if (gegebenPreis) {
+    schritte.push({
+      titel: 'Umstellen',
+      latex: b === 1
+        ? gleichungsKette([`${pVonX} = ${p1L}`, `x_1 = ${zahlL(a)} - ${p1L} = ${x0L}`])
+        : gleichungsKette([`${pVonX} = ${p1L}`, `${zahlL(b)}x = ${zahlL(a)} - ${p1L}`, `x_1 = ${x0L}`]),
+      hinweis: 'Zuerst die Menge zum gegebenen Preis bestimmen: p(x) = p₁ nach x auflösen.',
+    });
+  } else {
+    schritte.push({
+      titel: 'Einsetzen',
+      latex: `p_1 = p(${x0L}) = ${zahlL(a)} - ${cdotWennNicht1(b, x0L)} = ${p1L}`,
+      hinweis: 'Zuerst den Preis zur gegebenen Menge bestimmen.',
+    });
+  }
+  schritte.push(
+    {
+      titel: 'Formel',
+      latex: `\\varepsilon_{x,p} = x'(p) \\cdot \\dfrac{p}{x}`,
+      hinweis: 'Weg 1: p(x) nach x umstellen (Umkehrfunktion x(p)), dann nach p ableiten.',
+    },
+    {
+      titel: 'Umstellen',
+      latex: b === 1
+        ? mehrzeiligeKette([`x(p) = ${xVonP}`, `x'(p) = ${xStrichLatex}`])
+        : mehrzeiligeKette([`${zahlL(b)}x = ${zahlL(a)} - p \;\\Rightarrow\; x(p) = ${xVonP}`, `x'(p) = ${xStrichLatex}`]),
+    },
+    {
+      titel: 'Einsetzen',
+      latex: `\\varepsilon_{x,p} = (${xStrichLatex}) \\cdot \\dfrac{${p1L}}{${x0L}} = ${epsL}`,
+    },
+    {
+      titel: 'Formel',
+      latex: `\\varepsilon_{x,p} = \\dfrac{1}{p'(x) \\cdot \\dfrac{x}{p}}`,
+      hinweis: 'Weg 2: Kehrwert der Elastizität von p nach x — ohne Umkehrfunktion. Beide Wege führen zum selben Ergebnis.',
+    },
+    {
+      titel: 'Einsetzen',
+      latex: mehrzeiligeKette([
+        `p'(x) = ${zahlL(-b)}`,
+        `\\varepsilon_{x,p} = \\dfrac{1}{(${zahlL(-b)}) \\cdot \\dfrac{${x0L}}{${p1L}}} = ${epsL}`,
+      ]),
+    },
+    { titel: 'Ergebnis', latex: `\\varepsilon_{x,p} = ${epsL}` },
+  );
+
+  const stelleText = gegebenPreis ? `beim Preis p₁ = ${formatDeZahl(p1, minimaleNachkommastellen(p1))}` : `an der Stelle x₀ = ${x0}`;
   return {
     frage: {
-      text: `Eine Preis-Absatz-Funktion lautet f(x) = ${aProse} ${b < 0 ? '+' : '−'} ${bProse}x. ` +
-        `Bestimmen Sie die Punktelastizität der Nachfrage ε an der Stelle x₀ = ${x0}.`,
+      text: `Eine Preis-Absatz-Funktion lautet p(x) = ${aProse} − ${bProse}x (x = Menge, p = Preis). ` +
+        `Bestimmen Sie die Preiselastizität der Nachfrage ${stelleText}.`,
     },
     eingaben: [
-      { id: 'eps', label: 'Punktelastizität ε(x₀)', typ: 'zahl', punkte: 3, loesung: epsExakt, toleranz: KONFIG.toleranz.exakt },
+      { id: 'eps', label: 'Preiselastizität der Nachfrage ε', typ: 'zahl', punkte: 3, loesung: epsExakt, toleranz: KONFIG.toleranz.exakt },
     ],
     loesung: {
-      schritte: [
-        {
-          titel: 'Formel',
-          latex: `\\varepsilon_{x,p}(x) = \\dfrac{f(x)}{f'(x) \\cdot x}`,
-          hinweis: 'Elastizität der nachgefragten Menge x nach dem Preis p: x ist hier nur implizit über die ' +
-            'Preis-Absatz-Funktion f (Preis in Abhängigkeit von der Menge) gegeben — deshalb der Kehrwert von f\'(x)·x/f(x).',
-        },
-        {
-          titel: 'Einsetzen',
-          latex: mehrzeiligeKette([
-            `f'(x) = ${b < 0 ? '' : '-'}${bLatex} \\quad (\\text{konstant})`,
-            `f(${x0Latex}) = ${aLatex} ${b < 0 ? '+' : '-'} ${bLatex} \\cdot ${x0Latex} = ${zahlZuLatex(f0, minimaleNachkommastellen(f0))}`,
-          ]),
-          hinweis: 'f\' ist bei einer linearen Funktion immer konstant — erst f\'(x), dann den Funktionswert f(x₀) getrennt berechnen.',
-        },
-        {
-          // Erst mit f'(x) und x0 noch unausgerechnet im Nenner (f'(x)
-          // geklammert, da immer negativ), dann der ausgerechnete Nenner,
-          // zuletzt das Ergebnis — "jeder Rechenschritt wird gezeigt", auch
-          // für die Substitution selbst (iPhone-Rückmeldung). Immer als
-          // "\dfrac", nie als bloßer Schrägstrich am Ende.
-          titel: 'Einsetzen',
-          latex: mehrzeiligeGleichung(`\\varepsilon(${x0Latex})`, [
-            `\\dfrac{${zahlZuLatex(f0, minimaleNachkommastellen(f0))}}{(${zahlZuLatex(fStrich, minimaleNachkommastellen(fStrich))}) \\cdot ${x0Latex}}`,
-            `\\dfrac{${zahlZuLatex(f0, minimaleNachkommastellen(f0))}}{${zahlZuLatex(nennerWert, minimaleNachkommastellen(nennerWert))}}`,
-            zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)),
-          ]),
-        },
-      ],
-      ergebnisse: [{ label: 'Punktelastizität ε(x₀)', latex: zahlZuLatex(epsExakt, minimaleNachkommastellen(epsExakt)) }],
+      schritte,
+      ergebnisse: [{ label: 'Preiselastizität der Nachfrage ε', latex: epsL }],
     },
     params,
   };
